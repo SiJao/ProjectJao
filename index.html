@@ -1,30 +1,29 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>I/O 19 Countdown</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="shortcut icon" href="https://events.google.com/io/favicon.ico">
-    <script src="https://www.gstatic.com/external_hosted/lottie/lottie.js"></script>
-    
-    <style>
-        body {
-            margin: 0;
-            font-family: sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        io19-countdown {
-            max-width: 640px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Simple Elegant Countdown</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <io19-countdown date="May 7, 2019 10:00 PDT"></io19-countdown>
-    <script type="module" src="./src/io19-countdown.js"></script>
+  <div class="countdown-container">
+    <h1>Countdown</h1>
+    <!-- Set target date and time here -->
+    <div>
+      <label for="target-time">Countdown to:</label>
+      <input type="datetime-local" id="target-time" value="2025-12-31T23:59">
+      <button id="start-btn">Start</button>
+    </div>
+    <div class="countdown" id="countdown">
+      <span id="days">00</span>d :
+      <span id="hours">00</span>h :
+      <span id="minutes">00</span>m :
+      <span id="seconds">00</span>s
+    </div>
+    <p id="finished" style="display:none;">Time's up!</p>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
