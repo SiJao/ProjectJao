@@ -2,20 +2,33 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Countdown to 15 November 2025</title>
+  <title>Countdown Elegan</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="countdown-container">
-    <h1>Countdown Menuju 15 November 2025</h1>
-    <div class="countdown" id="countdown">
-      <span id="days">00</span> Hari
-      <span id="hours">00</span> Jam
-      <span id="minutes">00</span> Menit
-      <span id="seconds">00</span> Detik
+    <h1>Hitung Mundur</h1>
+    <p class="target-label">Menuju <time id="target-date" datetime="2025-11-15T00:00:00">15 November 2025 00:00</time></p>
+    <div class="countdown" id="countdown" data-target="2025-11-15T00:00:00">
+      <div class="time-segment">
+        <span class="value" id="days">00</span>
+        <span class="label">Hari</span>
+      </div>
+      <div class="time-segment">
+        <span class="value" id="hours">00</span>
+        <span class="label">Jam</span>
+      </div>
+      <div class="time-segment">
+        <span class="value" id="minutes">00</span>
+        <span class="label">Menit</span>
+      </div>
+      <div class="time-segment">
+        <span class="value" id="seconds">00</span>
+        <span class="label">Detik</span>
+      </div>
     </div>
-    <p id="finished" style="display:none;">Waktu telah tiba!</p>
+    <p id="finished">Waktu telah tiba!</p>
   </div>
   <script src="script.js"></script>
 </body>
