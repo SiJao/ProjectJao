@@ -1,51 +1,208 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 body {
-  background: #f6f7fa;
-  font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
-  margin: 0;
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+    font-family: 'Poppins', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    overflow: hidden;
+    position: relative;
 }
 
-.countdown-container {
-  background: #fff;
-  padding: 2.2rem 2.5rem;
-  border-radius: 18px;
-  box-shadow: 0 8px 24px rgba(25,32,80,0.10);
-  text-align: center;
-  max-width: 410px;
+body::before {
+    content: '';
+    position: absolute;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+    animation: moveBackground 20s linear infinite;
 }
 
-.countdown-container h1 {
-  font-weight: 600;
-  margin-bottom: 2rem;
-  color: #2d3a6e;
+@keyframes moveBackground {
+    0% {
+        transform: translate(0, 0);
+    }
+    100% {
+        transform: translate(50px, 50px);
+    }
+}
+
+.container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 900px;
+    padding: 20px;
+}
+
+.content {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 30px;
+    padding: 60px 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    animation: fadeIn 1s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.title {
+    font-size: 3rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+    letter-spacing: 2px;
+}
+
+.subtitle {
+    font-size: 1.2rem;
+    color: #666;
+    font-weight: 300;
+    margin-bottom: 50px;
+    letter-spacing: 1px;
 }
 
 .countdown {
-  font-size: 2.2rem;
-  font-weight: 500;
-  color: #325AA5;
-  letter-spacing: 0.06em;
-  margin-bottom: 1.2rem;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.3em 1em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 30px;
 }
 
-.countdown span {
-  background: #eaf0fa;
-  border-radius: 8px;
-  padding: 0.25em 0.6em;
-  min-width: 50px;
-  display: inline-block;
+.time-box {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    padding: 30px 25px;
+    min-width: 140px;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    animation: pulse 2s ease-in-out infinite;
 }
 
-#finished {
-  font-size: 1.1rem;
-  color: #cf2d2d;
-  font-weight: 500;
-  margin-top: 1.1em;
+.time-box:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.02);
+    }
+}
+
+.time-value {
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+    margin-bottom: 10px;
+}
+
+.time-label {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.separator {
+    font-size: 3rem;
+    font-weight: 700;
+    color: #667eea;
+    margin: 0 10px;
+}
+
+.message {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #667eea;
+    margin-top: 30px;
+    min-height: 40px;
+    animation: fadeIn 1s ease-in-out;
+}
+
+@media (max-width: 768px) {
+    .title {
+        font-size: 2rem;
+    }
+    
+    .subtitle {
+        font-size: 1rem;
+        margin-bottom: 30px;
+    }
+    
+    .content {
+        padding: 40px 20px;
+    }
+    
+    .countdown {
+        gap: 10px;
+    }
+    
+    .time-box {
+        min-width: 100px;
+        padding: 20px 15px;
+    }
+    
+    .time-value {
+        font-size: 2.5rem;
+    }
+    
+    .time-label {
+        font-size: 0.7rem;
+    }
+    
+    .separator {
+        font-size: 2rem;
+        margin: 0 5px;
+    }
+    
+    .message {
+        font-size: 1.2rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .separator {
+        display: none;
+    }
+    
+    .countdown {
+        gap: 15px;
+    }
+    
+    .time-box {
+        min-width: 70px;
+        padding: 15px 10px;
+    }
+    
+    .time-value {
+        font-size: 2rem;
+    }
 }
