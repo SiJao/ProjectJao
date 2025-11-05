@@ -1,64 +1,51 @@
 body {
-  background: #f0f4f8;
+  background: #f6f7fa;
   font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
   margin: 0;
-  padding: 0;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+
 .countdown-container {
   background: #fff;
-  padding: 2rem 2.5rem;
+  padding: 2.2rem 2.5rem;
   border-radius: 18px;
-  box-shadow: 0 8px 24px rgba(25, 32, 80, 0.09);
-  max-width: 400px;
-  width: 100%;
+  box-shadow: 0 8px 24px rgba(25,32,80,0.10);
   text-align: center;
+  max-width: 410px;
 }
+
 .countdown-container h1 {
-  font-weight: 500;
-  margin-bottom: 1.5rem;
-  color: #29314f;
-  letter-spacing: 0.04em;
-}
-.countdown {
-  font-size: 2.4rem;
-  letter-spacing: 0.06em;
   font-weight: 600;
-  color: #35486b;
-  margin: 1.5rem 0;
+  margin-bottom: 2rem;
+  color: #2d3a6e;
 }
-input[type="datetime-local"] {
-  padding: 0.35em 1em;
-  border: 1px solid #ccd2e3;
+
+.countdown {
+  font-size: 2.2rem;
+  font-weight: 500;
+  color: #325AA5;
+  letter-spacing: 0.06em;
+  margin-bottom: 1.2rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.3em 1em;
+}
+
+.countdown span {
+  background: #eaf0fa;
   border-radius: 8px;
-  font-size: 1rem;
-  margin-right: 0.7em;
-  outline: none;
-  transition: border-color 0.2s;
+  padding: 0.25em 0.6em;
+  min-width: 50px;
+  display: inline-block;
 }
-input[type="datetime-local"]:focus {
-  border-color: #507aff;
-}
-button {
-  background: #507aff;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 0.39em 1.1em;
-  font-size: 1rem;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(90, 120, 160, 0.06);
-  transition: background 0.2s;
-}
-button:hover {
-  background: #29314f;
-}
+
 #finished {
   font-size: 1.1rem;
-  color: #be3a23;
+  color: #cf2d2d;
   font-weight: 500;
   margin-top: 1.1em;
 }
