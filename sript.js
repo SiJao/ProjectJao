@@ -44,10 +44,11 @@ function startCountdown(targetDate) {
   countdownInterval = setInterval(updateCountdown, 1000);
 }
 
+// Tombol mulai countdown dengan waktu input
 startBtn.addEventListener('click', () => {
   const val = targetTimeInput.value;
   if (!val) return;
-  const targetDate = new Date(val.replace('T', ' ') + ':00').getTime();
+  const targetDate = new Date(val).getTime();
   if (isNaN(targetDate) || targetDate < Date.now()) {
     alert('Please set a future date and time.');
     return;
@@ -55,10 +56,11 @@ startBtn.addEventListener('click', () => {
   startCountdown(targetDate);
 });
 
-// Optionally, start automatically if preset value is valid
+// Mulai countdown otomatis saat halaman terbuka
 document.addEventListener('DOMContentLoaded', () => {
-  if (targetTimeInput.value) {
-    const targetDate = new Date(targetTimeInput.value.replace('T', ' ') + ':00').getTime();
+  const val = targetTimeInput.value;
+  if (val) {
+    const targetDate = new Date(val).getTime();
     if (targetDate > Date.now()) {
       startCountdown(targetDate);
     }
