@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Countdown Timer</title>
+    <link rel="stylesheet" href="countdown.css">
+</head>
+<body>
+    <div class="countdown-container">
+        <h1 class="title">Countdown Timer</h1>
+
+        <!-- Target waktu dapat diubah di sini -->
+        <div class="target-date" data-date="2025-12-31 23:59:59"></div>
+
+        <div class="countdown-display">
+            <div class="time-box">
+                <div class="time-value" id="days">00</div>
+                <div class="time-label">Hari</div>
+            </div>
+
+            <div class="separator">:</div>
+
+            <div class="time-box">
+                <div class="time-value" id="hours">00</div>
+                <div class="time-label">Jam</div>
+            </div>
+
+            <div class="separator">:</div>
+
+            <div class="time-box">
+                <div class="time-value" id="minutes">00</div>
+                <div class="time-label">Menit</div>
+            </div>
+
+            <div class="separator">:</div>
+
+            <div class="time-box">
+                <div class="time-value" id="seconds">00</div>
+                <div class="time-label">Detik</div>
+            </div>
+        </div>
+
+        <div class="message" id="message"></div>
+    </div>
+
+    <script src="countdown.js"></script>
+</body>
+</html>
