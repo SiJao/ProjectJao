@@ -1,22 +1,51 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <title>Countdown to 15 November 2025</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Countdown Timer</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="countdown-container">
-    <h1>Countdown Menuju 15 November 2025</h1>
-    <div class="countdown" id="countdown">
-      <span id="days">00</span> Hari
-      <span id="hours">00</span> Jam
-      <span id="minutes">00</span> Menit
-      <span id="seconds">00</span> Detik
+    <div class="container">
+        <div class="countdown-wrapper">
+            <h1 class="title">Countdown Timer</h1>
+            
+            <!-- Set waktu target di sini (format: YYYY-MM-DD HH:MM:SS) -->
+            <div class="target-date" data-target="2025-12-31 23:59:59"></div>
+            
+            <div class="countdown-display">
+                <div class="time-box">
+                    <div class="time-value" id="days">00</div>
+                    <div class="time-label">Hari</div>
+                </div>
+                
+                <div class="separator">:</div>
+                
+                <div class="time-box">
+                    <div class="time-value" id="hours">00</div>
+                    <div class="time-label">Jam</div>
+                </div>
+                
+                <div class="separator">:</div>
+                
+                <div class="time-box">
+                    <div class="time-value" id="minutes">00</div>
+                    <div class="time-label">Menit</div>
+                </div>
+                
+                <div class="separator">:</div>
+                
+                <div class="time-box">
+                    <div class="time-value" id="seconds">00</div>
+                    <div class="time-label">Detik</div>
+                </div>
+            </div>
+            
+            <div class="message" id="message"></div>
+        </div>
     </div>
-    <p id="finished" style="display:none;">Waktu telah tiba!</p>
-  </div>
-  <script src="script.js"></script>
+    
+    <script src="script.js"></script>
 </body>
 </html>

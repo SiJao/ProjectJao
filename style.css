@@ -1,51 +1,161 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 body {
-  background: #f6f7fa;
-  font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
-  margin: 0;
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
 }
 
-.countdown-container {
-  background: #fff;
-  padding: 2.2rem 2.5rem;
-  border-radius: 18px;
-  box-shadow: 0 8px 24px rgba(25,32,80,0.10);
-  text-align: center;
-  max-width: 410px;
+.container {
+    width: 100%;
+    max-width: 900px;
 }
 
-.countdown-container h1 {
-  font-weight: 600;
-  margin-bottom: 2rem;
-  color: #2d3a6e;
+.countdown-wrapper {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 50px 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
 }
 
-.countdown {
-  font-size: 2.2rem;
-  font-weight: 500;
-  color: #325AA5;
-  letter-spacing: 0.06em;
-  margin-bottom: 1.2rem;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.3em 1em;
+.title {
+    text-align: center;
+    font-size: 2.5rem;
+    color: #333;
+    margin-bottom: 50px;
+    font-weight: 600;
+    letter-spacing: 1px;
 }
 
-.countdown span {
-  background: #eaf0fa;
-  border-radius: 8px;
-  padding: 0.25em 0.6em;
-  min-width: 50px;
-  display: inline-block;
+.target-date {
+    display: none;
 }
 
-#finished {
-  font-size: 1.1rem;
-  color: #cf2d2d;
-  font-weight: 500;
-  margin-top: 1.1em;
+.countdown-display {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.time-box {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    padding: 30px 25px;
+    min-width: 140px;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.time-box:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
+}
+
+.time-value {
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    line-height: 1;
+    margin-bottom: 10px;
+}
+
+.time-label {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.9);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: 500;
+}
+
+.separator {
+    font-size: 3rem;
+    font-weight: 700;
+    color: #667eea;
+    margin: 0 10px;
+}
+
+.message {
+    text-align: center;
+    margin-top: 40px;
+    font-size: 1.5rem;
+    color: #667eea;
+    font-weight: 600;
+    min-height: 30px;
+    animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 768px) {
+    .countdown-wrapper {
+        padding: 40px 25px;
+    }
+    
+    .title {
+        font-size: 2rem;
+        margin-bottom: 40px;
+    }
+    
+    .time-box {
+        min-width: 100px;
+        padding: 20px 15px;
+    }
+    
+    .time-value {
+        font-size: 2.5rem;
+    }
+    
+    .time-label {
+        font-size: 0.75rem;
+    }
+    
+    .separator {
+        font-size: 2rem;
+        margin: 0 5px;
+    }
+    
+    .message {
+        font-size: 1.2rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .countdown-display {
+        gap: 10px;
+    }
+    
+    .time-box {
+        min-width: 70px;
+        padding: 15px 10px;
+    }
+    
+    .time-value {
+        font-size: 2rem;
+    }
+    
+    .separator {
+        display: none;
+    }
 }
