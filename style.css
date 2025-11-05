@@ -20,7 +20,7 @@ body::before {
     position: absolute;
     width: 200%;
     height: 200%;
-    background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
     background-size: 50px 50px;
     animation: moveBackground 20s linear infinite;
 }
@@ -151,38 +151,38 @@ body::before {
     .title {
         font-size: 2rem;
     }
-    
+
     .subtitle {
         font-size: 1rem;
         margin-bottom: 30px;
     }
-    
+
     .content {
         padding: 40px 20px;
     }
-    
+
     .countdown {
         gap: 10px;
     }
-    
+
     .time-box {
         min-width: 100px;
         padding: 20px 15px;
     }
-    
+
     .time-value {
         font-size: 2.5rem;
     }
-    
+
     .time-label {
         font-size: 0.7rem;
     }
-    
+
     .separator {
         font-size: 2rem;
         margin: 0 5px;
     }
-    
+
     .message {
         font-size: 1.2rem;
     }
@@ -192,16 +192,16 @@ body::before {
     .separator {
         display: none;
     }
-    
+
     .countdown {
         gap: 15px;
     }
-    
+
     .time-box {
         min-width: 70px;
         padding: 15px 10px;
     }
-    
+
     .time-value {
         font-size: 2rem;
     }

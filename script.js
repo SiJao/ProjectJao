@@ -1,4 +1,4 @@
-const targetDate = new Date('November 15, 2025 00:00:00').getTime();
+const targetDate = new Date('2025-11-15T00:00:00').getTime();
 
 const daysElement = document.getElementById('days');
 const hoursElement = document.getElementById('hours');
@@ -36,6 +36,8 @@ function updateCountdown() {
         messageElement.textContent = '🔥 Kurang dari sehari lagi!';
     } else if (days <= 7) {
         messageElement.textContent = '⚡ Tinggal beberapa hari lagi!';
+    } else {
+        messageElement.textContent = '';
     }
 }
 
