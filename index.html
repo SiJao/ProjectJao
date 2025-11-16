@@ -1,22 +1,716 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <title>Countdown to 15 November 2025</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Absensi Online - Daarul 'Uluum Lido</title>
+    <!-- Memuat Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Memuat ikon (Heroicons) -->
+    <script type="module" src="https://unpkg.com/heroicons@2.1.1/24/outline/index.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Menyembunyikan halaman/konten secara default */
+        .content-page, #appScreen, #modal {
+            display: none;
+        }
+        /* Menampilkan konten yang aktif */
+        .content-page.active {
+            display: block;
+        }
+        /* Style untuk sidebar item aktif */
+        .sidebar-item.active {
+            background-color: #166534; /* green-800 */
+            color: white;
+            font-weight: 600;
+        }
+        /* Animasi loading spinner */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #15803d; /* green-700 */
+            animation: spin 1s ease infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
-<body>
-  <div class="countdown-container">
-    <h1>Countdown Menuju 15 November 2025</h1>
-    <div class="countdown" id="countdown">
-      <span id="days">00</span> Hari
-      <span id="hours">00</span> Jam
-      <span id="minutes">00</span> Menit
-      <span id="seconds">00</span> Detik
+<body class="bg-gray-100">
+
+    <!-- =========== LAYAR LOGIN =========== -->
+    <div id="loginScreen" class="flex items-center justify-center min-h-screen bg-gray-200" style="display: flex;">
+        <div class="w-full max-w-md p-8 space-y-6 bg-white shadow-2xl rounded-2xl">
+            <div class="flex flex-col items-center">
+                <!-- Ganti dengan URL logo pesantren jika ada -->
+                <img src="https://placehold.co/100x100/166534/FFFFFF?text=Logo" alt="Logo Pesantren" class="w-20 h-20 rounded-full mb-4">
+                <h2 class="text-2xl font-bold text-center text-gray-900">Sistem Absensi Online</h2>
+                <p class="text-center text-gray-600">Pesantren Daarul 'Uluum Lido</p>
+            </div>
+            <form id="loginForm" class="space-y-6">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
+                    <input id="username" name="username" type="text" autocomplete="username" required value="admin"
+                           class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input id="password" name="password" type="password" autocomplete="current-password" required value="password"
+                           class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                </div>
+                <div>
+                    <button type="submit"
+                            class="w-full px-4 py-2 text-base font-medium text-white bg-green-700 border border-transparent rounded-lg shadow-sm hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out">
+                        Masuk
+                    </button>
+                </div>
+            </form>
+            <p class="text-xs text-center text-gray-500">(Gunakan <span class="font-medium">admin</span> / <span class="font-medium">password</span> untuk demo)</p>
+        </div>
     </div>
-    <p id="finished" style="display:none;">Waktu telah tiba!</p>
-  </div>
-  <script src="script.js"></script>
+
+    <!-- =========== APLIKASI UTAMA (DASHBOARD) =========== -->
+    <div id="appScreen" class="flex h-screen bg-gray-100">
+        
+        <!-- Sidebar Navigasi -->
+        <nav id="sidebar" class="w-64 p-4 space-y-2 text-white bg-green-900 shadow-lg flex flex-col">
+            <div class="flex items-center p-3 space-x-3">
+                <div class="p-2 bg-white rounded-lg">
+                    <img src="https://placehold.co/40x40/166534/FFFFFF?text=Logo" alt="Logo" class="w-8 h-8">
+                </div>
+                <span class="text-lg font-semibold">Admin Panel</span>
+            </div>
+            
+            <div class="flex-grow pt-4 space-y-1">
+                <div class="px-3 text-xs font-semibold tracking-wider uppercase text-green-300">Menu Utama</div>
+                <a href="#" data-page="pageDashboard" class="sidebar-item active flex items-center px-3 py-3 space-x-3 rounded-lg hover:bg-green-800 transition duration-150">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25A2.25 2.25 0 0 1 13.5 8.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>
+                    <span>Dashboard</span>
+                </a>
+
+                <div class="px-3 pt-4 text-xs font-semibold tracking-wider uppercase text-green-300">Ambil Absensi</div>
+                <a href="#" data-page="pageAbsenKamar" class="sidebar-item flex items-center px-3 py-3 space-x-3 rounded-lg hover:bg-green-800 transition duration-150">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>
+                    <span>Absensi Kamar / Harian</span>
+                </a>
+                <a href="#" data-page="pageAbsenMuhadhoroh" class="sidebar-item flex items-center px-3 py-3 space-x-3 rounded-lg hover:bg-green-800 transition duration-150">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 10.648a.848.848 0 0 0-.811-.478h-8.008a.848.848 0 0 0-.811.478l-1.348 2.697a.848.848 0 0 0 .405 1.118l7.25 3.624a.848.848 0 0 0 .81 0l7.25-3.624a.848.848 0 0 0 .406-1.118l-1.347-2.697Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M3.75 18h16.5M5.25 10.17v5.66M18.75 10.17v5.66M12 15.83v-5.66" /></svg>
+                    <span>Absensi Muhadhoroh</span>
+                </a>
+                <a href="#" data-page="pageAbsenHalaqoh" class="sidebar-item flex items-center px-3 py-3 space-x-3 rounded-lg hover:bg-green-800 transition duration-150">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18c-2.305 0-4.408.867-6 2.292m0-14.25v14.25" /></svg>
+                    <span>Absensi Halaqoh Qur'an</span>
+                </a>
+
+                <div class="px-3 pt-4 text-xs font-semibold tracking-wider uppercase text-green-300">Rekapitulasi</div>
+                <a href="#" data-page="pageRekapKamar" class="sidebar-item flex items-center px-3 py-3 space-x-3 rounded-lg hover:bg-green-800 transition duration-150">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75c0-.231-.035-.454-.1-.664M6.75 7.5H4.875c-1.125 0-2.131.906-2.131 2.028v8.66c0 1.121.906 2.028 2.028 2.028h8.66c1.121 0 2.028-.906 2.028-2.028v-1.62m-6.892 4.298.056-.027m-5.04-5.039.027-.056m5.039-5.04-.056.027m-5.04 5.04-.027.056" /></svg>
+                    <span>Rekap Kamar / Harian</span>
+                </a>
+                <a href="#" data-page="pageRekapMuhadhoroh" class="sidebar-item flex items-center px-3 py-3 space-x-3 rounded-lg hover:bg-green-800 transition duration-150">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z" /></svg>
+                    <span>Rekap Muhadhoroh</span>
+                </a>
+                <a href="#" data-page="pageRekapHalaqoh" class="sidebar-item flex items-center px-3 py-3 space-x-3 rounded-lg hover:bg-green-800 transition duration-150">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
+                    <span>Rekap Halaqoh Qur'an</span>
+                </a>
+            </div>
+
+            <div class="mt-auto">
+                <a href="#" id="logoutButton" class="flex items-center w-full px-3 py-3 space-x-3 text-red-300 rounded-lg hover:bg-red-800 hover:text-white transition duration-150">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" /></svg>
+                    <span>Keluar</span>
+                </a>
+            </div>
+        </nav>
+
+        <!-- Konten Utama -->
+        <div class="flex flex-col flex-1 h-screen overflow-y-auto">
+            
+            <!-- Header Konten -->
+            <header class="flex items-center justify-between p-6 bg-white shadow-md sticky top-0 z-10">
+                <h1 id="pageTitle" class="text-2xl font-bold text-gray-800">Dashboard</h1>
+                <div id="liveClock" class="px-4 py-2 text-lg font-semibold text-right text-green-800 bg-green-100 rounded-lg shadow-inner">
+                    Memuat waktu...
+                </div>
+            </header>
+
+            <!-- Area Konten Dinamis -->
+            <main class="p-6 space-y-6">
+
+                <!-- 1. Halaman Dashboard (Ringkasan) -->
+                <div id="pageDashboard" class="content-page active">
+                    <h2 class="text-xl font-semibold text-gray-700">Selamat Datang, Admin!</h2>
+                    <p class="text-gray-600">Pilih menu di samping untuk memulai absensi atau melihat rekapitulasi data.</p>
+                    
+                    <div id="loadingSantri" class="flex items-center p-4 mt-4 space-x-3 text-blue-800 bg-blue-100 rounded-lg">
+                        <div class="spinner !border-l-blue-700 !w-6 !h-6"></div>
+                        <span>Memuat data base santri dari Google Sheet...</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-3">
+                        <div class="p-6 bg-white rounded-lg shadow-lg">
+                            <h3 class="text-lg font-semibold text-green-800">Absensi Cepat</h3>
+                            <p class="mt-2 text-gray-600">Gunakan menu di samping untuk mencatat kehadiran santri pada kegiatan Kamar, Muhadhoroh, atau Halaqoh.</p>
+                        </div>
+                        <div class="p-6 bg-white rounded-lg shadow-lg">
+                            <h3 class="text-lg font-semibold text-green-800">Rekap Data</h3>
+                            <p class="mt-2 text-gray-600">Lihat riwayat absensi santri yang telah terekam dalam sistem secara real-time.</p>
+                        </div>
+                        <div class="p-6 bg-white rounded-lg shadow-lg">
+                            <h3 class="text-lg font-semibold text-green-800">Total Santri</h3>
+                            <p class="mt-2 text-gray-600">Total santri terdaftar di sistem:</p>
+                            <div id="totalSantri" class="text-3xl font-bold text-green-700">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Halaman Absen Kamar -->
+                <div id="pageAbsenKamar" class="content-page">
+                    <div class="max-w-2xl p-8 mx-auto bg-white rounded-lg shadow-xl">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-6">Form Absensi Kamar / Harian</h2>
+                        <form id="formAbsenKamar" class="space-y-4">
+                            <div>
+                                <label for="santriIdKamar" class="block text-sm font-medium text-gray-700">Masukkan ID Santri</label>
+                                <div class="flex mt-1 space-x-2">
+                                    <input type="text" id="santriIdKamar" class="flex-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500" placeholder="Contoh: 12345">
+                                    <button type="button" id="checkSantriKamar" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Cari</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Info Santri (muncul setelah dicari) -->
+                            <div id="santriInfoKamar" class="hidden p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                <h3 class="text-lg font-semibold text-gray-900">Data Santri</h3>
+                                <p class="text-gray-600">ID Santri: <span id="santriIdDisplayKamar" class="font-medium"></span></p>
+                                <p class="text-gray-600">Nama Santri: <span id="santriNameDisplayKamar" class="font-medium"></span></p>
+                                
+                                <div class="mt-4">
+                                    <label for="statusKamar" class="block text-sm font-medium text-gray-700">Keterangan Kehadiran</label>
+                                    <select id="statusKamar" class="w-full mt-1 border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500">
+                                        <option value="Hadir">Hadir</option>
+                                        <option value="Sakit">Sakit</option>
+                                        <option value="Izin">Izin</option>
+                                        <option value="Alpha">Alpha</option>
+                                    </select>
+                                </div>
+                                
+                                <button type="submit" class="w-full px-4 py-2 mt-6 text-base font-medium text-white bg-green-700 rounded-lg shadow-sm hover:bg-green-800">
+                                    Kirim Absensi
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- 3. Halaman Absen Muhadhoroh -->
+                <div id="pageAbsenMuhadhoroh" class="content-page">
+                    <div class="max-w-2xl p-8 mx-auto bg-white rounded-lg shadow-xl">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-6">Form Absensi Muhadhoroh</h2>
+                        <form id="formAbsenMuhadhoroh" class="space-y-4">
+                            <div>
+                                <label for="santriIdMuhadhoroh" class="block text-sm font-medium text-gray-700">Masukkan ID Santri</label>
+                                <div class="flex mt-1 space-x-2">
+                                    <input type="text" id="santriIdMuhadhoroh" class="flex-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500" placeholder="Contoh: 12345">
+                                    <button type="button" id="checkSantriMuhadhoroh" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Cari</button>
+                                </div>
+                            </div>
+                            <div id="santriInfoMuhadhoroh" class="hidden p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                <h3 class="text-lg font-semibold text-gray-900">Data Santri</h3>
+                                <p class="text-gray-600">ID Santri: <span id="santriIdDisplayMuhadhoroh" class="font-medium"></span></p>
+                                <p class="text-gray-600">Nama Santri: <span id="santriNameDisplayMuhadhoroh" class="font-medium"></span></p>
+                                <div class="mt-4">
+                                    <label for="statusMuhadhoroh" class="block text-sm font-medium text-gray-700">Keterangan Kehadiran</label>
+                                    <select id="statusMuhadhoroh" class="w-full mt-1 border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500">
+                                        <option value="Hadir">Hadir</option>
+                                        <option value="Sakit">Sakit</option>
+                                        <option value="Izin">Izin</option>
+                                        <option value="Alpha">Alpha</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="w-full px-4 py-2 mt-6 text-base font-medium text-white bg-green-700 rounded-lg shadow-sm hover:bg-green-800">
+                                    Kirim Absensi
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 4. Halaman Absen Halaqoh -->
+                <div id="pageAbsenHalaqoh" class="content-page">
+                    <div class="max-w-2xl p-8 mx-auto bg-white rounded-lg shadow-xl">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-6">Form Absensi Halaqoh Qur'an</h2>
+                        <form id="formAbsenHalaqoh" class="space-y-4">
+                            <div>
+                                <label for="santriIdHalaqoh" class="block text-sm font-medium text-gray-700">Masukkan ID Santri</label>
+                                <div class="flex mt-1 space-x-2">
+                                    <input type="text" id="santriIdHalaqoh" class="flex-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500" placeholder="Contoh: 12345">
+                                    <button type="button" id="checkSantriHalaqoh" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Cari</button>
+                                </div>
+                            </div>
+                            <div id="santriInfoHalaqoh" class="hidden p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                <h3 class="text-lg font-semibold text-gray-900">Data Santri</h3>
+                                <p class="text-gray-600">ID Santri: <span id="santriIdDisplayHalaqoh" class="font-medium"></span></p>
+                                <p class="text-gray-600">Nama Santri: <span id="santriNameDisplayHalaqoh" class="font-medium"></span></p>
+                                <div class="mt-4">
+                                    <label for="statusHalaqoh" class="block text-sm font-medium text-gray-700">Keterangan Kehadiran</label>
+                                    <select id="statusHalaqoh" class="w-full mt-1 border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500">
+                                        <option value="Hadir">Hadir</option>
+                                        <option value="Sakit">Sakit</option>
+                                        <option value="Izin">Izin</option>
+                                        <option value="Alpha">Alpha</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="w-full px-4 py-2 mt-6 text-base font-medium text-white bg-green-700 rounded-lg shadow-sm hover:bg-green-800">
+                                    Kirim Absensi
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 5. Halaman Rekap Kamar -->
+                <div id="pageRekapKamar" class="content-page">
+                    <div class="p-8 bg-white rounded-lg shadow-xl">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">Rekapitulasi Absensi Kamar / Harian</h2>
+                        <div id="loadingRekapKamar" class="flex items-center p-4 space-x-3 text-blue-800 bg-blue-100 rounded-lg">
+                            <div class="spinner !border-l-blue-700 !w-6 !h-6"></div>
+                            <span>Memuat data rekap...</span>
+                        </div>
+                        <div id="rekapContainerKamar" class="mt-4 overflow-x-auto"></div>
+                    </div>
+                </div>
+
+                <!-- 6. Halaman Rekap Muhadhoroh -->
+                <div id="pageRekapMuhadhoroh" class="content-page">
+                    <div class="p-8 bg-white rounded-lg shadow-xl">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">Rekapitulasi Absensi Muhadhoroh</h2>
+                        <div id="loadingRekapMuhadhoroh" class="flex items-center p-4 space-x-3 text-blue-800 bg-blue-100 rounded-lg">
+                            <div class="spinner !border-l-blue-700 !w-6 !h-6"></div>
+                            <span>Memuat data rekap...</span>
+                        </div>
+                        <div id="rekapContainerMuhadhoroh" class="mt-4 overflow-x-auto"></div>
+                    </div>
+                </div>
+
+                <!-- 7. Halaman Rekap Halaqoh -->
+                <div id="pageRekapHalaqoh" class="content-page">
+                    <div class="p-8 bg-white rounded-lg shadow-xl">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">Rekapitulasi Absensi Halaqoh Qur'an</h2>
+                        <div id="loadingRekapHalaqoh" class="flex items-center p-4 space-x-3 text-blue-800 bg-blue-100 rounded-lg">
+                            <div class="spinner !border-l-blue-700 !w-6 !h-6"></div>
+                            <span>Memuat data rekap...</span>
+                        </div>
+                        <div id="rekapContainerHalaqoh" class="mt-4 overflow-x-auto"></div>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- =========== MODAL (Notifikasi) =========== -->
+    <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-xl">
+            <h3 id="modalTitle" class="text-lg font-semibold text-gray-900">Notifikasi</h3>
+            <p id="modalMessage" class="mt-2 text-sm text-gray-600">Ini adalah pesan notifikasi.</p>
+            <div class="mt-6">
+                <button id="modalClose" class="w-full px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ============================================= -->
+    <!-- =============== SCRIPT UTAMA ================ -->
+    <!-- ============================================= -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+
+            // =============================================
+            // ========= PENGATURAN GOOGLE SHEETS ==========
+            // =============================================
+
+            // 1. URL untuk MENGAMBIL DATA SANTRI (ID dan Nama)
+            // DARI: https://docs.google.com/spreadsheets/d/1tDcjwTtCdXF9zn7tMRivDLOsxub7AxTr-VghVztwU-g/
+            // PENTING: Anda HARUS "Publish to the web" sheet ini sebagai CSV
+            // 1. Buka Google Sheet di atas.
+            // 2. Klik File > Share > Publish to web.
+            // 3. Di bagian "Link", pilih sheet yang berisi data santri (misal "Sheet1").
+            // 4. Di bagian "Embed", pilih "Comma-separated values (.csv)".
+            // 5. Klik "Publish" dan "OK".
+            // 6. Ganti URL di bawah dengan URL yang Anda dapatkan (gunakan URL export CSV, BUKAN URL edit).
+            // (Saya sudah buatkan URL export-nya untuk Anda)
+            const SHEET_SANTRI_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSYLbwyS_IlmifxxFbLRIgC3gvaMoJ-eZWDPhbPlPgb-eSttIvEovN0WzxzzTX1uv7fPgcwaIIhFl_v/pub?gid=0&single=true&output=csv';
+
+            // 2. URL untuk MENGIRIM DATA ABSENSI
+            // KE: https://docs.google.com/spreadsheets/d/1Zs1GKOyj5ucjcubazpW9iYQf_xTNUMSAowV0N_zrE5Y/
+            // PENTING: Ini HARUS berupa URL Web App dari Google Apps Script.
+            // 1. Buka Google Sheet di atas.
+            // 2. Klik Extensions > Apps Script.
+            // 3. Hapus semua kode yang ada dan tempelkan kode Apps Script di bawah ini:
+            /*
+                function doPost(e) {
+                  try {
+                    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Sheet1"); // Ganti "Sheet1" jika nama sheet Anda berbeda
+                    
+                    var timestamp = new Date();
+                    var absensiType = e.parameter.absensiType;
+                    var santriId = e.parameter.santriId;
+                    var santriName = e.parameter.santriName;
+                    var status = e.parameter.status;
+                    
+                    sheet.appendRow([timestamp, absensiType, santriId, santriName, status]);
+                    
+                    return ContentService
+                      .createTextOutput(JSON.stringify({ "result": "success", "message": "Data received" }))
+                      .setMimeType(ContentService.MimeType.JSON);
+                  } catch (error) {
+                    return ContentService
+                      .createTextOutput(JSON.stringify({ "result": "error", "message": error.toString() }))
+                      .setMimeType(ContentService.MimeType.JSON);
+                  }
+                }
+            */
+            // 4. Simpan proyek (beri nama, misal "Absensi Web App").
+            // 5. Klik "Deploy" (di kanan atas) > "New deployment".
+            // 6. Pilih Tipe: "Web app".
+            // 7. Di bagian "Who has access", pilih "Anyone" (Siapa saja).
+            // 8. Klik "Deploy".
+            // 9. Berikan otorisasi (klik "Authorize access", pilih akun Google Anda, klik "Advanced", lalu "Go to (unsafe)").
+            // 10. Salin "Web app URL" yang muncul.
+            // 11. TEMPELKAN URL tersebut di bawah ini.
+            const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxMwQrOskKw9ogWPJU_3RDyP6E5Bh26HtWo3gVqhf-qxKCrl-iNIXuPmROt8eoyHAis/exec'; // <-- ISI URL WEB APP ANDA DI SINI
+
+            // 3. URL untuk MELIHAT REKAP DATA ABSENSI
+            // DARI: https://docs.google.com/spreadsheets/d/1Zs1GKOyj5ucjcubazpW9iYQf_xTNUMSAowV0N_zrE5Y/
+            // PENTING: Lakukan langkah yang sama seperti SHEET_SANTRI_URL (Publish to the web sebagai CSV)
+            const SHEET_REKAP_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRqUR--kT1UvRL7rcRaLaXDYpakJkJ1fnA07QHA-fxSB_LEyr8Poc_gO7BG7-sMq9r7Ls9mongNEKvg/pub?gid=0&single=true&output=csv';
+
+
+            // =============================================
+            // =========== VARIABEL GLOBAL & STATE ===========
+            // =============================================
+            const santriDatabase = new Map();
+            const loginScreen = document.getElementById('loginScreen');
+            const appScreen = document.getElementById('appScreen');
+            const loginForm = document.getElementById('loginForm');
+            const logoutButton = document.getElementById('logoutButton');
+            const sidebarItems = document.querySelectorAll('.sidebar-item');
+            const pageTitle = document.getElementById('pageTitle');
+            const contentPages = document.querySelectorAll('.content-page');
+            const liveClock = document.getElementById('liveClock');
+            const totalSantriDisplay = document.getElementById('totalSantri');
+            const loadingSantriDisplay = document.getElementById('loadingSantri');
+            
+            // Modal Elements
+            const modal = document.getElementById('modal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalMessage = document.getElementById('modalMessage');
+            const modalClose = document.getElementById('modalClose');
+
+            // =============================================
+            // ============ FUNGSI UTAMA =================
+            // =============================================
+
+            // Fungsi untuk menampilkan jam live (WIB)
+            function updateClock() {
+                try {
+                    const now = new Date();
+                    const options = {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        timeZone: 'Asia/Jakarta',
+                        hour12: false
+                    };
+                    const timeString = now.toLocaleString('id-ID', options).replace(/\./g, ':');
+                    liveClock.textContent = `${timeString} WIB`;
+                } catch (e) {
+                    liveClock.textContent = "Gagal memuat waktu.";
+                    console.error("Clock error:", e);
+                }
+                setTimeout(updateClock, 1000);
+            }
+
+            // Fungsi untuk menampilkan modal notifikasi
+            function showModal(title, message) {
+                modalTitle.textContent = title;
+                modalMessage.textContent = message;
+                modal.style.display = 'flex';
+            }
+
+            // Fungsi untuk menyembunyikan modal
+            function closeModal() {
+                modal.style.display = 'none';
+            }
+            modalClose.addEventListener('click', closeModal);
+
+            // Fungsi untuk mem-parsing CSV mentah
+            function parseCSV(text) {
+                const lines = text.split(/\r\n|\n/);
+                const data = [];
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].trim() !== '') {
+                        data.push(lines[i].split(','));
+                    }
+                }
+                return data;
+            }
+
+            // Fungsi untuk memuat data base santri
+            async function loadSantriData() {
+                try {
+                    const response = await fetch(SHEET_SANTRI_URL);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const csvText = await response.text();
+                    const data = parseCSV(csvText);
+
+                    santriDatabase.clear();
+                    // Mulai dari 1 untuk melewati header (ID, Nama)
+                    for (let i = 1; i < data.length; i++) {
+                        const id = data[i][0] ? data[i][0].trim() : '';
+                        const name = data[i][1] ? data[i][1].trim() : '';
+                        if (id && name) {
+                            santriDatabase.set(id, name);
+                        }
+                    }
+                    
+                    totalSantriDisplay.textContent = santriDatabase.size;
+                    loadingSantriDisplay.style.display = 'none';
+                    showModal("Sukses", `Berhasil memuat ${santriDatabase.size} data santri.`);
+
+                } catch (error) {
+                    console.error("Gagal memuat data santri:", error);
+                    showModal("Error", "Gagal memuat data santri dari Google Sheet. Pastikan sheet sudah di 'Publish to the web' sebagai CSV.");
+                    loadingSantriDisplay.innerHTML = `<span class="text-red-600">Gagal memuat data santri.</span>`;
+                }
+            }
+            
+            // Fungsi untuk menampilkan halaman
+            function showPage(pageId) {
+                // Sembunyikan semua halaman
+                contentPages.forEach(page => page.classList.remove('active'));
+                
+                // Tampilkan halaman yang dipilih
+                const activePage = document.getElementById(pageId);
+                if (activePage) {
+                    activePage.classList.add('active');
+                }
+                
+                // Update judul halaman
+                const activeLink = document.querySelector(`.sidebar-item[data-page="${pageId}"]`);
+                if (activeLink) {
+                    pageTitle.textContent = activeLink.querySelector('span').textContent;
+                    
+                    // Update style sidebar
+                    sidebarItems.forEach(item => item.classList.remove('active'));
+                    activeLink.classList.add('active');
+                }
+
+                // Jika halaman rekap, muat datanya
+                if (pageId.startsWith('pageRekap')) {
+                    const type = pageId.replace('pageRekap', ''); // Kamar, Muhadhoroh, Halaqoh
+                    loadRekapData(type);
+                }
+            }
+
+            // Fungsi untuk menangani login
+            function handleLogin(e) {
+                e.preventDefault();
+                const user = document.getElementById('username').value;
+                const pass = document.getElementById('password').value;
+                
+                // Demo login sederhana
+                if (user === 'admin' && pass === 'password') {
+                    loginScreen.style.display = 'none';
+                    appScreen.style.display = 'flex';
+                    // Muat data setelah login berhasil
+                    loadSantriData();
+                    showPage('pageDashboard');
+                } else {
+                    showModal("Login Gagal", "Username atau password salah. Silakan coba lagi.");
+                }
+            }
+
+            // Fungsi untuk menangani logout
+            function handleLogout() {
+                loginScreen.style.display = 'flex';
+                appScreen.style.display = 'none';
+                document.getElementById('loginForm').reset();
+            }
+
+            // Fungsi untuk mengecek ID Santri
+            function checkSantri(absensiType) {
+                const idInput = document.getElementById(`santriId${absensiType}`);
+                const infoDiv = document.getElementById(`santriInfo${absensiType}`);
+                const idDisplay = document.getElementById(`santriIdDisplay${absensiType}`);
+                const nameDisplay = document.getElementById(`santriNameDisplay${absensiType}`);
+
+                const santriId = idInput.value.trim();
+                const santriName = santriDatabase.get(santriId);
+
+                if (santriName) {
+                    idDisplay.textContent = santriId;
+                    nameDisplay.textContent = santriName;
+                    infoDiv.classList.remove('hidden');
+                } else {
+                    showModal("Error", "ID Santri tidak ditemukan. Pastikan ID benar dan data santri sudah dimuat.");
+                    infoDiv.classList.add('hidden');
+                }
+            }
+
+            // Fungsi untuk mengirim data absensi
+            async function submitAttendance(e, absensiType) {
+                e.preventDefault();
+                
+                // Validasi URL GAS
+                if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL === '') {
+                    showModal("Konfigurasi Diperlukan!", "Harap masukkan URL Google Apps Script (GAS_WEB_APP_URL) di dalam kode HTML untuk menyimpan data absensi. Lihat komentar di dalam kode untuk instruksi.");
+                    return;
+                }
+
+                const idDisplay = document.getElementById(`santriIdDisplay${absensiType}`);
+                const nameDisplay = document.getElementById(`santriNameDisplay${absensiType}`);
+                const statusSelect = document.getElementById(`status${absensiType}`);
+                const form = document.getElementById(`formAbsen${absensiType}`);
+                
+                const formData = new FormData();
+                formData.append('absensiType', absensiType); // Kamar, Muhadhoroh, Halaqoh
+                formData.append('santriId', idDisplay.textContent);
+                formData.append('santriName', nameDisplay.textContent);
+                formData.append('status', statusSelect.value);
+
+                showModal("Mengirim...", "Data absensi sedang dikirim ke Google Sheet.");
+                
+                try {
+                    const response = await fetch(GAS_WEB_APP_URL, {
+                        method: 'POST',
+                        body: formData,
+                        mode: 'no-cors' // Gunakan no-cors jika GAS tidak diset untuk CORS, meski ini berarti kita tidak bisa baca respons
+                    });
+
+                    // Karena mode 'no-cors', kita tidak bisa cek response.ok atau response.json()
+                    // Kita anggap berhasil jika tidak ada error network
+                    // Untuk debugging, 'no-cors' bisa diubah dan pastikan GAS mengembalikan JSON yang benar
+                    showModal("Sukses", "Absensi berhasil direkam. Data mungkin perlu beberapa saat untuk muncul di Google Sheet.");
+                    form.reset();
+                    document.getElementById(`santriInfo${absensiType}`).classList.add('hidden');
+
+                } catch (error) {
+                    console.error("Gagal mengirim absensi:", error);
+                    showModal("Gagal", "Terjadi kesalahan saat mengirim data. Cek koneksi internet dan konfigurasi GAS_WEB_APP_URL.");
+                }
+            }
+
+            // Fungsi untuk memuat data rekap
+            async function loadRekapData(absensiType) { // Kamar, Muhadhoroh, Halaqoh
+                const container = document.getElementById(`rekapContainer${absensiType}`);
+                const loading = document.getElementById(`loadingRekap${absensiType}`);
+                loading.style.display = 'flex';
+                container.innerHTML = '';
+
+                try {
+                    const response = await fetch(SHEET_REKAP_URL);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    
+                    const csvText = await response.text();
+                    const data = parseCSV(csvText);
+
+                    // Filter data berdasarkan tipe absensi
+                    // Asumsi kolom di rekap: [Timestamp, TipeAbsensi, ID, Nama, Status]
+                    const header = data[0] || ['Timestamp', 'Tipe Kegiatan', 'ID Santri', 'Nama Santri', 'Status'];
+                    const filteredData = data.slice(1).filter(row => row[1] && row[1].trim() === absensiType);
+                    
+                    if (filteredData.length === 0) {
+                        container.innerHTML = `<p class="text-gray-500">Belum ada data rekap untuk ${absensiType}.</p>`;
+                        loading.style.display = 'none';
+                        return;
+                    }
+
+                    // Buat tabel HTML
+                    let tableHTML = '<table class="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg">';
+                    tableHTML += '<thead class="bg-gray-50"><tr class="bg-green-800 text-white">';
+                    header.forEach(h => tableHTML += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">${h}</th>`);
+                    tableHTML += '</tr></thead>';
+                    
+                    tableHTML += '<tbody class="bg-white divide-y divide-gray-200">';
+                    // Tampilkan data terbaru di atas
+                    filteredData.reverse().forEach(row => {
+                        tableHTML += '<tr>';
+                        row.forEach(cell => tableHTML += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${cell}</td>`);
+                        tableHTML += '</tr>';
+                    });
+                    tableHTML += '</tbody></table>';
+
+                    container.innerHTML = tableHTML;
+
+                } catch (error) {
+                    console.error(`Gagal memuat rekap ${absensiType}:`, error);
+                    container.innerHTML = `<p class="text-red-500">Gagal memuat data rekap. Pastikan sheet rekap sudah di 'Publish to the web' sebagai CSV.</p>`;
+                } finally {
+                    loading.style.display = 'none';
+                }
+            }
+
+
+            // =============================================
+            // =========== EVENT LISTENERS =================
+            // =============================================
+            
+            // Listener untuk Login
+            loginForm.addEventListener('submit', handleLogin);
+            
+            // Listener untuk Logout
+            logoutButton.addEventListener('click', handleLogout);
+
+            // Listener untuk Navigasi Halaman
+            sidebarItems.forEach(item => {
+                item.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const pageId = this.getAttribute('data-page');
+                    if (pageId) {
+                        showPage(pageId);
+                    }
+                });
+            });
+
+            // Listeners untuk Absensi
+            // Kamar
+            document.getElementById('checkSantriKamar').addEventListener('click', () => checkSantri('Kamar'));
+            document.getElementById('formAbsenKamar').addEventListener('submit', (e) => submitAttendance(e, 'Kamar'));
+            // Muhadhoroh
+            document.getElementById('checkSantriMuhadhoroh').addEventListener('click', () => checkSantri('Muhadhoroh'));
+            document.getElementById('formAbsenMuhadhoroh').addEventListener('submit', (e) => submitAttendance(e, 'Muhadhoroh'));
+            // Halaqoh
+            document.getElementById('checkSantriHalaqoh').addEventListener('click', () => checkSantri('Halaqoh'));
+            document.getElementById('formAbsenHalaqoh').addEventListener('submit', (e) => submitAttendance(e, 'Halaqoh'));
+            
+            // Inisialisasi
+            updateClock();
+            
+            // Cek jika URL GAS belum diisi saat aplikasi dimuat
+            if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL === '') {
+                 // Tunda sedikit agar tidak bentrok dengan modal lain
+                 setTimeout(() => {
+                    showModal("Peringatan Konfigurasi", "URL Google Apps Script (GAS_WEB_APP_URL) belum diisi. Anda bisa mengambil data santri, namun Anda tidak akan bisa MENYIMPAN data absensi. Harap ikuti instruksi di dalam kode file HTML.");
+                 }, 2000);
+            }
+        });
+    </script>
 </body>
 </html>
