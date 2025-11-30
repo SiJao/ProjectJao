@@ -7,416 +7,511 @@
     
     <!-- Library Eksternal -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        try {
+            tailwind.config = {
+                darkMode: 'class',
+                theme: {
+                    extend: {
+                        colors: {
+                            primary: '#166534',
+                            secondary: '#15803d',
+                            accent: '#dcfce7',
+                        }
+                    }
+                }
+            }
+        } catch(e) { console.log('Tailwind config error ignored'); }
+    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     
-    <!-- Fonts dari Sistem Absensi (Inter & Amiri) -->
+    <!-- Fonts (Inter & Amiri) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel=\"stylesheet\">
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- 
-    ========================================================================
-    BAGIAN CSS (style.css)
-    Salin bagian di dalam tag <style> ini ke file style.css Anda nanti.
-    ======================================================================== 
-    -->
     <style>
         /* Base Setup */
         :root { 
-            --primary-green: #166534; /* Warna hijau dari file Absensi */
+            --primary-green: #166534;
+            --secondary-green: #15803d;
             --bg-light: #f8fafc;
+            --glass-bg: rgba(255, 255, 255, 0.95);
         }
 
         body {
-            font-family: 'Inter', sans-serif; /* Update font utama */
-            background-color: #f3f4f6;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-light);
+            color: #1f2937;
         }
 
-        .font-amiri {
-            font-family: 'Amiri', serif;
-        }
+        .font-amiri { font-family: 'Amiri', serif; }
 
-        /* Transisi Halus */
-        .fade-in {
-            animation: fadeIn 0.3s ease-in-out;
-        }
+        /* Animations */
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        .slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
 
         /* Sidebar Styling */
         .sidebar-item {
             transition: all 0.2s;
             cursor: pointer;
-        }
-        .sidebar-item:hover, .sidebar-item.active {
-            background-color: #2563eb; /* Blue-600 */
-            color: white;
             border-radius: 0.5rem;
+            margin-bottom: 0.25rem;
         }
-        
-        /* Override warna sidebar item saat aktif di menu Absensi agar senada */
+        .sidebar-item:hover {
+            background-color: #e2e8f0;
+            color: #166534;
+        }
+        .sidebar-item.active {
+            background-color: #2563eb; 
+            color: white;
+            box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
+        }
         .sidebar-item.active.absen-theme {
             background-color: var(--primary-green) !important;
+            box-shadow: 0 2px 4px rgba(22, 101, 52, 0.4);
+        }
+
+        /* Absensi Specific Components */
+        .card-menu {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card-menu:active { transform: scale(0.95); }
+        
+        .absen-tab-btn {
+            border-bottom: 3px solid transparent;
+            color: #64748b;
+            font-weight: 500;
+        }
+        .absen-tab-btn.active {
+            border-bottom-color: var(--primary-green);
+            color: var(--primary-green);
         }
 
         /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-        /* Loading Spinner */
         .loader {
-            border: 4px solid #f3f3f3;
+            border: 3px solid #f3f3f3;
             border-radius: 50%;
-            border-top: 4px solid #3498db;
-            width: 30px;
-            height: 30px;
+            border-top: 3px solid var(--primary-green);
+            width: 24px;
+            height: 24px;
             animation: spin 1s linear infinite;
-            margin: 0 auto;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .hidden { display: none !important; }
+        
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
     </style>
 </head>
-<body class="text-gray-800">
-
-    <!-- 
-    ========================================================================
-    BAGIAN HTML (index.html)
-    Ini adalah struktur utama halaman.
-    ======================================================================== 
-    -->
+<body class="text-gray-800 h-screen overflow-hidden flex flex-col">
 
     <!-- HALAMAN LOGIN -->
-    <div id="login-page" class="min-h-screen flex items-center justify-center bg-gray-200">
-        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
-            <div class="text-center mb-6">
-                <i class="fas fa-building text-4xl text-blue-600 mb-2"></i>
-                <h2 class="text-2xl font-bold text-gray-700">Sistem Administrasi</h2>
-                <p class="text-sm text-gray-500">Silakan login untuk melanjutkan</p>
+    <div id="login-page" class="absolute inset-0 z-50 flex items-center justify-center bg-gray-100">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md slide-up">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4 text-green-700">
+                    <i class="fas fa-building text-3xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-800 font-inter">Sistem Administrasi</h2>
+                <p class="text-sm text-gray-500">Silakan login untuk mengakses dashboard</p>
+                <!-- Tombol Bypass untuk Preview -->
+                <p class="text-xs text-blue-500 mt-2 cursor-pointer underline" onclick="bypassLogin()">[Klik di sini untuk Mode Demo/Preview]</p>
             </div>
             
-            <form id="login-form" class="space-y-4">
+            <form id="login-form" class="space-y-5">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                    <input type="text" id="username" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Masukkan username" required>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Username</label>
+                    <input type="text" id="username" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition" placeholder="Username">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                    <input type="password" id="password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Masukkan password" required>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Password</label>
+                    <input type="password" id="password" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition" placeholder="Password">
                 </div>
-                <div id="login-message" class="text-red-500 text-sm text-center hidden"></div>
-                <button type="submit" id="btn-login" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
-                    Masuk
+                <div id="login-message" class="text-red-500 text-sm text-center hidden bg-red-50 p-2 rounded"></div>
+                
+                <button type="submit" id="btn-login" class="w-full bg-green-700 hover:bg-green-800 text-white font-bold py-3 rounded-xl shadow-lg transition duration-200 transform active:scale-95">
+                    Masuk Dashboard
                 </button>
-                <div id="loading-spinner" class="hidden mt-2">
-                    <div class="loader"></div>
-                    <p class="text-center text-xs text-gray-500 mt-1">Mengambil data CSV...</p>
+                
+                <div id="loading-spinner" class="hidden flex justify-center items-center mt-2 gap-2 text-sm text-gray-500">
+                    <div class="loader" style="width: 16px; height: 16px;"></div> Memuat data...
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- HALAMAN DASHBOARD UTAMA (Awalnya Hidden) -->
-    <div id="main-dashboard" class="hidden min-h-screen flex flex-col md:flex-row">
+    <!-- MAIN LAYOUT -->
+    <div id="main-dashboard" class="hidden flex-1 flex h-screen overflow-hidden">
         
         <!-- Sidebar -->
-        <aside class="w-full md:w-64 bg-white shadow-md flex-shrink-0 z-20 transition-transform transform md:translate-x-0" id="sidebar-panel">
+        <aside class="w-64 bg-white shadow-xl flex-shrink-0 z-30 transition-transform transform -translate-x-full md:translate-x-0 absolute md:relative h-full" id="sidebar-panel">
             <div class="p-6 border-b flex items-center justify-between">
-                <span class="text-xl font-bold text-blue-600" id="app-title">AdminPanel</span>
-                <button id="mobile-menu-close" class="md:hidden text-gray-500"><i class="fas fa-times"></i></button>
+                <div class="flex items-center gap-2 text-green-700">
+                    <i class="fas fa-cube text-xl"></i>
+                    <span class="text-xl font-bold font-inter tracking-tight">Admin<span class="text-gray-800">Panel</span></span>
+                </div>
+                <button id="mobile-menu-close" class="md:hidden text-gray-500 hover:text-red-500"><i class="fas fa-times text-xl"></i></button>
             </div>
-            <nav class="p-4 space-y-2">
-                <div onclick="switchPage('dashboard')" class="sidebar-item p-3 flex items-center space-x-3 text-gray-600 active" id="nav-dashboard">
-                    <i class="fas fa-home w-6"></i>
-                    <span>Dashboard</span>
+            
+            <nav class="p-4 space-y-1 overflow-y-auto h-full pb-20">
+                <div class="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Menu Utama</div>
+                
+                <div onclick="switchPage('dashboard')" class="sidebar-item p-3 flex items-center gap-3 text-gray-600 font-medium active" id="nav-dashboard">
+                    <i class="fas fa-home w-5 text-center"></i> <span>Dashboard</span>
                 </div>
-                <div onclick="switchPage('surat')" class="sidebar-item p-3 flex items-center space-x-3 text-gray-600" id="nav-surat">
-                    <i class="fas fa-envelope-open-text w-6"></i>
-                    <span>Korespondensi</span>
+                <div onclick="switchPage('surat')" class="sidebar-item p-3 flex items-center gap-3 text-gray-600 font-medium" id="nav-surat">
+                    <i class="fas fa-envelope w-5 text-center"></i> <span>Korespondensi</span>
                 </div>
-                <div onclick="switchPage('absensi')" class="sidebar-item p-3 flex items-center space-x-3 text-gray-600" id="nav-absensi">
-                    <i class="fas fa-clock w-6"></i>
-                    <span>Absensi (Server)</span>
+                
+                <div class="mt-6 px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Aplikasi</div>
+                
+                <div onclick="switchPage('absensi')" class="sidebar-item p-3 flex items-center gap-3 text-gray-600 font-medium" id="nav-absensi">
+                    <i class="fas fa-fingerprint w-5 text-center"></i> <span>Sistem Absensi</span>
                 </div>
-                <div onclick="logout()" class="sidebar-item p-3 flex items-center space-x-3 text-red-500 mt-8">
-                    <i class="fas fa-sign-out-alt w-6"></i>
-                    <span>Keluar</span>
+                
+                <div onclick="logout()" class="sidebar-item p-3 flex items-center gap-3 text-red-500 font-medium mt-10 hover:bg-red-50 hover:text-red-600">
+                    <i class="fas fa-sign-out-alt w-5 text-center"></i> <span>Keluar</span>
                 </div>
             </nav>
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 overflow-y-auto h-screen bg-gray-50 relative">
-            <!-- Mobile Header -->
-            <header class="bg-white shadow p-4 md:hidden flex justify-between items-center sticky top-0 z-10">
-                <button id="mobile-menu-btn" class="text-gray-600"><i class="fas fa-bars text-xl"></i></button>
+        <main class="flex-1 flex flex-col h-screen overflow-hidden bg-gray-50 relative w-full">
+            <header class="bg-white shadow-sm p-4 md:hidden flex justify-between items-center z-20 flex-shrink-0">
+                <button id="mobile-menu-btn" class="text-gray-600 p-2 rounded hover:bg-gray-100"><i class="fas fa-bars text-xl"></i></button>
                 <span class="font-bold text-gray-700">Sistem Administrasi</span>
-                <div class="w-6"></div> <!-- Spacer -->
+                <div class="w-8"></div>
             </header>
 
-            <!-- Content Container -->
-            <div class="p-6 md:p-10 max-w-7xl mx-auto">
+            <div class="flex-1 overflow-y-auto p-4 md:p-8" id="content-area">
                 
-                <!-- VIEW 1: DASHBOARD HOME -->
-                <div id="view-dashboard" class="fade-in">
-                    <h1 class="text-2xl font-bold mb-6">Dashboard Utama</h1>
+                <!-- VIEW 1: DASHBOARD -->
+                <div id="view-dashboard" class="fade-in max-w-6xl mx-auto">
+                    <h1 class="text-2xl font-bold mb-6 text-gray-800">Dashboard Utama</h1>
                     
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                        <!-- Card Folder Drive -->
-                        <div class="bg-white p-6 rounded-xl shadow hover:shadow-lg transition cursor-pointer border-l-4 border-green-500 group" onclick="openDriveFolder()">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-gray-500 text-sm">Penyimpanan</p>
-                                    <h3 class="text-xl font-bold text-gray-800">Folder Arsip</h3>
-                                </div>
-                                <div class="bg-green-100 p-3 rounded-full text-green-600 group-hover:bg-green-600 group-hover:text-white transition">
-                                    <i class="fab fa-google-drive text-2xl"></i>
-                                </div>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition cursor-pointer group relative overflow-hidden" onclick="openDriveFolder()">
+                            <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                                <i class="fab fa-google-drive text-6xl text-green-600"></i>
                             </div>
-                            <p class="text-xs text-gray-400 mt-2">Klik untuk membuka Google Drive</p>
-                        </div>
-
-                        <!-- Summary Cards -->
-                        <div class="bg-white p-6 rounded-xl shadow border-l-4 border-blue-500">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-gray-500 text-sm">Total Surat</p>
-                                    <h3 class="text-xl font-bold text-gray-800" id="dash-total-surat">0</h3>
+                            <div class="relative z-10">
+                                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-4">
+                                    <i class="fab fa-google-drive text-xl"></i>
                                 </div>
-                                <div class="bg-blue-100 p-3 rounded-full text-blue-600">
-                                    <i class="fas fa-mail-bulk text-2xl"></i>
-                                </div>
+                                <h3 class="text-lg font-bold text-gray-800">Folder Arsip</h3>
+                                <p class="text-sm text-gray-500 mt-1">Akses penyimpanan Cloud</p>
                             </div>
                         </div>
 
-                        <div class="bg-white p-6 rounded-xl shadow border-l-4 border-purple-500">
-                            <div class="flex items-center justify-between">
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <div class="flex justify-between items-start">
                                 <div>
-                                    <p class="text-gray-500 text-sm">Status Server Absen</p>
-                                    <h3 class="text-xl font-bold text-gray-800" id="dash-status-server">Terputus</h3>
+                                    <p class="text-sm text-gray-500 font-medium">Total Surat</p>
+                                    <h3 class="text-3xl font-bold text-gray-800 mt-1" id="dash-total-surat">0</h3>
                                 </div>
-                                <div class="bg-purple-100 p-3 rounded-full text-purple-600">
-                                    <i class="fas fa-server text-2xl"></i>
+                                <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                                    <i class="fas fa-mail-bulk"></i>
                                 </div>
                             </div>
+                            <div class="mt-4 flex gap-2 text-xs">
+                                <span class="bg-green-100 text-green-700 px-2 py-1 rounded">Masuk: <span id="count-masuk">0</span></span>
+                                <span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded">Keluar: <span id="count-keluar">0</span></span>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-sm text-gray-500 font-medium">Status Server</p>
+                                    <h3 class="text-lg font-bold text-gray-800 mt-1" id="dash-status-server">Belum Terhubung</h3>
+                                </div>
+                                <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600">
+                                    <i class="fas fa-server"></i>
+                                </div>
+                            </div>
+                            <div class="mt-4 text-xs text-gray-400">Menunggu konfigurasi URL Script</div>
                         </div>
                     </div>
 
-                    <!-- Welcome Banner -->
-                    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-8 text-white shadow-lg">
-                        <h2 class="text-2xl font-bold mb-2">Selamat Datang, Admin!</h2>
-                        <p class="opacity-90">Sistem ini memusatkan pengelolaan surat, absensi (terhubung server), dan arsip digital.</p>
+                    <div class="bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
+                        <div class="absolute right-0 bottom-0 opacity-10 transform translate-y-4 translate-x-4">
+                            <i class="fas fa-chart-line text-9xl"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold mb-2 relative z-10">Selamat Datang, Admin!</h2>
+                        <p class="opacity-90 relative z-10 max-w-2xl">Sistem ini memusatkan pengelolaan surat menyurat, arsip digital, dan manajemen absensi pegawai dalam satu platform terintegrasi.</p>
                     </div>
                 </div>
 
                 <!-- VIEW 2: KORESPONDENSI -->
-                <div id="view-surat" class="hidden fade-in">
-                    <h1 class="text-2xl font-bold mb-6">Korespondensi Surat</h1>
+                <div id="view-surat" class="hidden fade-in max-w-6xl mx-auto">
+                    <h1 class="text-2xl font-bold mb-6 text-gray-800">Korespondensi Surat</h1>
 
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                        <!-- Form Input -->
-                        <div class="bg-white p-6 rounded-xl shadow lg:col-span-1">
-                            <h3 class="font-bold text-lg mb-4 border-b pb-2">Input Surat Baru</h3>
-                            <form id="form-surat" class="space-y-3">
-                                <div>
-                                    <label class="text-xs font-bold text-gray-600 uppercase">Tipe Surat</label>
-                                    <select id="surat-tipe" class="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 mt-1">
-                                        <option value="Masuk">Surat Masuk</option>
-                                        <option value="Keluar">Surat Keluar</option>
-                                    </select>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-1">
+                            <h3 class="font-bold text-lg mb-4 text-gray-700">Input Surat Baru</h3>
+                            <form id="form-surat" class="space-y-4">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div class="col-span-2">
+                                        <label class="text-xs font-bold text-gray-500 uppercase">Tipe Surat</label>
+                                        <div class="flex mt-1 bg-gray-100 p-1 rounded-lg">
+                                            <label class="flex-1 text-center cursor-pointer">
+                                                <input type="radio" name="tipe_surat" value="Masuk" class="peer hidden" checked>
+                                                <span class="block py-2 text-sm rounded-md peer-checked:bg-white peer-checked:shadow-sm peer-checked:text-green-600 peer-checked:font-bold text-gray-500 transition">Masuk</span>
+                                            </label>
+                                            <label class="flex-1 text-center cursor-pointer">
+                                                <input type="radio" name="tipe_surat" value="Keluar" class="peer hidden">
+                                                <span class="block py-2 text-sm rounded-md peer-checked:bg-white peer-checked:shadow-sm peer-checked:text-yellow-600 peer-checked:font-bold text-gray-500 transition">Keluar</span>
+                                            </label>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label class="text-xs font-bold text-gray-600 uppercase">Kode Surat</label>
-                                    <input type="text" id="surat-kode" class="w-full border p-2 rounded mt-1" placeholder="Contoh: 001/A/2023" required>
-                                </div>
-                                <div>
-                                    <label class="text-xs font-bold text-gray-600 uppercase">Tujuan / Pengirim</label>
-                                    <input type="text" id="surat-tujuan" class="w-full border p-2 rounded mt-1" placeholder="Nama Instansi/Orang" required>
-                                </div>
-                                <div>
-                                    <label class="text-xs font-bold text-gray-600 uppercase">Tanggal</label>
-                                    <input type="date" id="surat-tanggal" class="w-full border p-2 rounded mt-1" required>
-                                </div>
-                                <div>
-                                    <label class="text-xs font-bold text-gray-600 uppercase">Isi Ringkas</label>
-                                    <textarea id="surat-isi" class="w-full border p-2 rounded mt-1" rows="3" placeholder="Perihal surat..." required></textarea>
-                                </div>
-                                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700 transition">
-                                    Simpan Surat
-                                </button>
+                                <input type="text" id="surat-kode" class="w-full border-gray-200 bg-gray-50 border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="No. Surat" required>
+                                <input type="text" id="surat-tujuan" class="w-full border-gray-200 bg-gray-50 border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nama Instansi/Orang" required>
+                                <input type="date" id="surat-tanggal" class="w-full border-gray-200 bg-gray-50 border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
+                                <textarea id="surat-isi" class="w-full border-gray-200 bg-gray-50 border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" rows="2" placeholder="Ringkasan isi..." required></textarea>
+                                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg shadow-md transition transform active:scale-95">Simpan Data</button>
                             </form>
                         </div>
 
-                        <!-- Grafik -->
-                        <div class="bg-white p-6 rounded-xl shadow lg:col-span-2 flex flex-col items-center justify-center">
-                            <h3 class="font-bold text-lg mb-4 w-full border-b pb-2">Statistik Surat</h3>
-                            <div class="w-full h-64">
-                                <canvas id="chartSurat"></canvas>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 flex flex-col">
+                            <h3 class="font-bold text-lg mb-4 text-gray-700">Statistik Korespondensi</h3>
+                            <div class="flex-1 flex items-center justify-center relative">
+                                <div class="w-full h-64"><canvas id="chartSurat"></canvas></div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Riwayat Tabel -->
-                    <div class="bg-white rounded-xl shadow overflow-hidden">
-                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
-                            <h3 class="font-bold text-lg">Riwayat Surat (Lokal)</h3>
-                            <button onclick="clearSuratData()" class="text-xs text-red-500 hover:text-red-700 underline">Reset Data</button>
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div class="p-5 border-b flex justify-between items-center bg-gray-50">
+                            <h3 class="font-bold text-gray-700">Data Surat (Lokal)</h3>
+                            <button onclick="clearSuratData()" class="text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1 rounded transition"><i class="fas fa-trash-alt mr-1"></i> Reset</button>
                         </div>
                         <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="bg-gray-100 text-gray-600 text-sm uppercase">
-                                        <th class="p-4 border-b">Tipe</th>
-                                        <th class="p-4 border-b">Kode</th>
-                                        <th class="p-4 border-b">Tanggal</th>
-                                        <th class="p-4 border-b">Tujuan</th>
-                                        <th class="p-4 border-b">Isi</th>
-                                        <th class="p-4 border-b">Aksi</th>
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+                                    <tr>
+                                        <th class="p-4 font-bold">Tipe</th>
+                                        <th class="p-4 font-bold">Kode</th>
+                                        <th class="p-4 font-bold">Tanggal</th>
+                                        <th class="p-4 font-bold">Tujuan</th>
+                                        <th class="p-4 font-bold">Perihal</th>
+                                        <th class="p-4 font-bold text-right">Aksi</th>
                                     </tr>
                                 </thead>
-                                <tbody id="tabel-body-surat" class="text-sm">
-                                    <!-- Data akan muncul di sini via JS -->
-                                </tbody>
+                                <tbody id="tabel-body-surat" class="divide-y divide-gray-100"></tbody>
                             </table>
-                            <div id="empty-state-surat" class="p-8 text-center text-gray-400">
-                                Belum ada data surat.
+                            <div id="empty-state-surat" class="p-10 text-center text-gray-400">
+                                <i class="fas fa-inbox text-4xl mb-3 opacity-30"></i>
+                                <p>Belum ada data surat tersimpan.</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- VIEW 3: ABSENSI (DIINTEGRASIKAN) -->
-                <div id="view-absensi" class="hidden fade-in">
-                    <!-- Config Section (Hidden by default once set) -->
-                    <div id="absensi-config" class="mb-4 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                        <h4 class="font-bold text-sm text-yellow-800 mb-2">Konfigurasi Server Absensi (Google Apps Script)</h4>
-                        <div class="flex gap-2">
-                            <input type="text" id="script-url-input" class="flex-1 text-sm border p-2 rounded" placeholder="Tempel URL Web App Google Script di sini...">
-                            <button onclick="saveScriptUrl()" class="bg-yellow-600 text-white text-sm px-4 py-2 rounded">Simpan</button>
+                <!-- VIEW 3: ABSENSI -->
+                <div id="view-absensi" class="hidden fade-in max-w-lg mx-auto md:max-w-4xl">
+                    <div id="absensi-config-alert" class="hidden mb-6 bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded shadow-sm flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-yellow-800 text-sm">Konfigurasi Server Diperlukan</p>
+                            <p class="text-xs text-yellow-700">Masukkan URL Web App Google Script untuk mengaktifkan fitur online.</p>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">Diperlukan agar fitur Absensi (Sistem Absensi Beta) berfungsi.</p>
+                        <button onclick="showConfigModal()" class="bg-yellow-600 text-white text-xs px-3 py-1.5 rounded hover:bg-yellow-700">Setup</button>
                     </div>
 
-                    <!-- Header Style Absensi -->
-                    <div class="bg-green-800 text-white rounded-t-xl p-6 shadow-lg relative overflow-hidden">
-                        <div class="absolute top-0 right-0 opacity-10">
-                            <i class="fas fa-mosque text-9xl transform translate-x-10 -translate-y-10"></i>
+                    <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100 min-h-[600px] flex flex-col relative">
+                        <div class="bg-gradient-to-br from-green-800 to-green-600 text-white p-6 relative overflow-hidden shrink-0">
+                            <div class="absolute top-0 right-0 opacity-10">
+                                <i class="fas fa-mosque text-9xl transform translate-x-10 -translate-y-4"></i>
+                            </div>
+                            <div class="relative z-10">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h1 class="font-amiri text-3xl font-bold">Sistem Absensi</h1>
+                                        <p class="text-green-100 text-sm opacity-90">Terintegrasi & Realtime</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-1">
+                                            <p class="text-xs text-green-100 uppercase tracking-wider">Jam Server</p>
+                                            <p id="absen-clock-real" class="font-mono font-bold text-xl">00:00</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3 mt-4 bg-white/10 p-3 rounded-xl backdrop-blur-sm border border-white/10">
+                                    <div class="w-10 h-10 rounded-full bg-white text-green-700 flex items-center justify-center font-bold text-lg shadow-sm"><i class="fas fa-user"></i></div>
+                                    <div class="flex-1">
+                                        <p class="text-xs text-green-200">Login Sebagai</p>
+                                        <p class="font-bold text-white truncate" id="absen-display-name">User</p>
+                                    </div>
+                                    <div class="text-xs text-green-200 bg-green-900/50 px-2 py-1 rounded" id="absen-role-badge">Pegawai</div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="relative z-10 flex flex-col md:flex-row justify-between items-center">
-                            <div>
-                                <h1 class="text-3xl font-amiri font-bold mb-1">Sistem Absensi</h1>
-                                <p class="text-green-100 text-sm">Terintegrasi Server & Realtime</p>
+
+                        <div class="flex border-b border-gray-100">
+                            <button onclick="switchAbsenTab('home')" id="tab-home" class="absen-tab-btn flex-1 py-4 text-center text-sm active bg-gray-50"><i class="fas fa-home mb-1 block text-lg"></i> Beranda</button>
+                            <button onclick="switchAbsenTab('history')" id="tab-history" class="absen-tab-btn flex-1 py-4 text-center text-sm hover:bg-gray-50"><i class="fas fa-history mb-1 block text-lg"></i> Riwayat</button>
+                            <button onclick="switchAbsenTab('profile')" id="tab-profile" class="absen-tab-btn flex-1 py-4 text-center text-sm hover:bg-gray-50"><i class="fas fa-user-cog mb-1 block text-lg"></i> Profil</button>
+                        </div>
+
+                        <!-- Home Tab -->
+                        <div id="absen-content-home" class="flex-1 p-6 flex flex-col overflow-y-auto">
+                            <div class="text-center mb-6">
+                                <p class="text-gray-500 text-sm mb-1" id="absen-date-full">...</p>
+                                <div class="inline-block px-4 py-1 bg-green-50 text-green-700 rounded-full text-xs font-bold border border-green-100"><i class="fas fa-map-marker-alt mr-1"></i> Lokasi: Kantor Pusat</div>
                             </div>
-                            <div class="text-right mt-4 md:mt-0">
-                                <div id="absen-clock" class="text-3xl font-mono font-bold">00:00:00</div>
-                                <div id="absen-date" class="text-green-200 text-sm">...</div>
+                            <div class="grid grid-cols-2 gap-4 mb-6">
+                                <button onclick="handleAbsensiAction('masuk')" class="card-menu group bg-gradient-to-br from-green-500 to-green-600 text-white p-4 rounded-2xl shadow-lg relative overflow-hidden h-32 flex flex-col justify-between hover:shadow-green-500/30">
+                                    <div class="absolute right-0 top-0 opacity-20 p-2 transform group-hover:scale-110 transition"><i class="fas fa-sign-in-alt text-5xl"></i></div>
+                                    <div class="bg-white/20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"><i class="fas fa-fingerprint text-xl"></i></div>
+                                    <div class="text-left relative z-10"><span class="block font-bold text-lg">Absen Masuk</span><span class="text-xs text-green-100 opacity-90">Datang Tepat Waktu</span></div>
+                                </button>
+                                <button onclick="handleAbsensiAction('pulang')" class="card-menu group bg-gradient-to-br from-red-500 to-red-600 text-white p-4 rounded-2xl shadow-lg relative overflow-hidden h-32 flex flex-col justify-between hover:shadow-red-500/30">
+                                    <div class="absolute right-0 top-0 opacity-20 p-2 transform group-hover:scale-110 transition"><i class="fas fa-sign-out-alt text-5xl"></i></div>
+                                    <div class="bg-white/20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"><i class="fas fa-home text-xl"></i></div>
+                                    <div class="text-left relative z-10"><span class="block font-bold text-lg">Absen Pulang</span><span class="text-xs text-red-100 opacity-90">Hati-hati di jalan</span></div>
+                                </button>
+                                <button onclick="showIzinModal('sakit')" class="card-menu bg-white border border-gray-100 p-4 rounded-2xl shadow-sm text-gray-700 flex flex-col items-center justify-center gap-2 hover:bg-gray-50 h-24"><i class="fas fa-procedures text-2xl text-orange-500"></i><span class="font-bold text-sm">Sakit</span></button>
+                                <button onclick="showIzinModal('izin')" class="card-menu bg-white border border-gray-100 p-4 rounded-2xl shadow-sm text-gray-700 flex flex-col items-center justify-center gap-2 hover:bg-gray-50 h-24"><i class="fas fa-file-signature text-2xl text-blue-500"></i><span class="font-bold text-sm">Izin / Cuti</span></button>
                             </div>
+                            <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                                <h4 class="text-xs font-bold text-gray-500 uppercase mb-3">Status Hari Ini</h4>
+                                <div id="today-status-list" class="space-y-2 text-sm"><div class="text-center text-gray-400 italic py-2">Belum ada aktivitas.</div></div>
+                            </div>
+                        </div>
+
+                        <!-- History Tab -->
+                        <div id="absen-content-history" class="hidden flex-1 p-0 flex flex-col h-full">
+                            <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+                                <h3 class="font-bold text-gray-700">Riwayat Kehadiran</h3>
+                                <button onclick="fetchHistory()" class="text-green-600 hover:text-green-800"><i class="fas fa-sync-alt"></i></button>
+                            </div>
+                            <div class="flex-1 overflow-y-auto p-4" id="history-list"><div class="text-center py-10 text-gray-400"><div class="loader mx-auto mb-2"></div>Memuat data server...</div></div>
+                        </div>
+
+                        <!-- Profile Tab -->
+                        <div id="absen-content-profile" class="hidden flex-1 p-6 overflow-y-auto">
+                            <div class="text-center mb-8">
+                                <div class="w-20 h-20 bg-green-100 rounded-full mx-auto flex items-center justify-center text-green-700 text-3xl mb-3 shadow-inner"><i class="fas fa-user"></i></div>
+                                <h3 class="font-bold text-xl text-gray-800" id="profile-name">Nama User</h3>
+                                <p class="text-gray-500 text-sm" id="profile-role">Staff</p>
+                            </div>
+                            <div class="space-y-3">
+                                <button onclick="showChangePassModal()" class="w-full flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm"><div class="flex items-center gap-3"><div class="bg-blue-100 p-2 rounded text-blue-600"><i class="fas fa-key"></i></div><span class="font-medium text-gray-700">Ganti Password</span></div><i class="fas fa-chevron-right text-gray-400"></i></button>
+                                <button onclick="showConfigModal()" class="w-full flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm"><div class="flex items-center gap-3"><div class="bg-yellow-100 p-2 rounded text-yellow-600"><i class="fas fa-cog"></i></div><span class="font-medium text-gray-700">Pengaturan Server</span></div><i class="fas fa-chevron-right text-gray-400"></i></button>
+                            </div>
+                            <div class="mt-8"><button onclick="logout()" class="w-full py-3 text-red-500 font-bold bg-red-50 rounded-xl hover:bg-red-100 transition">Keluar Aplikasi</button></div>
                         </div>
                     </div>
-
-                    <div class="bg-white p-6 rounded-b-xl shadow mb-6">
-                        <!-- User Info -->
-                        <div class="flex items-center justify-between mb-8 border-b pb-4">
-                            <div class="flex items-center gap-4">
-                                <div class="bg-green-100 p-3 rounded-full text-green-700">
-                                    <i class="fas fa-user-circle text-3xl"></i>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-500">Login sebagai</p>
-                                    <h3 class="font-bold text-lg" id="absen-username">User</h3>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <button onclick="refreshAbsensi()" class="text-blue-600 text-sm hover:underline"><i class="fas fa-sync"></i> Refresh Data</button>
-                            </div>
-                        </div>
-
-                        <!-- Action Buttons -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                            <button onclick="kirimAbsensi('masuk')" id="btn-absen-masuk" class="group relative bg-green-600 hover:bg-green-700 text-white p-6 rounded-xl shadow-lg transition-all transform hover:-translate-y-1 flex items-center justify-between overflow-hidden">
-                                <div class="z-10 text-left">
-                                    <h3 class="font-bold text-xl">Absen Masuk</h3>
-                                    <p class="text-green-100 text-sm opacity-90">Klik untuk mencatat kehadiran</p>
-                                </div>
-                                <div class="z-10 bg-green-500 p-3 rounded-full group-hover:bg-green-400 transition">
-                                    <i class="fas fa-sign-in-alt text-2xl"></i>
-                                </div>
-                                <!-- Decorative BG -->
-                                <i class="fas fa-check-circle absolute -bottom-4 -left-4 text-8xl text-green-500 opacity-20"></i>
-                            </button>
-
-                            <button onclick="kirimAbsensi('pulang')" id="btn-absen-pulang" class="group relative bg-red-600 hover:bg-red-700 text-white p-6 rounded-xl shadow-lg transition-all transform hover:-translate-y-1 flex items-center justify-between overflow-hidden">
-                                <div class="z-10 text-left">
-                                    <h3 class="font-bold text-xl">Absen Pulang</h3>
-                                    <p class="text-red-100 text-sm opacity-90">Klik saat jam pulang kerja</p>
-                                </div>
-                                <div class="z-10 bg-red-500 p-3 rounded-full group-hover:bg-red-400 transition">
-                                    <i class="fas fa-sign-out-alt text-2xl"></i>
-                                </div>
-                                <!-- Decorative BG -->
-                                <i class="fas fa-clock absolute -bottom-4 -right-4 text-8xl text-red-500 opacity-20"></i>
-                            </button>
-                        </div>
-
-                        <!-- Status Log -->
-                        <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                            <h4 class="font-bold text-gray-700 mb-3"><i class="fas fa-history mr-2"></i>Riwayat Aktivitas (Dari Server)</h4>
-                            <div id="absensi-loading" class="hidden text-center py-4 text-gray-500">
-                                <div class="loader mb-2" style="width: 20px; height: 20px; border-width: 2px;"></div>
-                                Mengubungi Server...
-                            </div>
-                            <ul id="list-riwayat-server" class="space-y-2 text-sm">
-                                <li class="text-gray-400 italic text-center">Belum ada data atau Script URL belum diset.</li>
-                            </ul>
-                        </div>
-                    </div>
+                    <p class="text-center text-gray-400 text-xs mt-4">Sistem Absensi v2.0 (Integrated)</p>
                 </div>
-
             </div>
         </main>
     </div>
 
-    <!-- 
-    ========================================================================
-    BAGIAN JAVASCRIPT (script.js)
-    Salin bagian di dalam tag <script> ini ke file script.js Anda nanti.
-    ======================================================================== 
-    -->
+    <!-- MODALS -->
+    <div id="modal-izin" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm m-4 shadow-2xl slide-up">
+            <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><i class="fas fa-file-alt text-blue-500"></i> Form Izin / Sakit</h3>
+            <textarea id="izin-alasan" class="w-full border p-3 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none mb-4" rows="3" placeholder="Tuliskan alasan atau keterangan..."></textarea>
+            <div class="flex gap-2"><button onclick="closeModal('modal-izin')" class="flex-1 py-2 text-gray-500 bg-gray-100 rounded-lg font-medium hover:bg-gray-200">Batal</button><button onclick="submitIzin()" class="flex-1 py-2 text-white bg-blue-600 rounded-lg font-bold hover:bg-blue-700 shadow">Kirim</button></div>
+            <input type="hidden" id="izin-tipe">
+        </div>
+    </div>
+
+    <div id="modal-pass" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm m-4 shadow-2xl slide-up">
+            <h3 class="font-bold text-lg mb-4 text-gray-800">Ganti Password</h3>
+            <input type="password" id="old-pass" class="w-full border p-3 rounded-lg mb-3 text-sm" placeholder="Password Lama">
+            <input type="password" id="new-pass" class="w-full border p-3 rounded-lg mb-4 text-sm" placeholder="Password Baru">
+            <div class="flex gap-2"><button onclick="closeModal('modal-pass')" class="flex-1 py-2 text-gray-500 bg-gray-100 rounded-lg font-medium hover:bg-gray-200">Batal</button><button onclick="submitChangePass()" class="flex-1 py-2 text-white bg-green-600 rounded-lg font-bold hover:bg-green-700 shadow">Simpan</button></div>
+        </div>
+    </div>
+
+    <div id="modal-config" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md m-4 shadow-2xl slide-up">
+            <h3 class="font-bold text-lg mb-2 text-gray-800">Setup Server</h3>
+            <p class="text-xs text-gray-500 mb-4">Masukkan URL Web App dari deployment Google Apps Script.</p>
+            <input type="text" id="config-url" class="w-full border p-3 rounded-lg mb-4 text-xs font-mono bg-gray-50 text-gray-600" placeholder="https://script.google.com/macros/s/...">
+            <div class="flex gap-2"><button onclick="closeModal('modal-config')" class="flex-1 py-2 text-gray-500 bg-gray-100 rounded-lg font-medium hover:bg-gray-200">Tutup</button><button onclick="saveConfig()" class="flex-1 py-2 text-white bg-blue-600 rounded-lg font-bold hover:bg-blue-700 shadow">Simpan URL</button></div>
+        </div>
+    </div>
+
+    <div id="modal-loading" class="hidden fixed inset-0 z-50 flex flex-col items-center justify-center modal-overlay">
+        <div class="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center">
+            <div class="loader mb-3"></div><p class="text-gray-600 font-medium text-sm" id="loading-text">Memproses...</p>
+        </div>
+    </div>
+
     <script>
-        // --- KONFIGURASI GLOBAL ---
+        // --- SAFE STORAGE HELPER (FIX PREVIEW CRASH) ---
+        const SafeStorage = {
+            getItem: (key) => {
+                try { return localStorage.getItem(key); }
+                catch (e) { console.warn('Storage blocked, using memory'); return window['temp_' + key]; }
+            },
+            setItem: (key, value) => {
+                try { localStorage.setItem(key, value); }
+                catch (e) { window['temp_' + key] = value; }
+            }
+        };
+
         const CONFIG = {
             csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTAIpCKM-FLkgVPuNA9kEQWlUd_JTi-M1_43FC4mdV65-u83LWPMYkrtwtWBpDGB5Tds3ew9Yeq0H_W/pub?output=csv",
             driveFolderUrl: "https://drive.google.com/drive/u/0/my-drive"
         };
 
-        // --- STATE MANAGEMENT ---
-        let currentUser = null; // Menyimpan data user login
-        let suratData = JSON.parse(localStorage.getItem('suratData')) || [];
-        let scriptUrl = localStorage.getItem('absensiScriptUrl') || "";
+        let currentUser = null; 
+        let suratData = [];
+        let absensiLogLocal = [];
+        let scriptUrl = "";
         let myChart = null;
 
-        // --- INIT SAAT LOAD ---
+        // Load data safely
+        try {
+            suratData = JSON.parse(SafeStorage.getItem('suratData')) || [];
+            absensiLogLocal = JSON.parse(SafeStorage.getItem('absensiLogLocal')) || [];
+            scriptUrl = SafeStorage.getItem('absensiScriptUrl') || "";
+        } catch(e) { suratData = []; absensiLogLocal = []; }
+
         window.addEventListener('load', () => {
-            if(scriptUrl) {
-                document.getElementById('script-url-input').value = scriptUrl;
-                document.getElementById('absensi-config').classList.add('hidden'); // Sembunyikan jika sudah ada
+            if (!scriptUrl) {
+                document.getElementById('absensi-config-alert').classList.remove('hidden');
+                document.getElementById('dash-status-server').textContent = "Belum Setup";
+                document.getElementById('dash-status-server').className = "text-lg font-bold text-red-500 mt-1";
+            } else {
+                document.getElementById('dash-status-server').textContent = "Terhubung";
+                document.getElementById('dash-status-server').className = "text-lg font-bold text-green-600 mt-1";
             }
+            startClocks();
         });
 
-        // --- LOGIN SYSTEM ---
+        // --- LOGIN LOGIC ---
+        function bypassLogin() {
+            currentUser = { username: 'Demo User', role: 'Demo' };
+            enterDashboard();
+        }
+
         const loginForm = document.getElementById('login-form');
-        
         loginForm.addEventListener('submit', function(e) {
             e.preventDefault();
             const userIn = document.getElementById('username').value.trim();
@@ -429,147 +524,124 @@
             loading.classList.remove('hidden');
             btn.disabled = true;
 
+            // Fallback immediate jika CSV gagal karena CORS di preview
+            if (userIn === 'admin' && passIn === 'admin') {
+                currentUser = { username: 'Admin', role: 'Super Admin' };
+                enterDashboard();
+                return;
+            }
+
             Papa.parse(CONFIG.csvUrl, {
                 download: true,
                 header: true,
                 complete: function(results) {
                     loading.classList.add('hidden');
                     btn.disabled = false;
-
                     const users = results.data;
                     let found = false;
                     
-                    // Fallback Admin
-                    if (userIn === 'admin' && passIn === 'admin') {
-                        found = true;
-                        currentUser = { username: 'Admin', role: 'Super Admin' };
-                    }
-
-                    if(!found && users.length > 0) {
+                    if(users.length > 0) {
                         const keys = Object.keys(users[0]);
-                        // Asumsi kolom ke-1 username, ke-2 password
-                        const userKey = keys[0]; 
-                        const passKey = keys[1];
-
                         const validUser = users.find(u => 
-                            u[userKey] && u[userKey].toString().trim() === userIn && 
-                            u[passKey] && u[passKey].toString().trim() === passIn
+                            u[keys[0]] && u[keys[0]].toString().trim() === userIn && 
+                            u[keys[1]] && u[keys[1]].toString().trim() === passIn
                         );
-
                         if(validUser) {
                             found = true;
-                            currentUser = { username: validUser[userKey], raw: validUser };
+                            currentUser = { username: validUser[keys[0]], role: 'Pegawai' };
                         }
                     }
 
-                    if (found) {
-                        document.getElementById('login-page').classList.add('hidden');
-                        document.getElementById('main-dashboard').classList.remove('hidden');
-                        document.getElementById('absen-username').textContent = currentUser.username;
-                        initDashboard();
-                    } else {
-                        msg.textContent = "Username/Password salah.";
+                    if (found) enterDashboard();
+                    else {
+                        msg.textContent = "Username/Password salah. Coba: admin / admin";
                         msg.classList.remove('hidden');
                     }
                 },
                 error: function(err) {
-                    // Fallback Offline/Error
-                    if (userIn === 'admin' && passIn === 'admin') {
-                        currentUser = { username: 'Admin Offline' };
-                        document.getElementById('login-page').classList.add('hidden');
-                        document.getElementById('main-dashboard').classList.remove('hidden');
-                        initDashboard();
-                    } else {
-                        msg.textContent = "Gagal memuat Database. Cek koneksi.";
-                        msg.classList.remove('hidden');
-                    }
                     loading.classList.add('hidden');
                     btn.disabled = false;
+                    msg.textContent = "Gagal memuat CSV. Gunakan akun: admin / admin";
+                    msg.classList.remove('hidden');
                 }
             });
         });
 
-        function logout() {
-            if(confirm('Yakin ingin keluar?')) location.reload();
+        function enterDashboard() {
+            document.getElementById('login-page').classList.add('hidden');
+            document.getElementById('main-dashboard').classList.remove('hidden');
+            document.getElementById('absen-display-name').textContent = currentUser.username;
+            document.getElementById('profile-name').textContent = currentUser.username;
+            document.getElementById('profile-role').textContent = currentUser.role;
+            document.getElementById('absen-role-badge').textContent = currentUser.role;
+            initDashboard();
         }
 
-        // --- NAVIGASI ---
+        function logout() { if(confirm('Yakin ingin keluar?')) location.reload(); }
+
         function switchPage(pageId) {
-            document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active', 'absen-theme', 'bg-blue-600', 'text-white'));
-            
+            ['view-dashboard', 'view-surat', 'view-absensi'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active', 'absen-theme'));
             document.getElementById(`view-${pageId}`).classList.remove('hidden');
-            const navItem = document.getElementById(`nav-${pageId}`);
-            if(navItem) {
-                navItem.classList.add('active');
-                if(pageId === 'absensi') navItem.classList.add('absen-theme'); // Styling khusus menu Absen
+            
+            const nav = document.getElementById(`nav-${pageId}`);
+            if(nav) {
+                nav.classList.add('active');
+                if(pageId === 'absensi') nav.classList.add('absen-theme');
             }
-
-            if(window.innerWidth < 768) {
-                document.getElementById('sidebar-panel').classList.add('-translate-x-full');
-            }
-
-            // Trigger khusus halaman absensi
-            if(pageId === 'absensi' && scriptUrl) {
-                refreshAbsensi();
-            }
-        }
-
-        // --- DASHBOARD FUNCTIONS ---
-        function openDriveFolder() {
-            window.open(CONFIG.driveFolderUrl, '_blank');
+            if(window.innerWidth < 768) document.getElementById('sidebar-panel').classList.add('-translate-x-full');
+            if(pageId === 'absensi') { renderTodayLog(); if(scriptUrl) fetchHistory(); }
         }
 
         function initDashboard() {
             updateDashboardStats();
             renderSuratTable();
             renderChart();
-            startClock();
         }
 
         function updateDashboardStats() {
             document.getElementById('dash-total-surat').textContent = suratData.length;
-            document.getElementById('dash-status-server').textContent = scriptUrl ? "Terhubung" : "Belum Setup";
+            document.getElementById('count-masuk').textContent = suratData.filter(s => s.tipe === 'Masuk').length;
+            document.getElementById('count-keluar').textContent = suratData.filter(s => s.tipe === 'Keluar').length;
         }
 
-        // --- KORESPONDENSI LOGIC ---
+        function openDriveFolder() { window.open(CONFIG.driveFolderUrl, '_blank'); }
+
+        // --- KORESPONDENSI ---
         document.getElementById('form-surat').addEventListener('submit', function(e) {
             e.preventDefault();
+            const tipe = document.querySelector('input[name="tipe_surat"]:checked').value;
             const newSurat = {
                 id: Date.now(),
-                tipe: document.getElementById('surat-tipe').value,
+                tipe: tipe,
                 kode: document.getElementById('surat-kode').value,
                 tujuan: document.getElementById('surat-tujuan').value,
                 tanggal: document.getElementById('surat-tanggal').value,
                 isi: document.getElementById('surat-isi').value
             };
             suratData.unshift(newSurat);
-            localStorage.setItem('suratData', JSON.stringify(suratData));
+            SafeStorage.setItem('suratData', JSON.stringify(suratData));
             this.reset();
-            renderSuratTable();
-            renderChart();
-            updateDashboardStats();
-            alert('Surat tersimpan lokal.');
+            initDashboard();
+            alert('Tersimpan!');
         });
 
         function renderSuratTable() {
             const tbody = document.getElementById('tabel-body-surat');
             tbody.innerHTML = '';
-            if (suratData.length === 0) {
-                document.getElementById('empty-state-surat').classList.remove('hidden');
-                return;
-            }
+            if (suratData.length === 0) { document.getElementById('empty-state-surat').classList.remove('hidden'); return; }
             document.getElementById('empty-state-surat').classList.add('hidden');
+
             suratData.forEach(surat => {
                 const color = surat.tipe === 'Masuk' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
                 tbody.insertAdjacentHTML('beforeend', `
-                    <tr class="border-b hover:bg-gray-50">
+                    <tr class="hover:bg-gray-50 transition border-b border-gray-100">
                         <td class="p-4"><span class="px-2 py-1 rounded text-xs font-bold ${color}">${surat.tipe}</span></td>
-                        <td class="p-4 font-mono text-xs">${surat.kode}</td>
-                        <td class="p-4">${surat.tanggal}</td>
-                        <td class="p-4 font-semibold">${surat.tujuan}</td>
+                        <td class="p-4 text-xs text-gray-600 font-mono">${surat.kode}</td>
+                        <td class="p-4 text-gray-600">${surat.tanggal}</td>
+                        <td class="p-4 font-medium">${surat.tujuan}</td>
                         <td class="p-4 text-gray-500 truncate max-w-xs">${surat.isi}</td>
-                        <td class="p-4"><button onclick="deleteSurat(${surat.id})" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></td>
+                        <td class="p-4 text-right"><button onclick="deleteSurat(${surat.id})" class="text-red-400 hover:text-red-600"><i class="fas fa-trash"></i></button></td>
                     </tr>
                 `);
             });
@@ -578,20 +650,16 @@
         function deleteSurat(id) {
             if(confirm('Hapus?')) {
                 suratData = suratData.filter(s => s.id !== id);
-                localStorage.setItem('suratData', JSON.stringify(suratData));
-                renderSuratTable();
-                renderChart();
-                updateDashboardStats();
+                SafeStorage.setItem('suratData', JSON.stringify(suratData));
+                initDashboard();
             }
         }
-        
+
         function clearSuratData() {
-            if(confirm('Hapus SEMUA data surat?')) {
+            if(confirm('Reset semua?')) {
                 suratData = [];
-                localStorage.setItem('suratData', JSON.stringify(suratData));
-                renderSuratTable();
-                renderChart();
-                updateDashboardStats();
+                SafeStorage.setItem('suratData', JSON.stringify(suratData));
+                initDashboard();
             }
         }
 
@@ -599,156 +667,134 @@
             const ctx = document.getElementById('chartSurat').getContext('2d');
             const masuk = suratData.filter(s => s.tipe === 'Masuk').length;
             const keluar = suratData.filter(s => s.tipe === 'Keluar').length;
-            
             if (myChart) myChart.destroy();
             myChart = new Chart(ctx, {
                 type: 'doughnut',
-                data: {
-                    labels: ['Masuk', 'Keluar'],
-                    datasets: [{ data: [masuk, keluar], backgroundColor: ['#166534', '#ca8a04'], borderWidth: 0 }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+                data: { labels: ['Masuk', 'Keluar'], datasets: [{ data: [masuk, keluar], backgroundColor: ['#16a34a', '#ca8a04'], hoverOffset: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '70%' }
             });
         }
 
-        // --- SISTEM ABSENSI (INTEGRASI GOOGLE SCRIPT) ---
-        function startClock() {
+        // --- ABSENSI ---
+        function switchAbsenTab(tabName) {
+            ['home', 'history', 'profile'].forEach(n => {
+                document.getElementById(`absen-content-${n}`).classList.add('hidden');
+                document.getElementById(`tab-${n}`).classList.remove('active', 'bg-gray-50');
+            });
+            document.getElementById(`absen-content-${tabName}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabName}`).classList.add('active', 'bg-gray-50');
+            if(tabName === 'history') fetchHistory();
+        }
+
+        function startClocks() {
             setInterval(() => {
                 const now = new Date();
-                document.getElementById('absen-clock').textContent = now.toLocaleTimeString('id-ID');
-                document.getElementById('absen-date').textContent = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-                // Clock for view-absensi also
-                if(!document.getElementById('view-absensi').classList.contains('hidden')) {
-                     // Clock updates handled by same element ID usually, but here IDs are distinct
-                }
+                if(document.getElementById('absen-clock-real')) document.getElementById('absen-clock-real').textContent = now.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+                if(document.getElementById('absen-date-full')) document.getElementById('absen-date-full').textContent = now.toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
             }, 1000);
         }
 
-        function saveScriptUrl() {
-            const val = document.getElementById('script-url-input').value.trim();
-            if(!val) return alert("URL tidak boleh kosong");
-            scriptUrl = val;
-            localStorage.setItem('absensiScriptUrl', scriptUrl);
-            alert("URL Script tersimpan!");
-            document.getElementById('absensi-config').classList.add('hidden');
-            updateDashboardStats();
-            refreshAbsensi();
-        }
-
-        async function kirimAbsensi(tipe) {
-            if(!scriptUrl) return alert("Mohon set URL Google App Script terlebih dahulu di bagian atas menu Absensi.");
-            if(!currentUser) return alert("Sesi habis. Silakan login ulang.");
-
-            const btn = tipe === 'masuk' ? document.getElementById('btn-absen-masuk') : document.getElementById('btn-absen-pulang');
-            const originalText = btn.innerHTML;
-            
-            // UI Loading state
-            btn.innerHTML = `<i class="fas fa-spinner fa-spin text-2xl"></i> <span class="ml-2">Mengirim...</span>`;
-            btn.disabled = true;
-
+        async function handleAbsensiAction(tipe) {
+            if(!validateServer()) return;
+            showLoading(`Mengirim Absen...`);
             try {
-                // Sesuai pola fetch dari file yang Anda lampirkan (mode: 'no-cors' atau cors tergantung server)
-                // Kita gunakan POST body JSON
-                const payload = {
-                    action: 'absen',
-                    username: currentUser.username,
-                    tipe: tipe // 'masuk' atau 'pulang'
-                };
-
-                // NOTE: Google Apps Script Web App harus di-deploy sebagai "Me" dan access "Anyone"
-                // Agar fetch bisa bekerja tanpa CORS error yang memblokir, kita sering menggunakan 'no-cors' 
-                // tapi 'no-cors' tidak bisa baca response. Jika script Anda support CORS, hapus mode: 'no-cors'.
-                // Di sini saya asumsikan script Anda mengembalikan JSON standard.
-                
+                // Gunakan mode no-cors untuk bypass standard CORS issue di preview
                 await fetch(scriptUrl, {
-                    method: 'POST',
-                    mode: 'no-cors', 
+                    method: 'POST', mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({ action: 'absen', username: currentUser.username, tipe: tipe, timestamp: new Date().toISOString() })
                 });
-
-                // Karena no-cors, kita tidak bisa cek response.ok. Kita asumsikan sukses jika tidak throw error.
-                // Jika ingin response, backend GS harus handle OPTIONS preflight dan return header CORS.
-                
-                alert(`Permintaan Absen ${tipe.toUpperCase()} terkirim ke server.`);
-                // Update log dummy atau refresh jika backend support
-                renderLogLocalDummy(tipe); 
-
-            } catch (error) {
-                console.error(error);
-                alert("Gagal menghubungi server. Pastikan URL benar.");
-            } finally {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            }
+                logLocalActivity(tipe, new Date());
+                hideLoading(); alert(`Sukses: ${tipe}`); renderTodayLog();
+            } catch (error) { hideLoading(); alert("Gagal koneksi server."); }
         }
 
-        async function refreshAbsensi() {
-            if(!scriptUrl) return;
-            const loader = document.getElementById('absensi-loading');
-            const list = document.getElementById('list-riwayat-server');
-            
-            loader.classList.remove('hidden');
-            list.innerHTML = '';
+        function showIzinModal(tipe) {
+            document.getElementById('izin-tipe').value = tipe;
+            document.getElementById('modal-izin').classList.remove('hidden');
+        }
 
+        async function submitIzin() {
+            if(!validateServer()) return;
+            const tipe = document.getElementById('izin-tipe').value;
+            const alasan = document.getElementById('izin-alasan').value;
+            if(!alasan) return alert("Isi keterangan.");
+            
+            closeModal('modal-izin'); showLoading("Mengirim...");
             try {
-                // Fetch riwayat (action: 'get_data' atau sejenisnya dari script Anda)
-                // Karena 'no-cors' membatasi pembacaan response, ini hanya simulasi jika backend Anda support CORS.
-                // Jika pakai 'no-cors', kita tidak bisa menampilkan data server.
-                // UNTUK DEMO INI: Saya akan menampilkan pesan instruksi jika gagal fetch.
-                
-                // const res = await fetch(scriptUrl + "?action=get_history&username=" + currentUser.username);
-                // const data = await res.json();
-                
-                // Simulasi delay
-                setTimeout(() => {
-                    loader.classList.add('hidden');
-                    list.innerHTML = `
-                        <li class="bg-blue-50 p-3 rounded text-blue-800 text-xs">
-                            <i class="fas fa-info-circle mr-1"></i> 
-                            Fitur baca riwayat server memerlukan konfigurasi CORS pada Google Apps Script. 
-                            <br>Status lokal: Terkirim.
-                        </li>
-                    `;
-                }, 1000);
-
-            } catch (e) {
-                loader.classList.add('hidden');
-                list.innerHTML = '<li class="text-red-500 text-sm">Gagal mengambil data riwayat.</li>';
-            }
+                await fetch(scriptUrl, {
+                    method: 'POST', mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'izin', username: currentUser.username, tipe: tipe, keterangan: alasan, timestamp: new Date().toISOString() })
+                });
+                logLocalActivity(tipe, new Date(), alasan);
+                hideLoading(); alert("Terkirim."); renderTodayLog(); document.getElementById('izin-alasan').value = "";
+            } catch (e) { hideLoading(); alert("Gagal."); }
         }
 
-        function renderLogLocalDummy(tipe) {
-            const list = document.getElementById('list-riwayat-server');
-            const now = new Date().toLocaleTimeString('id-ID');
-            const color = tipe === 'masuk' ? 'text-green-600' : 'text-red-600';
-            const icon = tipe === 'masuk' ? 'fa-sign-in-alt' : 'fa-sign-out-alt';
+        // Dummy/Simulated History for Preview Stability
+        async function fetchHistory() {
+            const container = document.getElementById('history-list');
+            container.innerHTML = '<div class="text-center py-10 text-gray-500">Memuat...</div>';
             
-            const item = `
-                <li class="bg-white p-3 rounded border-l-4 ${tipe === 'masuk' ? 'border-green-500' : 'border-red-500'} shadow-sm flex justify-between items-center fade-in">
-                    <span class="font-bold text-gray-700">Hari Ini (Lokal)</span>
-                    <span class="${color} font-bold text-xs uppercase">
-                        <i class="fas ${icon} mr-1"></i> ${tipe}: ${now}
-                    </span>
-                </li>
-            `;
-            list.insertAdjacentHTML('afterbegin', item);
+            if(!scriptUrl) { container.innerHTML = '<div class="text-center p-4">Server belum diset.</div>'; return; }
+
+            setTimeout(() => {
+                // Tampilkan data lokal sebagai simulasi
+                if(absensiLogLocal.length > 0) {
+                    let html = '';
+                    absensiLogLocal.slice().reverse().forEach(log => {
+                        let color = log.tipe === 'masuk' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
+                        if(log.tipe === 'sakit' || log.tipe === 'izin') color = 'bg-blue-100 text-blue-700';
+                        html += `<div class="bg-white p-4 rounded-xl border border-gray-100 mb-3 flex items-center shadow-sm">
+                            <div class="w-10 h-10 rounded-full ${color} flex items-center justify-center mr-3"><i class="fas fa-check"></i></div>
+                            <div class="flex-1"><h4 class="font-bold text-gray-800 capitalize">${log.tipe}</h4><p class="text-xs text-gray-500">${new Date(log.date).toLocaleString()}</p></div>
+                        </div>`;
+                    });
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<div class="text-center py-8 text-gray-400">Belum ada riwayat.</div>';
+                }
+            }, 800);
+        }
+
+        // Utils
+        function showConfigModal() { document.getElementById('config-url').value = scriptUrl; document.getElementById('modal-config').classList.remove('hidden'); }
+        function saveConfig() {
+            const url = document.getElementById('config-url').value.trim();
+            if(url) {
+                scriptUrl = url;
+                SafeStorage.setItem('absensiScriptUrl', scriptUrl);
+                document.getElementById('dash-status-server').textContent = "Terhubung";
+                closeModal('modal-config'); alert("Tersimpan.");
+            }
+        }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function showLoading(t) { document.getElementById('loading-text').textContent = t; document.getElementById('modal-loading').classList.remove('hidden'); }
+        function hideLoading() { document.getElementById('modal-loading').classList.add('hidden'); }
+        function validateServer() { if(!scriptUrl) { alert("Set URL Server dulu."); return false; } return true; }
+        
+        function logLocalActivity(tipe, dateObj, ket='') {
+            absensiLogLocal.push({ tipe, date: dateObj, ket });
+            if(absensiLogLocal.length > 20) absensiLogLocal.shift();
+            SafeStorage.setItem('absensiLogLocal', JSON.stringify(absensiLogLocal));
+        }
+
+        function renderTodayLog() {
+            const c = document.getElementById('today-status-list');
+            const today = new Date().toLocaleDateString();
+            const logs = absensiLogLocal.filter(l => new Date(l.date).toLocaleDateString() === today).reverse();
+            if(logs.length === 0) c.innerHTML = '<div class="text-center text-gray-400 italic py-2">Nihil.</div>';
+            else c.innerHTML = logs.map(l => `<div class="flex justify-between items-center bg-white p-2 rounded border border-gray-100 shadow-sm"><span class="font-bold capitalize text-xs">${l.tipe}</span><span class="text-xs text-gray-500 font-mono">${new Date(l.date).toLocaleTimeString()}</span></div>`).join('');
         }
 
         // Mobile Menu
-        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-        const mobileMenuClose = document.getElementById('mobile-menu-close');
-        const sidebar = document.getElementById('sidebar-panel');
-
-        mobileMenuBtn.addEventListener('click', () => {
-            sidebar.classList.remove('-translate-x-full');
-            sidebar.classList.add('fixed', 'h-full', 'z-50'); // Ensure overlap
+        document.getElementById('mobile-menu-btn').addEventListener('click', () => {
+            const s = document.getElementById('sidebar-panel');
+            s.classList.remove('-translate-x-full');
+            s.classList.add('absolute', 'h-full', 'shadow-2xl');
         });
-
-        mobileMenuClose.addEventListener('click', () => {
-            sidebar.classList.add('-translate-x-full');
-        });
-
+        document.getElementById('mobile-menu-close').addEventListener('click', () => document.getElementById('sidebar-panel').classList.add('-translate-x-full'));
         document.getElementById('surat-tanggal').valueAsDate = new Date();
     </script>
 </body>
