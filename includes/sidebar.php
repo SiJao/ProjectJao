@@ -15,8 +15,9 @@ function nav_link($modulKey, $icon, $label, $currentModul)
         <span class="fw-semibold text-white">Menu</span>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#sidebarMobile" aria-label="Tutup"></button>
     </div>
-    <div class="logo-box">
+    <div class="logo-box position-relative">
         <img src="https://ik.imagekit.io/HiLink/LOGO%20HISADA%20.png?updatedAt=1788676662703" alt="Logo Hisada">
+        <span id="notifBadge" class="badge bg-danger rounded-pill d-none" style="position:absolute;top:10px;right:16px;" title=""></span>
     </div>
 
     <small class="section-title">Umum</small>
@@ -29,6 +30,8 @@ function nav_link($modulKey, $icon, $label, $currentModul)
         <small class="section-title">Kesantrian</small>
         <?php nav_link('absensi', 'bi-clipboard-check', 'Absensi', $currentModul); ?>
         <?php nav_link('perizinan', 'bi-door-open', 'Perizinan & Kamtib', $currentModul); ?>
+        <?php nav_link('kunjungan_tamu', 'bi-person-lines-fill', 'Kunjungan Tamu', $currentModul); ?>
+        <?php nav_link('inventaris', 'bi-box-seam', 'Inventaris Barang', $currentModul); ?>
     <?php endif; ?>
 
     <?php if ($isAdmin || in_array($role, ['asisten_poskestren'], true)): ?>
@@ -53,6 +56,7 @@ function nav_link($modulKey, $icon, $label, $currentModul)
         <small class="section-title">Administrasi</small>
         <?php nav_link('korespondensi', 'bi-envelope', 'Korespondensi', $currentModul); ?>
         <?php nav_link('prestasi', 'bi-trophy', 'Prestasi Santri', $currentModul); ?>
+        <?php nav_link('rapor', 'bi-file-earmark-text', 'Rapor Kesantrian', $currentModul); ?>
     <?php endif; ?>
 
     <?php if ($isAdmin): ?>
@@ -61,6 +65,7 @@ function nav_link($modulKey, $icon, $label, $currentModul)
         <?php nav_link('serah_terima', 'bi-arrow-left-right', 'Serah Terima Jabatan', $currentModul); ?>
         <?php nav_link('data_master', 'bi-database', 'Data Master', $currentModul); ?>
         <?php nav_link('history', 'bi-clock-history', 'Riwayat Perubahan', $currentModul); ?>
+        <?php nav_link('backup', 'bi-cloud-arrow-down', 'Backup Database', $currentModul); ?>
     <?php endif; ?>
 
     <div class="mt-auto user-box">

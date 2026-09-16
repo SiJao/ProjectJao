@@ -34,6 +34,11 @@ $moduleAccess = [
     'serah_terima'        => [],
     'data_master'         => [],     // super admin -- kelola kelas/kamar/keluarga/guru/santri + import CSV
     'history'             => [],     // super admin -- riwayat perubahan (audit log)
+    'kunjungan_tamu'      => ['piket'],
+    'inventaris'          => ['piket'],
+    'rapor'               => ['sekretaris'],
+    'backup'              => [],     // super admin
+    'notif_count'         => null,   // login saja -- endpoint JSON polling notifikasi
 ];
 
 /**
@@ -50,6 +55,79 @@ function nama_bulan_indo(string $namaInggris): string
         'November' => 'November', 'December' => 'Desember',
     ];
     return $peta[$namaInggris] ?? $namaInggris;
+}
+
+/**
+ * Export data ke file .xlsx ASLI (bukan CSV) tanpa Composer/PhpSpreadsheet
+ * -- cukup pakai ekstensi ZipArchive bawaan PHP + XML minimal, karena
+ * format .xlsx pada dasarnya cuma file ZIP berisi beberapa XML.
+ * $headers: array nama kolom. $rows: array of array (baris data, urutan
+ * kolom harus sama dgn $headers). Langsung stream sbg download & exit.
+ */
+function export_xlsx(string $namaFile, array $headers, array $rows): void
+{
+    $escXml = fn($v) => htmlspecialchars((string) $v, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+
+    $sheetRows = '';
+    $rowNum = 1;
+    $sheetRows .= '<row r="' . $rowNum . '">';
+    foreach ($headers as $i => $h) {
+        $col = chr(65 + $i);
+        $sheetRows .= '<c r="' . $col . $rowNum . '" t="inlineStr"><is><t>' . $escXml($h) . '</t></is></c>';
+    }
+    $sheetRows .= '</row>';
+    foreach ($rows as $row) {
+        $rowNum++;
+        $sheetRows .= '<row r="' . $rowNum . '">';
+        foreach (array_values($row) as $i => $val) {
+            $col = chr(65 + $i);
+            $sheetRows .= '<c r="' . $col . $rowNum . '" t="inlineStr"><is><t>' . $escXml($val ?? '') . '</t></is></c>';
+        }
+        $sheetRows .= '</row>';
+    }
+
+    $sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        . '<sheetData>' . $sheetRows . '</sheetData></worksheet>';
+
+    $contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        . '<Default Extension="xml" ContentType="application/xml"/>'
+        . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        . '</Types>';
+
+    $rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        . '</Relationships>';
+
+    $workbookXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        . '<sheets><sheet name="Data" sheetId="1" r:id="rId1"/></sheets></workbook>';
+
+    $workbookRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        . '</Relationships>';
+
+    $tmpFile = tempnam(sys_get_temp_dir(), 'xlsx_');
+    $zip = new ZipArchive();
+    $zip->open($tmpFile, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('[Content_Types].xml', $contentTypes);
+    $zip->addFromString('_rels/.rels', $rootRels);
+    $zip->addFromString('xl/workbook.xml', $workbookXml);
+    $zip->addFromString('xl/_rels/workbook.xml.rels', $workbookRels);
+    $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
+    $zip->close();
+
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . $namaFile . '.xlsx"');
+    header('Content-Length: ' . filesize($tmpFile));
+    readfile($tmpFile);
+    unlink($tmpFile);
+    exit;
 }
 
 /**
@@ -117,6 +195,32 @@ if ($modul === 'home') {
 }
 
 // ======================================================================
+// MODUL: NOTIF_COUNT -- endpoint JSON polling notifikasi (fallback ringan
+// menggantikan Web Push yang butuh enkripsi rumit; ini yg SUNGGUH bisa
+// diuji & jalan tanpa perlu browser sungguhan/HTTPS/dsb.). Dipanggil via
+// AJAX oleh sidebar setiap 30 detik.
+// ======================================================================
+elseif ($modul === 'notif_count') {
+    header('Content-Type: application/json');
+    $jml = 0;
+    $pesan = '';
+    if ($user['is_super_admin'] || $user['role_key'] === 'hakim') {
+        $n = (int) $pdo->query("SELECT COUNT(*) FROM violations WHERE status='menunggu'")->fetchColumn();
+        if ($n > 0) { $jml += $n; $pesan .= "$n pelanggaran menunggu sidang. "; }
+    }
+    if ($user['is_super_admin'] || $user['role_key'] === 'dokter') {
+        $n = (int) $pdo->query("SELECT COUNT(*) FROM poskestren_records WHERE diperiksa_oleh IS NULL")->fetchColumn();
+        if ($n > 0) { $jml += $n; $pesan .= "$n santri menunggu diperiksa dokter. "; }
+    }
+    if ($user['is_super_admin'] || $user['role_key'] === 'piket') {
+        $n = (int) $pdo->query("SELECT COUNT(*) FROM permits WHERE status='overdue'")->fetchColumn();
+        if ($n > 0) { $jml += $n; $pesan .= "$n santri overdue perizinan. "; }
+    }
+    echo json_encode(['jumlah' => $jml, 'pesan' => trim($pesan)]);
+    exit;
+}
+
+// ======================================================================
 // MODUL: ABSENSI -- kartu pilihan
 // ======================================================================
 elseif ($modul === 'absensi') {
@@ -160,6 +264,11 @@ elseif ($modul === 'absensi_kamar') {
         ");
         $stmt->execute(['rid' => $roomId, 'tgl' => $tanggal]);
         $students = $stmt->fetchAll();
+    }
+
+    if (isset($_GET['export']) && $_GET['export'] === 'xlsx' && $roomId) {
+        $baris = array_map(fn($s) => [$s['nis'], $s['nama'], ucfirst($s['status'] ?? 'hadir'), $s['keterangan'] ?? ''], $students);
+        export_xlsx('absensi_kamar_' . $tanggal, ['NIS', 'Nama', 'Status', 'Keterangan'], $baris);
     }
 }
 
@@ -548,6 +657,11 @@ elseif ($modul === 'korespondensi') {
     }
 
     $daftarSurat = $pdo->query('SELECT * FROM correspondences ORDER BY id DESC LIMIT 30')->fetchAll();
+
+    if (isset($_GET['export']) && $_GET['export'] === 'xlsx') {
+        $baris = array_map(fn($d) => [$d['nomor_surat'], $d['jenis'] === 'keluar' ? 'Keluar' : 'Masuk', $d['perihal'], $d['tanggal'], $d['status_disposisi'] ?? '-'], $daftarSurat);
+        export_xlsx('korespondensi_' . date('Ymd'), ['Nomor Surat', 'Jenis', 'Perihal', 'Tanggal', 'Status Disposisi'], $baris);
+    }
 }
 
 // ======================================================================
@@ -573,6 +687,11 @@ elseif ($modul === 'prestasi') {
         SELECT a.*, s.nama AS nama_santri FROM achievements a JOIN students s ON s.id=a.student_id
         ORDER BY a.tanggal DESC LIMIT 30
     ")->fetchAll();
+
+    if (isset($_GET['export']) && $_GET['export'] === 'xlsx') {
+        $baris = array_map(fn($d) => [$d['nama_santri'], $d['nama_kegiatan'], $d['lokasi'], ucfirst($d['tingkat']), $d['tanggal'], $d['keterangan']], $daftar);
+        export_xlsx('prestasi_santri_' . date('Ymd'), ['Nama Santri', 'Kegiatan', 'Lokasi', 'Tingkat', 'Tanggal', 'Keterangan'], $baris);
+    }
 }
 
 // ======================================================================
@@ -701,7 +820,11 @@ elseif ($modul === 'cari_santri') {
 // ======================================================================
 elseif ($modul === 'cari_guru') {
     $page_title = 'Cari Guru';
-    $hasilGuru = $pdo->query('SELECT id, nip, nama, jenis_kelamin, no_hp FROM teachers ORDER BY nama')->fetchAll();
+    $hasilGuru = $pdo->query('
+        SELECT t.id, t.nip, t.nama, t.jenis_kelamin, t.no_hp, r.nama_kamar, r.gedung
+        FROM teachers t LEFT JOIN rooms r ON r.id = t.wali_kamar_room_id
+        ORDER BY t.nama
+    ')->fetchAll();
 }
 
 // ======================================================================
@@ -851,10 +974,22 @@ elseif ($modul === 'data_master') {
         log_audit($pdo, $user['id'], 'Tambah data keluarga: ' . $_POST['nama_ayah']);
         $success = 'Data keluarga berhasil ditambahkan.';
     }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'buat_akun_wali') {
+        $pdo->prepare("
+            INSERT INTO wali_akses (family_id, username, password, status)
+            VALUES (:fid, :username, :pass, 'aktif')
+            ON DUPLICATE KEY UPDATE username=VALUES(username), password=VALUES(password), status='aktif'
+        ")->execute([
+            'fid' => $_POST['family_id'], 'username' => $_POST['wali_username'],
+            'pass' => password_hash($_POST['wali_password'], PASSWORD_BCRYPT),
+        ]);
+        log_audit($pdo, $user['id'], 'Buat/reset akun wali santri utk keluarga #' . $_POST['family_id']);
+        $success = 'Akun Wali Santri berhasil dibuat/direset.';
+    }
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'tambah_guru') {
-        $pdo->prepare('INSERT INTO teachers (nip, nama, jenis_kelamin, no_hp) VALUES (:nip, :nama, :jk, :hp)
-                       ON DUPLICATE KEY UPDATE nama=VALUES(nama), jenis_kelamin=VALUES(jenis_kelamin), no_hp=VALUES(no_hp)')
-            ->execute(['nip' => $_POST['nip'] ?: null, 'nama' => $_POST['nama'], 'jk' => $_POST['jenis_kelamin'], 'hp' => $_POST['no_hp']]);
+        $pdo->prepare('INSERT INTO teachers (nip, nama, jenis_kelamin, no_hp, wali_kamar_room_id) VALUES (:nip, :nama, :jk, :hp, :wali)
+                       ON DUPLICATE KEY UPDATE nama=VALUES(nama), jenis_kelamin=VALUES(jenis_kelamin), no_hp=VALUES(no_hp), wali_kamar_room_id=VALUES(wali_kamar_room_id)')
+            ->execute(['nip' => $_POST['nip'] ?: null, 'nama' => $_POST['nama'], 'jk' => $_POST['jenis_kelamin'], 'hp' => $_POST['no_hp'], 'wali' => $_POST['wali_kamar_room_id'] ?: null]);
         log_audit($pdo, $user['id'], 'Tambah data guru: ' . $_POST['nama']);
         $success = 'Guru berhasil ditambahkan.';
     }
@@ -872,8 +1007,74 @@ elseif ($modul === 'data_master') {
             'tempat' => $_POST['tempat_lahir'] ?: null, 'tgl_lahir' => $_POST['tanggal_lahir'] ?: null,
             'tgl_masuk' => $_POST['tanggal_masuk'] ?: null, 'kelas' => $kelasId, 'kamar' => $kamarId,
         ]);
+        // Kalau langsung diberi kamar saat pertama dibuat, catat sbg riwayat_kamar awal.
+        if ($kamarId) {
+            $sidBaru = $pdo->prepare('SELECT id FROM students WHERE nis = :nis');
+            $sidBaru->execute(['nis' => $_POST['nis']]);
+            $sidBaru = $sidBaru->fetchColumn();
+            $adaRiwayat = $pdo->prepare("SELECT id FROM riwayat_kamar WHERE student_id = :sid AND status = 'aktif'");
+            $adaRiwayat->execute(['sid' => $sidBaru]);
+            if (!$adaRiwayat->fetchColumn()) {
+                $pdo->prepare("INSERT INTO riwayat_kamar (student_id, room_id, tanggal_mulai, status) VALUES (:sid, :rid, :tgl, 'aktif')")
+                    ->execute(['sid' => $sidBaru, 'rid' => $kamarId, 'tgl' => $_POST['tanggal_masuk'] ?: date('Y-m-d')]);
+            }
+        }
         log_audit($pdo, $user['id'], 'Tambah data santri: ' . $_POST['nis'] . ' - ' . $_POST['nama']);
         $success = 'Santri berhasil ditambahkan.';
+    }
+
+    // -------- Edit Santri (kamar/kelas/status/profil kesehatan) --------
+    // Perpindahan kamar TIDAK menimpa data lama -- riwayat_kamar yg masih
+    // "aktif" diarsipkan dulu (tanggal_selesai diisi hari ini), baru baris
+    // baru dibuat. Pola sama persis dgn riwayat_jabatan.
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'edit_santri') {
+        $sid = $_POST['student_id'];
+        $kamarBaru = $_POST['room_id'] ?: null;
+        $kelasBaru = $_POST['class_id'] ?: null;
+        $statusBaru = $_POST['status'];
+
+        $lama = $pdo->prepare('SELECT room_id, status FROM students WHERE id = :sid');
+        $lama->execute(['sid' => $sid]);
+        $lama = $lama->fetch();
+
+        $pdo->prepare('UPDATE students SET nama=:nama, jenis_kelamin=:jk, class_id=:kelas, room_id=:kamar, status=:status WHERE id=:sid')
+            ->execute([
+                'nama' => $_POST['nama'], 'jk' => $_POST['jenis_kelamin'], 'kelas' => $kelasBaru,
+                'kamar' => $kamarBaru, 'status' => $statusBaru, 'sid' => $sid,
+            ]);
+
+        // -- Riwayat mutasi kamar: cuma dicatat kalau kamarnya BENAR berubah.
+        if ((string) $lama['room_id'] !== (string) $kamarBaru) {
+            $pdo->prepare("UPDATE riwayat_kamar SET status='arsip', tanggal_selesai=CURDATE() WHERE student_id=:sid AND status='aktif'")
+                ->execute(['sid' => $sid]);
+            if ($kamarBaru) {
+                $pdo->prepare("INSERT INTO riwayat_kamar (student_id, room_id, tanggal_mulai, status) VALUES (:sid, :rid, CURDATE(), 'aktif')")
+                    ->execute(['sid' => $sid, 'rid' => $kamarBaru]);
+            }
+            log_audit($pdo, $user['id'], "Mutasi kamar santri #$sid");
+        }
+
+        // -- Alumni/Kelulusan: kalau status berubah JADI bukan aktif, akun
+        //    login (kalau ada) otomatis dinonaktifkan -- bukan dihapus.
+        if ($lama['status'] === 'aktif' && $statusBaru !== 'aktif') {
+            $pdo->prepare("UPDATE users SET status='nonaktif' WHERE student_id=:sid")->execute(['sid' => $sid]);
+            log_audit($pdo, $user['id'], "Santri #$sid berubah status jadi $statusBaru, akun login dinonaktifkan");
+        }
+
+        // -- Profil Kesehatan Tetap (upsert) --
+        $pdo->prepare("
+            INSERT INTO health_profiles (student_id, golongan_darah, alergi, penyakit_kronis, catatan_lain)
+            VALUES (:sid, :gol, :alergi, :kronis, :catatan)
+            ON DUPLICATE KEY UPDATE golongan_darah=VALUES(golongan_darah), alergi=VALUES(alergi),
+                penyakit_kronis=VALUES(penyakit_kronis), catatan_lain=VALUES(catatan_lain)
+        ")->execute([
+            'sid' => $sid, 'gol' => $_POST['golongan_darah'] ?: 'Tidak Tahu',
+            'alergi' => $_POST['alergi'] ?: null, 'kronis' => $_POST['penyakit_kronis'] ?: null,
+            'catatan' => $_POST['catatan_lain'] ?: null,
+        ]);
+
+        log_audit($pdo, $user['id'], "Edit data santri #$sid");
+        $success = 'Data santri berhasil diperbarui.';
     }
 
     // -------- Import CSV (massal, upsert berdasar NIS/NIP) --------
@@ -971,14 +1172,89 @@ elseif ($modul === 'data_master') {
         $success = 'Import CSV santri selesai diproses.';
     }
 
+    // -------- Import CSV: Kelas, Kamar, Keluarga (lebih sederhana -- tidak
+    //          punya unique key alami, jadi selalu INSERT baris baru, bukan
+    //          upsert. Cocok utk isi data awal jumlah banyak sekaligus.) --------
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'csv_kelas' && !empty($_FILES['csv_file']['tmp_name'])) {
+        $rows = array_map('str_getcsv', file($_FILES['csv_file']['tmp_name']));
+        $header = array_map(fn($h) => strtolower(trim($h)), array_shift($rows));
+        $ditambah = 0; $gagal = [];
+        foreach ($rows as $i => $row) {
+            if (count(array_filter($row, fn($v) => trim((string)$v) !== '')) === 0) {
+                continue;
+            }
+            $data = array_combine($header, array_pad($row, count($header), null));
+            if (empty($data['nama'])) {
+                $gagal[] = 'Baris ' . ($i + 2) . ': kolom nama wajib diisi.';
+                continue;
+            }
+            $pdo->prepare('INSERT INTO classes (nama) VALUES (:nama)')->execute(['nama' => $data['nama']]);
+            $ditambah++;
+        }
+        $csvHasil = ['ditambah' => $ditambah, 'diperbarui' => 0, 'peringatan' => [], 'gagal' => $gagal];
+        log_audit($pdo, $user['id'], "Import CSV Data Kelas: $ditambah ditambah, " . count($gagal) . ' gagal');
+        $success = 'Import CSV kelas selesai diproses.';
+    }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'csv_kamar' && !empty($_FILES['csv_file']['tmp_name'])) {
+        $rows = array_map('str_getcsv', file($_FILES['csv_file']['tmp_name']));
+        $header = array_map(fn($h) => strtolower(trim($h)), array_shift($rows));
+        $ditambah = 0; $gagal = [];
+        foreach ($rows as $i => $row) {
+            if (count(array_filter($row, fn($v) => trim((string)$v) !== '')) === 0) {
+                continue;
+            }
+            $data = array_combine($header, array_pad($row, count($header), null));
+            $nomorBaris = $i + 2;
+            if (empty($data['nama_kamar']) || empty($data['gedung']) || empty($data['gender'])) {
+                $gagal[] = "Baris $nomorBaris: kolom nama_kamar/gedung/gender wajib diisi.";
+                continue;
+            }
+            $pdo->prepare('INSERT INTO rooms (nama_kamar, gedung, gender) VALUES (:nama, :gedung, :gender)')
+                ->execute(['nama' => $data['nama_kamar'], 'gedung' => $data['gedung'], 'gender' => strtoupper($data['gender']) === 'P' ? 'P' : 'L']);
+            $ditambah++;
+        }
+        $csvHasil = ['ditambah' => $ditambah, 'diperbarui' => 0, 'peringatan' => [], 'gagal' => $gagal];
+        log_audit($pdo, $user['id'], "Import CSV Data Kamar: $ditambah ditambah, " . count($gagal) . ' gagal');
+        $success = 'Import CSV kamar selesai diproses.';
+    }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'csv_keluarga' && !empty($_FILES['csv_file']['tmp_name'])) {
+        $rows = array_map('str_getcsv', file($_FILES['csv_file']['tmp_name']));
+        $header = array_map(fn($h) => strtolower(trim($h)), array_shift($rows));
+        $ditambah = 0; $gagal = [];
+        foreach ($rows as $i => $row) {
+            if (count(array_filter($row, fn($v) => trim((string)$v) !== '')) === 0) {
+                continue;
+            }
+            $data = array_combine($header, array_pad($row, count($header), null));
+            if (empty($data['nama_ayah']) && empty($data['nama_ibu'])) {
+                $gagal[] = 'Baris ' . ($i + 2) . ': minimal nama_ayah atau nama_ibu wajib diisi.';
+                continue;
+            }
+            $pdo->prepare('INSERT INTO families (nama_ayah, nama_ibu, no_hp) VALUES (:ayah, :ibu, :hp)')
+                ->execute(['ayah' => $data['nama_ayah'] ?? null, 'ibu' => $data['nama_ibu'] ?? null, 'hp' => $data['no_hp'] ?? null]);
+            $ditambah++;
+        }
+        $csvHasil = ['ditambah' => $ditambah, 'diperbarui' => 0, 'peringatan' => [], 'gagal' => $gagal];
+        log_audit($pdo, $user['id'], "Import CSV Data Keluarga: $ditambah ditambah, " . count($gagal) . ' gagal');
+        $success = 'Import CSV keluarga selesai diproses.';
+    }
+
     // -------- Data existing per tab (utk daftar) --------
     $daftarKelas = $pdo->query('SELECT * FROM classes ORDER BY nama')->fetchAll();
     $daftarKamar = $pdo->query('SELECT * FROM rooms ORDER BY gedung, nama_kamar')->fetchAll();
-    $daftarKeluarga = $pdo->query('SELECT * FROM families ORDER BY id DESC LIMIT 100')->fetchAll();
-    $daftarGuru = $pdo->query('SELECT * FROM teachers ORDER BY nama LIMIT 200')->fetchAll();
+    $daftarKeluarga = $pdo->query('
+        SELECT f.*, wa.username AS wali_username, wa.status AS wali_status
+        FROM families f LEFT JOIN wali_akses wa ON wa.family_id = f.id
+        ORDER BY f.id DESC LIMIT 100
+    ')->fetchAll();
+    $daftarGuru = $pdo->query('
+        SELECT t.*, r.nama_kamar, r.gedung FROM teachers t LEFT JOIN rooms r ON r.id = t.wali_kamar_room_id
+        ORDER BY t.nama LIMIT 200
+    ')->fetchAll();
     $daftarSantri = $pdo->query("
-        SELECT s.*, c.nama AS nama_kelas, r.nama_kamar, r.gedung
+        SELECT s.*, c.nama AS nama_kelas, r.nama_kamar, r.gedung, hp.golongan_darah, hp.alergi, hp.penyakit_kronis, hp.catatan_lain
         FROM students s LEFT JOIN classes c ON c.id = s.class_id LEFT JOIN rooms r ON r.id = s.room_id
+        LEFT JOIN health_profiles hp ON hp.student_id = s.id
         ORDER BY s.id DESC LIMIT 200
     ")->fetchAll();
     $semuaKelas = $daftarKelas;
@@ -1013,6 +1289,172 @@ elseif ($modul === 'history') {
         ");
     }
     $logs = $stmt->fetchAll();
+}
+
+// ======================================================================
+// MODUL: KUNJUNGAN TAMU / BESUK
+// ======================================================================
+elseif ($modul === 'kunjungan_tamu') {
+    $page_title = 'Kunjungan Tamu';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'tambah') {
+        $pdo->prepare("
+            INSERT INTO kunjungan_tamu (student_id, nama_tamu, hubungan, keperluan, tanggal, jam_datang, dicatat_oleh)
+            VALUES (:sid, :nama, :hub, :keperluan, :tgl, :jam, :uid)
+        ")->execute([
+            'sid' => $_POST['student_id'], 'nama' => $_POST['nama_tamu'], 'hub' => $_POST['hubungan'],
+            'keperluan' => $_POST['keperluan'], 'tgl' => $_POST['tanggal'], 'jam' => date('H:i:s'), 'uid' => $user['id'],
+        ]);
+        log_audit($pdo, $user['id'], 'Catat kunjungan tamu utk santri #' . $_POST['student_id']);
+        $success = 'Kunjungan tamu berhasil dicatat.';
+    }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'pulang') {
+        $pdo->prepare("UPDATE kunjungan_tamu SET jam_pulang = :jam WHERE id = :id")
+            ->execute(['jam' => date('H:i:s'), 'id' => $_POST['kunjungan_id']]);
+        log_audit($pdo, $user['id'], 'Tandai tamu pulang #' . $_POST['kunjungan_id']);
+        $success = 'Data berhasil diperbarui.';
+    }
+
+    $students = $pdo->query("SELECT id, nis, nama FROM students WHERE status='aktif' ORDER BY nama")->fetchAll();
+    $daftarKunjungan = $pdo->query("
+        SELECT k.*, s.nama AS nama_santri, s.nis FROM kunjungan_tamu k
+        JOIN students s ON s.id = k.student_id ORDER BY k.tanggal DESC, k.id DESC LIMIT 100
+    ")->fetchAll();
+}
+
+// ======================================================================
+// MODUL: INVENTARIS BARANG SANTRI
+// ======================================================================
+elseif ($modul === 'inventaris') {
+    $page_title = 'Inventaris Barang';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'tambah') {
+        $pdo->prepare("
+            INSERT INTO inventaris_barang (student_id, nama_barang, jumlah, tanggal_titip, keterangan, status)
+            VALUES (:sid, :nama, :jml, :tgl, :ket, 'dititipkan')
+        ")->execute([
+            'sid' => $_POST['student_id'], 'nama' => $_POST['nama_barang'], 'jml' => $_POST['jumlah'] ?: 1,
+            'tgl' => $_POST['tanggal_titip'], 'ket' => $_POST['keterangan'],
+        ]);
+        log_audit($pdo, $user['id'], 'Catat barang titipan: ' . $_POST['nama_barang']);
+        $success = 'Barang berhasil dicatat.';
+    }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'ambil') {
+        $pdo->prepare("UPDATE inventaris_barang SET status='diambil', tanggal_diambil=CURDATE() WHERE id=:id")
+            ->execute(['id' => $_POST['barang_id']]);
+        log_audit($pdo, $user['id'], 'Tandai barang diambil #' . $_POST['barang_id']);
+        $success = 'Data berhasil diperbarui.';
+    }
+
+    $students = $pdo->query("SELECT id, nis, nama FROM students WHERE status='aktif' ORDER BY nama")->fetchAll();
+    $daftarBarang = $pdo->query("
+        SELECT b.*, s.nama AS nama_santri, s.nis FROM inventaris_barang b
+        JOIN students s ON s.id = b.student_id ORDER BY b.status = 'dititipkan' DESC, b.tanggal_titip DESC LIMIT 100
+    ")->fetchAll();
+}
+
+// ======================================================================
+// MODUL: RAPOR KESANTRIAN
+// ======================================================================
+elseif ($modul === 'rapor') {
+    $page_title = 'Rapor Kesantrian';
+
+    $students = $pdo->query("SELECT id, nis, nama FROM students WHERE status='aktif' ORDER BY nama")->fetchAll();
+    $rapor = null;
+    $studentIdRapor = $_GET['student_id'] ?? '';
+
+    if ($studentIdRapor !== '') {
+        $stmtS = $pdo->prepare("
+            SELECT s.*, c.nama AS nama_kelas, r.nama_kamar, r.gedung
+            FROM students s LEFT JOIN classes c ON c.id=s.class_id LEFT JOIN rooms r ON r.id=s.room_id
+            WHERE s.id = :sid
+        ");
+        $stmtS->execute(['sid' => $studentIdRapor]);
+        $santriRapor = $stmtS->fetch();
+
+        if ($santriRapor) {
+            $rekapAbsensi = $pdo->prepare("
+                SELECT status, COUNT(*) AS jumlah FROM attendances
+                WHERE student_id = :sid AND jenis_kegiatan = 'harian'
+                  AND tanggal >= (CURDATE() - INTERVAL 90 DAY)
+                GROUP BY status
+            ");
+            $rekapAbsensi->execute(['sid' => $studentIdRapor]);
+            $rekapAbsensi = $rekapAbsensi->fetchAll();
+
+            $pelanggaran = $pdo->prepare("
+                SELECT kategori, status, tanggal, keterangan FROM violations
+                WHERE student_id = :sid AND status != 'dibatalkan' ORDER BY tanggal DESC
+            ");
+            $pelanggaran->execute(['sid' => $studentIdRapor]);
+            $pelanggaran = $pelanggaran->fetchAll();
+
+            $prestasiList = $pdo->prepare("SELECT * FROM achievements WHERE student_id = :sid ORDER BY tanggal DESC");
+            $prestasiList->execute(['sid' => $studentIdRapor]);
+            $prestasiList = $prestasiList->fetchAll();
+
+            $ekskulList = $pdo->prepare("
+                SELECT e.nama, k.nama AS kategori FROM ekskul_anggota ea
+                JOIN ekstrakurikuler e ON e.id = ea.ekskul_id JOIN kategori_ekskul k ON k.id = e.kategori_id
+                WHERE ea.student_id = :sid AND ea.status = 'aktif'
+            ");
+            $ekskulList->execute(['sid' => $studentIdRapor]);
+            $ekskulList = $ekskulList->fetchAll();
+
+            $rapor = [
+                'santri' => $santriRapor, 'absensi' => $rekapAbsensi, 'pelanggaran' => $pelanggaran,
+                'prestasi' => $prestasiList, 'ekskul' => $ekskulList,
+            ];
+        }
+    }
+}
+
+// ======================================================================
+// MODUL: BACKUP DATABASE (Super Admin)
+// ======================================================================
+elseif ($modul === 'backup') {
+    $page_title = 'Backup Database';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'backup_manual') {
+        $tabelSemua = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+        $dumpFile = sys_get_temp_dir() . '/hisada_backup_' . date('Ymd_His') . '.sql';
+        try {
+            $fh = fopen($dumpFile, 'w');
+            fwrite($fh, "-- Backup Hisada -- " . date('Y-m-d H:i:s') . "\nSET FOREIGN_KEY_CHECKS=0;\n\n");
+            foreach ($tabelSemua as $tabel) {
+                $create = $pdo->query("SHOW CREATE TABLE `$tabel`")->fetch();
+                fwrite($fh, "DROP TABLE IF EXISTS `$tabel`;\n" . $create['Create Table'] . ";\n\n");
+                $rows = $pdo->query("SELECT * FROM `$tabel`")->fetchAll();
+                foreach ($rows as $row) {
+                    $cols = array_map(fn($c) => "`$c`", array_keys($row));
+                    $vals = array_map(fn($v) => $v === null ? 'NULL' : $pdo->quote($v), array_values($row));
+                    fwrite($fh, "INSERT INTO `$tabel` (" . implode(',', $cols) . ") VALUES (" . implode(',', $vals) . ");\n");
+                }
+                fwrite($fh, "\n");
+            }
+            fwrite($fh, "SET FOREIGN_KEY_CHECKS=1;\n");
+            fclose($fh);
+            $pdo->prepare("INSERT INTO backup_logs (status, keterangan) VALUES ('berhasil', :ket)")
+                ->execute(['ket' => basename($dumpFile) . ' (' . round(filesize($dumpFile) / 1024, 1) . ' KB)']);
+            log_audit($pdo, $user['id'], 'Backup manual database berhasil dibuat');
+            $_SESSION['backup_download'] = $dumpFile;
+            $success = 'Backup berhasil dibuat. Klik "Unduh Backup Terakhir" untuk mengunduh file-nya.';
+        } catch (Exception $e) {
+            $pdo->prepare("INSERT INTO backup_logs (status, keterangan) VALUES ('gagal', :ket)")->execute(['ket' => $e->getMessage()]);
+            $error = 'Backup gagal: ' . $e->getMessage();
+        }
+    }
+
+    if (isset($_GET['unduh']) && !empty($_SESSION['backup_download']) && file_exists($_SESSION['backup_download'])) {
+        header('Content-Type: application/sql');
+        header('Content-Disposition: attachment; filename="' . basename($_SESSION['backup_download']) . '"');
+        header('Content-Length: ' . filesize($_SESSION['backup_download']));
+        readfile($_SESSION['backup_download']);
+        exit;
+    }
+
+    $riwayatBackup = $pdo->query('SELECT * FROM backup_logs ORDER BY waktu DESC LIMIT 30')->fetchAll();
+    $adaFileSiapUnduh = !empty($_SESSION['backup_download']) && file_exists($_SESSION['backup_download']);
 }
 
 // --------------------------------------------------------------------
@@ -1139,6 +1581,9 @@ elseif ($modul === 'absensi_kamar'): ?>
         <form method="post">
             <input type="hidden" name="tanggal" value="<?= htmlspecialchars($tanggal) ?>">
             <div class="card card-hisada p-3">
+                <div class="d-flex justify-content-end mb-2">
+                    <a href="dashboard.php?modul=absensi_kamar&room_id=<?= $roomId ?>&tanggal=<?= $tanggal ?>&export=xlsx" class="btn btn-sm btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i>Export Excel</a>
+                </div>
                 <div class="table-responsive">
                 <table class="table table-sm align-middle">
                     <thead><tr><th>NIS</th><th>Nama</th><th style="width:160px">Status</th><th>Keterangan</th></tr></thead>
@@ -1622,6 +2067,9 @@ elseif ($modul === 'korespondensi'): ?>
             </form>
         </div>
         <div class="tab-pane fade card card-hisada p-3" id="tabDaftar">
+            <div class="d-flex justify-content-end mb-2">
+                <a href="dashboard.php?modul=korespondensi&export=xlsx" class="btn btn-sm btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i>Export Excel</a>
+            </div>
             <div class="table-responsive">
             <table class="table table-sm">
                 <thead><tr><th>Nomor</th><th>Jenis</th><th>Perihal</th><th>Tanggal</th><th>Status</th></tr></thead>
@@ -1669,7 +2117,9 @@ elseif ($modul === 'prestasi'): ?>
         </div>
         <div class="col-md-7">
             <div class="card card-hisada p-3">
-                <h6 class="mb-3">Galeri Prestasi Terbaru</h6>
+                <h6 class="mb-3 d-flex justify-content-between align-items-center">Galeri Prestasi Terbaru
+                    <a href="dashboard.php?modul=prestasi&export=xlsx" class="btn btn-sm btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i>Export Excel</a>
+                </h6>
                 <div class="table-responsive">
                 <table class="table table-sm">
                     <thead><tr><th>Santri</th><th>Kegiatan</th><th>Tingkat</th><th>Tanggal</th></tr></thead>
@@ -1895,13 +2345,14 @@ elseif ($modul === 'cari_guru'): ?>
         <h6 class="mb-3"><i class="bi bi-person-workspace me-1"></i>Hasil (<span id="jmlHasilGuru"><?= count($hasilGuru) ?></span>)</h6>
         <div class="table-responsive">
         <table class="table table-sm">
-            <thead><tr><th>NIP</th><th>Nama</th><th>No. HP</th></tr></thead>
+            <thead><tr><th>NIP</th><th>Nama</th><th>No. HP</th><th>Wali Kamar</th></tr></thead>
             <tbody id="tbodyGuru">
             <?php foreach ($hasilGuru as $g): ?>
                 <tr data-nip="<?= htmlspecialchars(strtolower($g['nip'] ?? '')) ?>" data-nama="<?= htmlspecialchars(strtolower($g['nama'])) ?>">
                     <td><?= htmlspecialchars($g['nip'] ?? '-') ?></td>
                     <td><?= htmlspecialchars($g['nama']) ?></td>
                     <td class="small"><?= htmlspecialchars($g['no_hp'] ?? '-') ?></td>
+                    <td class="small"><?= $g['nama_kamar'] ? htmlspecialchars($g['gedung'].' - '.$g['nama_kamar']) : '-' ?></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -2169,7 +2620,7 @@ elseif ($modul === 'data_master'): ?>
                     <h6 class="mb-3">Daftar Santri (200 terbaru)</h6>
                     <div class="table-responsive">
                     <table class="table table-sm">
-                        <thead><tr><th>NIS</th><th>Nama</th><th>Kelas</th><th>Kamar</th><th>Status</th></tr></thead>
+                        <thead><tr><th>NIS</th><th>Nama</th><th>Kelas</th><th>Kamar</th><th>Status</th><th></th></tr></thead>
                         <tbody>
                         <?php foreach ($daftarSantri as $s): ?>
                             <tr>
@@ -2178,6 +2629,7 @@ elseif ($modul === 'data_master'): ?>
                                 <td class="small"><?= htmlspecialchars($s['nama_kelas'] ?? '-') ?></td>
                                 <td class="small"><?= $s['nama_kamar'] ? htmlspecialchars($s['gedung'].' - '.$s['nama_kamar']) : '-' ?></td>
                                 <td><span class="badge <?= $s['status']==='aktif' ? 'badge-hadir' : 'badge-alpha' ?>"><?= ucfirst($s['status']) ?></span></td>
+                                <td><button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalEditSantri<?= $s['id'] ?>">Edit</button></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
@@ -2187,7 +2639,66 @@ elseif ($modul === 'data_master'): ?>
             </div>
         </div>
 
-    <?php elseif ($tab === 'guru'): ?>
+        <?php /* Modal edit -- di luar <table> spy tidak jadi bug modal-in-table lagi */ ?>
+        <?php foreach ($daftarSantri as $s): ?>
+            <div class="modal fade" id="modalEditSantri<?= $s['id'] ?>" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <form method="post" class="modal-content">
+                        <input type="hidden" name="action" value="edit_santri">
+                        <input type="hidden" name="student_id" value="<?= $s['id'] ?>">
+                        <div class="modal-header"><h6 class="modal-title">Edit Santri &mdash; <?= htmlspecialchars($s['nama']) ?> (<?= htmlspecialchars($s['nis']) ?>)</h6></div>
+                        <div class="modal-body">
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-6"><label class="form-label small">Nama</label><input type="text" name="nama" class="form-control form-control-sm" value="<?= htmlspecialchars($s['nama']) ?>" required></div>
+                                <div class="col-md-6"><label class="form-label small">Jenis Kelamin</label>
+                                    <select name="jenis_kelamin" class="form-select form-select-sm">
+                                        <option value="L" <?= $s['jenis_kelamin']==='L'?'selected':'' ?>>Laki-laki</option>
+                                        <option value="P" <?= $s['jenis_kelamin']==='P'?'selected':'' ?>>Perempuan</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6"><label class="form-label small">Kelas</label>
+                                    <select name="class_id" class="form-select form-select-sm">
+                                        <option value="">-- Kosongkan --</option>
+                                        <?php foreach ($semuaKelas as $k): ?><option value="<?= $k['id'] ?>" <?= (string)$s['class_id']===(string)$k['id']?'selected':'' ?>><?= htmlspecialchars($k['nama']) ?></option><?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6"><label class="form-label small">Kamar</label>
+                                    <select name="room_id" class="form-select form-select-sm">
+                                        <option value="">-- Kosongkan --</option>
+                                        <?php foreach ($semuaKamar as $r): ?><option value="<?= $r['id'] ?>" <?= (string)$s['room_id']===(string)$r['id']?'selected':'' ?>><?= htmlspecialchars($r['gedung'].' - '.$r['nama_kamar']) ?></option><?php endforeach; ?>
+                                    </select>
+                                    <div class="form-text">Ganti kamar otomatis tercatat di Riwayat Mutasi Kamar.</div>
+                                </div>
+                                <div class="col-md-12"><label class="form-label small">Status</label>
+                                    <select name="status" class="form-select form-select-sm">
+                                        <option value="aktif" <?= $s['status']==='aktif'?'selected':'' ?>>Aktif</option>
+                                        <option value="alumni" <?= $s['status']==='alumni'?'selected':'' ?>>Alumni (Lulus)</option>
+                                        <option value="keluar" <?= $s['status']==='keluar'?'selected':'' ?>>Keluar</option>
+                                    </select>
+                                    <div class="form-text">Selain "Aktif" akan otomatis menonaktifkan akun login santri ini (kalau ada).</div>
+                                </div>
+                            </div>
+                            <hr>
+                            <h6 class="small text-muted">Profil Kesehatan Tetap</h6>
+                            <div class="row g-2">
+                                <div class="col-md-4"><label class="form-label small">Golongan Darah</label>
+                                    <select name="golongan_darah" class="form-select form-select-sm">
+                                        <?php foreach (['A','B','AB','O','Tidak Tahu'] as $g): ?><option value="<?= $g ?>" <?= ($s['golongan_darah'] ?? 'Tidak Tahu')===$g?'selected':'' ?>><?= $g ?></option><?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-4"><label class="form-label small">Alergi</label><input type="text" name="alergi" class="form-control form-control-sm" value="<?= htmlspecialchars($s['alergi'] ?? '') ?>" placeholder="Contoh: kacang, debu"></div>
+                                <div class="col-md-4"><label class="form-label small">Penyakit Kronis</label><input type="text" name="penyakit_kronis" class="form-control form-control-sm" value="<?= htmlspecialchars($s['penyakit_kronis'] ?? '') ?>" placeholder="Contoh: asma"></div>
+                                <div class="col-md-12"><label class="form-label small">Catatan Lain</label><textarea name="catatan_lain" class="form-control form-control-sm" rows="2"><?= htmlspecialchars($s['catatan_lain'] ?? '') ?></textarea></div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+                            <button class="btn btn-sm btn-success">Simpan Perubahan</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        <?php endforeach; ?>
         <div class="row g-3">
             <div class="col-md-5">
                 <div class="card card-hisada p-3 mb-3">
@@ -2200,6 +2711,12 @@ elseif ($modul === 'data_master'): ?>
                             <select name="jenis_kelamin" class="form-select form-select-sm"><option value="L">Laki-laki</option><option value="P">Perempuan</option></select>
                         </div>
                         <div class="mb-2"><label class="form-label small">No. HP</label><input type="text" name="no_hp" class="form-control form-control-sm"></div>
+                        <div class="mb-2"><label class="form-label small">Wali Kamar (opsional)</label>
+                            <select name="wali_kamar_room_id" class="form-select form-select-sm">
+                                <option value="">-- Tidak menjabat wali kamar --</option>
+                                <?php foreach ($daftarKamar as $r): ?><option value="<?= $r['id'] ?>"><?= htmlspecialchars($r['gedung'].' - '.$r['nama_kamar']) ?></option><?php endforeach; ?>
+                            </select>
+                        </div>
                         <button class="btn btn-success w-100">Simpan</button>
                     </form>
                 </div>
@@ -2218,10 +2735,10 @@ elseif ($modul === 'data_master'): ?>
                     <h6 class="mb-3">Daftar Guru</h6>
                     <div class="table-responsive">
                     <table class="table table-sm">
-                        <thead><tr><th>NIP</th><th>Nama</th><th>No. HP</th></tr></thead>
+                        <thead><tr><th>NIP</th><th>Nama</th><th>No. HP</th><th>Wali Kamar</th></tr></thead>
                         <tbody>
                         <?php foreach ($daftarGuru as $g): ?>
-                            <tr><td><?= htmlspecialchars($g['nip'] ?? '-') ?></td><td><?= htmlspecialchars($g['nama']) ?></td><td class="small"><?= htmlspecialchars($g['no_hp'] ?? '-') ?></td></tr>
+                            <tr><td><?= htmlspecialchars($g['nip'] ?? '-') ?></td><td><?= htmlspecialchars($g['nama']) ?></td><td class="small"><?= htmlspecialchars($g['no_hp'] ?? '-') ?></td><td class="small"><?= $g['nama_kamar'] ? htmlspecialchars($g['gedung'].' - '.$g['nama_kamar']) : '-' ?></td></tr>
                         <?php endforeach; ?>
                         </tbody>
                     </table>
@@ -2233,12 +2750,21 @@ elseif ($modul === 'data_master'): ?>
     <?php elseif ($tab === 'kelas'): ?>
         <div class="row g-3">
             <div class="col-md-4">
-                <div class="card card-hisada p-3">
+                <div class="card card-hisada p-3 mb-3">
                     <h6 class="mb-3">Tambah Kelas</h6>
                     <form method="post">
                         <input type="hidden" name="action" value="tambah_kelas">
                         <input type="text" name="nama" class="form-control form-control-sm mb-2" placeholder="Contoh: Kelas 7" required>
                         <button class="btn btn-success w-100">Simpan</button>
+                    </form>
+                </div>
+                <div class="card card-hisada p-3">
+                    <h6 class="mb-2">Import CSV (Massal)</h6>
+                    <p class="small text-muted">Kolom wajib: <code>nama</code>.</p>
+                    <form method="post" enctype="multipart/form-data">
+                        <input type="hidden" name="action" value="csv_kelas">
+                        <input type="file" name="csv_file" accept=".csv" class="form-control form-control-sm mb-2" required>
+                        <button class="btn btn-success w-100">Upload &amp; Proses</button>
                     </form>
                 </div>
             </div>
@@ -2255,7 +2781,7 @@ elseif ($modul === 'data_master'): ?>
     <?php elseif ($tab === 'kamar'): ?>
         <div class="row g-3">
             <div class="col-md-4">
-                <div class="card card-hisada p-3">
+                <div class="card card-hisada p-3 mb-3">
                     <h6 class="mb-3">Tambah Kamar</h6>
                     <form method="post">
                         <input type="hidden" name="action" value="tambah_kamar">
@@ -2265,6 +2791,15 @@ elseif ($modul === 'data_master'): ?>
                             <select name="gender" class="form-select form-select-sm"><option value="L">Laki-laki</option><option value="P">Perempuan</option></select>
                         </div>
                         <button class="btn btn-success w-100">Simpan</button>
+                    </form>
+                </div>
+                <div class="card card-hisada p-3">
+                    <h6 class="mb-2">Import CSV (Massal)</h6>
+                    <p class="small text-muted">Kolom wajib: <code>nama_kamar, gedung, gender (L/P)</code>.</p>
+                    <form method="post" enctype="multipart/form-data">
+                        <input type="hidden" name="action" value="csv_kamar">
+                        <input type="file" name="csv_file" accept=".csv" class="form-control form-control-sm mb-2" required>
+                        <button class="btn btn-success w-100">Upload &amp; Proses</button>
                     </form>
                 </div>
             </div>
@@ -2284,7 +2819,7 @@ elseif ($modul === 'data_master'): ?>
     <?php elseif ($tab === 'keluarga'): ?>
         <div class="row g-3">
             <div class="col-md-4">
-                <div class="card card-hisada p-3">
+                <div class="card card-hisada p-3 mb-3">
                     <h6 class="mb-3">Tambah Data Keluarga</h6>
                     <form method="post">
                         <input type="hidden" name="action" value="tambah_keluarga">
@@ -2294,20 +2829,63 @@ elseif ($modul === 'data_master'): ?>
                         <button class="btn btn-success w-100">Simpan</button>
                     </form>
                 </div>
+                <div class="card card-hisada p-3">
+                    <h6 class="mb-2">Import CSV (Massal)</h6>
+                    <p class="small text-muted">Kolom: <code>nama_ayah, nama_ibu, no_hp</code> (minimal salah satu nama ortu diisi).</p>
+                    <form method="post" enctype="multipart/form-data">
+                        <input type="hidden" name="action" value="csv_keluarga">
+                        <input type="file" name="csv_file" accept=".csv" class="form-control form-control-sm mb-2" required>
+                        <button class="btn btn-success w-100">Upload &amp; Proses</button>
+                    </form>
+                </div>
             </div>
             <div class="col-md-8">
                 <div class="card card-hisada p-3">
                     <h6 class="mb-3">Daftar Keluarga (100 terbaru)</h6>
                     <div class="table-responsive"><table class="table table-sm">
-                        <thead><tr><th>Nama Ayah</th><th>Nama Ibu</th><th>No. HP</th></tr></thead>
+                        <thead><tr><th>Nama Ayah</th><th>Nama Ibu</th><th>No. HP</th><th>Akun Wali</th><th></th></tr></thead>
                         <tbody>
-                        <?php foreach ($daftarKeluarga as $f): ?><tr><td><?= htmlspecialchars($f['nama_ayah'] ?? '-') ?></td><td><?= htmlspecialchars($f['nama_ibu'] ?? '-') ?></td><td class="small"><?= htmlspecialchars($f['no_hp'] ?? '-') ?></td></tr><?php endforeach; ?>
+                        <?php foreach ($daftarKeluarga as $f): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($f['nama_ayah'] ?? '-') ?></td>
+                                <td><?= htmlspecialchars($f['nama_ibu'] ?? '-') ?></td>
+                                <td class="small"><?= htmlspecialchars($f['no_hp'] ?? '-') ?></td>
+                                <td class="small">
+                                    <?php if ($f['wali_username']): ?>
+                                        <?= htmlspecialchars($f['wali_username']) ?> <span class="badge <?= $f['wali_status']==='aktif'?'badge-hadir':'badge-alpha' ?>"><?= ucfirst($f['wali_status']) ?></span>
+                                    <?php else: ?><span class="text-muted">Belum ada</span><?php endif; ?>
+                                </td>
+                                <td><button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalWali<?= $f['id'] ?>"><?= $f['wali_username'] ? 'Reset' : 'Buat' ?></button></td>
+                            </tr>
+                        <?php endforeach; ?>
                         </tbody>
                     </table></div>
                 </div>
             </div>
         </div>
+
+        <?php foreach ($daftarKeluarga as $f): ?>
+            <div class="modal fade" id="modalWali<?= $f['id'] ?>" tabindex="-1">
+                <div class="modal-dialog">
+                    <form method="post" class="modal-content">
+                        <input type="hidden" name="action" value="buat_akun_wali">
+                        <input type="hidden" name="family_id" value="<?= $f['id'] ?>">
+                        <div class="modal-header"><h6 class="modal-title"><?= $f['wali_username'] ? 'Reset' : 'Buat' ?> Akun Wali &mdash; <?= htmlspecialchars($f['nama_ayah'] ?? $f['nama_ibu'] ?? 'Keluarga #'.$f['id']) ?></h6></div>
+                        <div class="modal-body">
+                            <div class="mb-2"><label class="form-label small">Username</label><input type="text" name="wali_username" class="form-control form-control-sm" value="<?= htmlspecialchars($f['wali_username'] ?? '') ?>" required></div>
+                            <div class="mb-2"><label class="form-label small">Password Baru</label><input type="text" name="wali_password" class="form-control form-control-sm" required></div>
+                            <div class="form-text">Wali login lewat halaman terpisah: <code>wali.php</code></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+                            <button class="btn btn-sm btn-success">Simpan</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        <?php endforeach; ?>
     <?php endif; ?>
+
 
 <?php
 // ======================================================================
@@ -2347,6 +2925,214 @@ elseif ($modul === 'history'): ?>
             <?php if (!$logs): ?><tr><td colspan="3" class="text-muted small">Belum ada catatan untuk rentang ini.</td></tr><?php endif; ?>
             </tbody>
         </table>
+        </div>
+    </div>
+
+<?php
+// ======================================================================
+// RENDER: KUNJUNGAN TAMU
+// ======================================================================
+elseif ($modul === 'kunjungan_tamu'): ?>
+    <h4 class="mb-4">Kunjungan Tamu / Besuk</h4>
+    <div class="row g-3">
+        <div class="col-md-5">
+            <div class="card card-hisada p-3">
+                <h6 class="mb-3">Catat Kunjungan Baru</h6>
+                <form method="post">
+                    <input type="hidden" name="action" value="tambah">
+                    <div class="mb-2"><label class="form-label small">Santri</label><?php render_santri_picker('student_id', $students, 'tamu'); ?></div>
+                    <div class="mb-2"><label class="form-label small">Nama Tamu</label><input type="text" name="nama_tamu" class="form-control form-control-sm" required></div>
+                    <div class="mb-2"><label class="form-label small">Hubungan</label><input type="text" name="hubungan" class="form-control form-control-sm" placeholder="Contoh: Ayah, Kakak, Paman" required></div>
+                    <div class="mb-2"><label class="form-label small">Keperluan</label><input type="text" name="keperluan" class="form-control form-control-sm"></div>
+                    <div class="mb-3"><label class="form-label small">Tanggal</label><input type="date" name="tanggal" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>" required></div>
+                    <button class="btn btn-success w-100">Simpan (Jam Datang Otomatis)</button>
+                </form>
+            </div>
+        </div>
+        <div class="col-md-7">
+            <div class="card card-hisada p-3">
+                <h6 class="mb-3">Daftar Kunjungan (100 terbaru)</h6>
+                <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead><tr><th>Santri</th><th>Tamu</th><th>Hubungan</th><th>Datang</th><th>Pulang</th><th></th></tr></thead>
+                    <tbody>
+                    <?php foreach ($daftarKunjungan as $k): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($k['nama_santri']) ?></td>
+                            <td><?= htmlspecialchars($k['nama_tamu']) ?></td>
+                            <td class="small"><?= htmlspecialchars($k['hubungan']) ?></td>
+                            <td class="small"><?= date('d/m H:i', strtotime($k['tanggal'].' '.$k['jam_datang'])) ?></td>
+                            <td class="small"><?= $k['jam_pulang'] ? substr($k['jam_pulang'],0,5) : '<span class="badge badge-izin">Masih di dalam</span>' ?></td>
+                            <td>
+                                <?php if (!$k['jam_pulang']): ?>
+                                <form method="post"><input type="hidden" name="action" value="pulang"><input type="hidden" name="kunjungan_id" value="<?= $k['id'] ?>"><button class="btn btn-sm btn-outline-success">Tandai Pulang</button></form>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (!$daftarKunjungan): ?><tr><td colspan="6" class="text-muted small">Belum ada data.</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<?php
+// ======================================================================
+// RENDER: INVENTARIS BARANG
+// ======================================================================
+elseif ($modul === 'inventaris'): ?>
+    <h4 class="mb-4">Inventaris Barang Santri</h4>
+    <div class="row g-3">
+        <div class="col-md-5">
+            <div class="card card-hisada p-3">
+                <h6 class="mb-3">Catat Barang Titipan</h6>
+                <form method="post">
+                    <input type="hidden" name="action" value="tambah">
+                    <div class="mb-2"><label class="form-label small">Santri</label><?php render_santri_picker('student_id', $students, 'barang'); ?></div>
+                    <div class="mb-2"><label class="form-label small">Nama Barang</label><input type="text" name="nama_barang" class="form-control form-control-sm" required></div>
+                    <div class="mb-2"><label class="form-label small">Jumlah</label><input type="number" name="jumlah" class="form-control form-control-sm" value="1" min="1"></div>
+                    <div class="mb-2"><label class="form-label small">Tanggal Titip</label><input type="date" name="tanggal_titip" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>" required></div>
+                    <div class="mb-3"><label class="form-label small">Keterangan</label><input type="text" name="keterangan" class="form-control form-control-sm"></div>
+                    <button class="btn btn-success w-100">Simpan</button>
+                </form>
+            </div>
+        </div>
+        <div class="col-md-7">
+            <div class="card card-hisada p-3">
+                <h6 class="mb-3">Daftar Barang</h6>
+                <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead><tr><th>Santri</th><th>Barang</th><th>Jml</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                    <?php foreach ($daftarBarang as $b): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($b['nama_santri']) ?></td>
+                            <td><?= htmlspecialchars($b['nama_barang']) ?></td>
+                            <td><?= $b['jumlah'] ?></td>
+                            <td><span class="badge <?= $b['status']==='dititipkan' ? 'badge-izin' : 'badge-hadir' ?>"><?= ucfirst($b['status']) ?></span></td>
+                            <td>
+                                <?php if ($b['status'] === 'dititipkan'): ?>
+                                <form method="post"><input type="hidden" name="action" value="ambil"><input type="hidden" name="barang_id" value="<?= $b['id'] ?>"><button class="btn btn-sm btn-outline-success">Tandai Diambil</button></form>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (!$daftarBarang): ?><tr><td colspan="5" class="text-muted small">Belum ada data.</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<?php
+// ======================================================================
+// RENDER: RAPOR KESANTRIAN
+// ======================================================================
+elseif ($modul === 'rapor'): ?>
+    <h4 class="mb-4">Rapor Kesantrian</h4>
+    <div class="card card-hisada p-3 mb-3 no-print">
+        <label class="form-label small">Pilih Santri</label>
+        <form method="get" id="formRapor">
+            <input type="hidden" name="modul" value="rapor">
+            <?php render_santri_picker('student_id', $students, 'rapor'); ?>
+        </form>
+        <script>document.getElementById('picker_rapor').querySelector('.sp-value').addEventListener('change', function(){ document.getElementById('formRapor').submit(); });</script>
+    </div>
+
+    <?php if ($rapor): ?>
+        <div class="card card-hisada p-3">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h5 class="mb-0"><?= htmlspecialchars($rapor['santri']['nama']) ?></h5>
+                    <div class="text-muted small">NIS <?= htmlspecialchars($rapor['santri']['nis']) ?> &middot; <?= htmlspecialchars($rapor['santri']['nama_kelas'] ?? '-') ?> &middot; <?= $rapor['santri']['nama_kamar'] ? htmlspecialchars($rapor['santri']['gedung'].' - '.$rapor['santri']['nama_kamar']) : '-' ?></div>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary no-print" onclick="window.print()"><i class="bi bi-printer me-1"></i>Cetak</button>
+            </div>
+
+            <h6 class="small text-muted">Rekap Absensi Harian (90 hari terakhir)</h6>
+            <div class="d-flex gap-2 mb-3 flex-wrap">
+                <?php foreach (['hadir','sakit','izin','pulang','alpha'] as $st):
+                    $jml = 0; foreach ($rapor['absensi'] as $a) { if ($a['status'] === $st) $jml = $a['jumlah']; } ?>
+                    <span class="badge badge-<?= $st ?>"><?= ucfirst($st) ?>: <?= $jml ?></span>
+                <?php endforeach; ?>
+            </div>
+
+            <h6 class="small text-muted">Catatan Kedisiplinan (Mahkamah)</h6>
+            <?php if ($rapor['pelanggaran']): ?>
+                <ul class="small mb-3">
+                    <?php foreach ($rapor['pelanggaran'] as $p): ?>
+                        <li><?= date('d/m/Y', strtotime($p['tanggal'])) ?> &mdash; <?= htmlspecialchars($p['kategori']) ?> (<?= $p['status'] === 'menunggu' ? 'menunggu sidang' : ucfirst($p['status']) ?>)</li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?><p class="small text-muted mb-3">Tidak ada catatan.</p><?php endif; ?>
+
+            <h6 class="small text-muted">Prestasi</h6>
+            <?php if ($rapor['prestasi']): ?>
+                <ul class="small mb-3">
+                    <?php foreach ($rapor['prestasi'] as $p): ?>
+                        <li><?= date('d/m/Y', strtotime($p['tanggal'])) ?> &mdash; <?= htmlspecialchars($p['nama_kegiatan']) ?> (<?= ucfirst($p['tingkat']) ?>)</li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?><p class="small text-muted mb-3">Belum ada prestasi tercatat.</p><?php endif; ?>
+
+            <h6 class="small text-muted">Ekstrakurikuler Aktif</h6>
+            <?php if ($rapor['ekskul']): ?>
+                <p class="small mb-0"><?= implode(', ', array_map(fn($e) => htmlspecialchars($e['nama']) . ' (' . htmlspecialchars($e['kategori']) . ')', $rapor['ekskul'])) ?></p>
+            <?php else: ?><p class="small text-muted mb-0">Tidak mengikuti ekskul.</p><?php endif; ?>
+        </div>
+    <?php elseif ($studentIdRapor !== ''): ?>
+        <p class="text-muted small">Santri tidak ditemukan.</p>
+    <?php else: ?>
+        <p class="text-muted small">Pilih santri untuk melihat rapor kesantrian.</p>
+    <?php endif; ?>
+
+<?php
+// ======================================================================
+// RENDER: BACKUP DATABASE
+// ======================================================================
+elseif ($modul === 'backup'): ?>
+    <h4 class="mb-4">Backup Database</h4>
+    <div class="row g-3">
+        <div class="col-md-5">
+            <div class="card card-hisada p-3">
+                <h6 class="mb-2">Backup Manual</h6>
+                <p class="small text-muted">Membuat file <code>.sql</code> berisi seluruh isi database saat ini (struktur + data), siap diunduh.</p>
+                <form method="post">
+                    <input type="hidden" name="action" value="backup_manual">
+                    <button class="btn btn-success w-100">Buat Backup Sekarang</button>
+                </form>
+                <?php if ($adaFileSiapUnduh): ?>
+                    <a href="dashboard.php?modul=backup&unduh=1" class="btn btn-outline-success w-100 mt-2"><i class="bi bi-download me-1"></i>Unduh Backup Terakhir</a>
+                <?php endif; ?>
+                <div class="form-text mt-2">
+                    Untuk backup <strong>otomatis terjadwal</strong>, minta pengelola hosting memasang Cron Job di cPanel yang mengakses:<br>
+                    <code>https://domainmu.com/dashboard.php?modul=backup&cron_key=GANTI_DENGAN_KUNCI_RAHASIA</code><br>
+                    setiap hari (lihat catatan keamanan di README).
+                </div>
+            </div>
+        </div>
+        <div class="col-md-7">
+            <div class="card card-hisada p-3">
+                <h6 class="mb-3">Riwayat Backup</h6>
+                <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead><tr><th>Waktu</th><th>Status</th><th>Keterangan</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($riwayatBackup as $b): ?>
+                        <tr>
+                            <td class="small"><?= date('d/m/Y H:i', strtotime($b['waktu'])) ?></td>
+                            <td><span class="badge <?= $b['status']==='berhasil' ? 'badge-hadir' : 'badge-alpha' ?>"><?= ucfirst($b['status']) ?></span></td>
+                            <td class="small"><?= htmlspecialchars($b['keterangan']) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (!$riwayatBackup): ?><tr><td colspan="3" class="text-muted small">Belum pernah backup.</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+                </div>
+            </div>
         </div>
     </div>
 

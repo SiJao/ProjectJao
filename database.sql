@@ -33,6 +33,8 @@
 
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS
+    wali_akses, backup_logs, push_subscriptions, inventaris_barang,
+    kunjungan_tamu, health_profiles, riwayat_kamar,
     audit_logs, agendas, achievements, correspondences, permits, violations,
     poskestren_records, attendances, kegiatan_grup_anggota, kegiatan_grup,
     ekskul_agenda, ekskul_anggota, ekstrakurikuler, riwayat_jabatan,
@@ -68,7 +70,9 @@ CREATE TABLE teachers (
     nip VARCHAR(30) UNIQUE,
     nama VARCHAR(100) NOT NULL,
     jenis_kelamin ENUM('L','P'),
-    no_hp VARCHAR(20)
+    no_hp VARCHAR(20),
+    wali_kamar_room_id INT NULL,   -- kamar yang diampu sbg wali kamar (opsional)
+    FOREIGN KEY (wali_kamar_room_id) REFERENCES rooms(id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE kategori_ekskul (
@@ -343,6 +347,115 @@ CREATE TABLE audit_logs (
     aksi VARCHAR(255) NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 15. RIWAYAT MUTASI KAMAR
+--     Pola sama dgn riwayat_jabatan: pindah kamar tidak menimpa data
+--     lama, tapi diarsipkan (tanggal_selesai diisi, status jadi arsip).
+-- ---------------------------------------------------------------------
+
+CREATE TABLE riwayat_kamar (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    room_id INT NOT NULL,
+    tanggal_mulai DATE NOT NULL,
+    tanggal_selesai DATE NULL,
+    status ENUM('aktif','arsip') DEFAULT 'aktif',
+    FOREIGN KEY (student_id) REFERENCES students(id),
+    FOREIGN KEY (room_id) REFERENCES rooms(id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 16. PROFIL KESEHATAN TETAP
+--     Terpisah dari poskestren_records (yg isinya log KEJADIAN sakit) --
+--     ini data PERMANEN yg dirujuk otomatis tiap dokter buka rekam medis.
+-- ---------------------------------------------------------------------
+
+CREATE TABLE health_profiles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL UNIQUE,
+    golongan_darah ENUM('A','B','AB','O','Tidak Tahu') DEFAULT 'Tidak Tahu',
+    alergi VARCHAR(255) NULL,
+    penyakit_kronis VARCHAR(255) NULL,
+    catatan_lain TEXT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES students(id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 17. KUNJUNGAN TAMU / BESUK
+-- ---------------------------------------------------------------------
+
+CREATE TABLE kunjungan_tamu (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    nama_tamu VARCHAR(100) NOT NULL,
+    hubungan VARCHAR(50) NOT NULL,
+    keperluan VARCHAR(255),
+    tanggal DATE NOT NULL,
+    jam_datang TIME NOT NULL,
+    jam_pulang TIME NULL,
+    dicatat_oleh INT NULL,
+    FOREIGN KEY (student_id) REFERENCES students(id),
+    FOREIGN KEY (dicatat_oleh) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 18. INVENTARIS BARANG SANTRI (barang titipan)
+-- ---------------------------------------------------------------------
+
+CREATE TABLE inventaris_barang (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    nama_barang VARCHAR(150) NOT NULL,
+    jumlah INT DEFAULT 1,
+    tanggal_titip DATE NOT NULL,
+    tanggal_diambil DATE NULL,
+    status ENUM('dititipkan','diambil') DEFAULT 'dititipkan',
+    keterangan VARCHAR(255),
+    FOREIGN KEY (student_id) REFERENCES students(id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 19. NOTIFIKASI WEB PUSH (subscription browser per user)
+-- ---------------------------------------------------------------------
+
+CREATE TABLE push_subscriptions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    endpoint TEXT NOT NULL,
+    p256dh VARCHAR(255) NOT NULL,
+    auth VARCHAR(255) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 20. LOG BACKUP
+-- ---------------------------------------------------------------------
+
+CREATE TABLE backup_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    waktu DATETIME DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('berhasil','gagal') NOT NULL,
+    keterangan VARCHAR(255)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 21. PORTAL WALI SANTRI (akun terpisah dari users -- bukan pengurus)
+--     Login berbasis keluarga (family_id), bukan santri per orang --
+--     satu akun wali bisa melihat semua anaknya (kalau lebih dari 1).
+-- ---------------------------------------------------------------------
+
+CREATE TABLE wali_akses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    family_id INT NOT NULL UNIQUE,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    status ENUM('aktif','nonaktif') DEFAULT 'aktif',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (family_id) REFERENCES families(id)
 ) ENGINE=InnoDB;
 
 -- =====================================================================
