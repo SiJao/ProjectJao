@@ -1,34 +1,19 @@
-# Hisada — Sistem Informasi Manajemen Kesantrian
+# Sistem Hisada
+### Himpunan Santri Daarul Uluum Lido — Sistem Informasi Manajemen Kesantrian
 
-Sistem administrasi kesantrian untuk **Pondok Pesantren Daarul Uluum Lido**, dibangun dengan PHP native + MySQL/MariaDB, tanpa framework, tanpa build-tool JavaScript (semua aset front-end di-vendor lokal — tidak ada dependensi CDN eksternal).
+Dibangun dengan PHP native + MySQL/MariaDB, tanpa framework, tanpa build-tool JavaScript. Semua aset front-end (Bootstrap 5, Bootstrap Icons) di-vendor lokal — tidak ada dependensi ke CDN eksternal.
 
-## Fitur / Modul
-
-| Modul | Fungsi Utama | Role |
-|---|---|---|
-| **Dashboard** | Statistik santri (L/P/total, sakit, pulang, alpha) + kegiatan mendatang | Semua user login |
-| **Kalender Akademik** | Kalender 1 bulan / 2 bulan / 1 semester / 2 semester (tahun ajaran), anchor otomatis ke Jan/Jul, bisa dicetak | Semua (input: sekretaris/admin) |
-| **Cari Santri / Cari Guru** | Live search (ketik langsung, tanpa tombol) | Semua user login |
-| **Absensi** | Harian (basis kamar), Halaqah Qur'an, Muhadhoroh, Olahraga, Kesenian | Piket |
-| **Poskestren** | Input kunjungan (rawat jalan/perawatan) + rekam medis + analisis tren musiman | Asisten Poskestren, Dokter |
-| **Mahkamah Santri** | Input pelanggaran → antrean sidang → vonis / pemutihan (soft-delete) | Sekretaris Mahkamah, Hakim |
-| **Perizinan & Kamtib** | Keluar Sementara (basis jam), Izin Dinas (tanggal+jam), Pulang (tanggal) — deteksi overdue otomatis, cetak surat izin | Piket |
-| **Korespondensi** | Surat masuk & keluar (nomor surat input manual) | Sekretaris |
-| **Prestasi Santri** | Pencatatan prestasi internal/eksternal | Sekretaris |
-| **Data Master** | Kelola Kelas, Kamar, Keluarga, Guru, Santri — satuan maupun **import CSV massal** (upsert berdasar NIS/NIP) | Super Admin |
-| **Kelola User** | Tambah/edit akun pengurus, reset password | Super Admin |
-| **Serah Terima Jabatan** | Ganti masa khidmat (arsipkan periode lama, aktifkan periode baru) | Super Admin |
-| **Riwayat Perubahan** | Audit log seluruh aksi, bisa difilter per masa jabatan | Super Admin |
+---
 
 ## Flowchart Sistem
 
 ```mermaid
 flowchart TD
     A["Login<br/>(NIS)@daarululuumlido.com + password"] --> B{"Cek riwayat_jabatan<br/>pada periode aktif"}
-    B -- "tidak menjabat /<br/>tidak punya akses" --> Z["Ditolak login"]
-    B -- "menjabat & punya_akses_sistem" --> C{"role_key"}
+    B -- "tidak menjabat" --> Z["Ditolak login"]
+    B -- "menjabat & punya akses" --> C{"role_key"}
 
-    C -- piket --> D1["Absensi<br/>(Harian/Halaqah/Muhadhoroh/Olahraga/Kesenian)"]
+    C -- piket --> D1["Absensi"]
     C -- piket --> D2["Perizinan & Kamtib"]
     C -- asisten_poskestren --> D3["Poskestren: Input Kunjungan"]
     C -- dokter --> D4["Poskestren: Rekam Medis"]
@@ -49,23 +34,144 @@ flowchart TD
     D2 -. "overdue terdeteksi" .-> D5
     D3 -. "status Perawatan" .-> D1
     D2 -. "status Izin/Pulang" .-> D1
-
-    E --> F["Riwayat Perubahan<br/>(audit_logs)"]
+    E --> F["Riwayat Perubahan (audit_logs)"]
 ```
 
-**Catatan alur penting:**
-- Status absensi sebagian besar **terisi otomatis** lewat integrasi antar modul (Poskestren & Perizinan → Absensi), bukan diinput manual satu-satu.
-- Perizinan yang **overdue** (lewat batas waktu tanpa konfirmasi kembali) otomatis masuk antrean Mahkamah.
-- Hak akses (`role_key`) diambil dari `riwayat_jabatan` pada **periode jabatan yang sedang aktif** — begitu Serah Terima Jabatan dilakukan, hak akses seluruh pengurus lama otomatis nonaktif tanpa perlu diedit manual satu per satu.
+---
+
+## 1. Autentikasi & RBAC
+
+- **Hanya santri yang sedang menjabat** (punya baris di `riwayat_jabatan` dengan `punya_akses_sistem = 1` pada periode aktif) yang bisa login.
+- Login pakai **email `(NIS)@daarululuumlido.com` + password**, bukan NIS polos.
+- Role (`role_key`) dicek lewat **join ke `riwayat_jabatan` pada periode jabatan yang sedang aktif** — bukan kolom statis di tabel `users`. Begitu Serah Terima Jabatan dilakukan, hak akses seluruh pengurus lama otomatis berubah tanpa admin perlu edit satu-satu.
+- Password di-hash **Bcrypt**.
+- Error tak terduga (exception, kolom/tabel hilang, dsb.) ditangani lewat *global exception handler* — pengguna tidak pernah melihat stack trace PHP mentah, diganti halaman error kustom yang konsisten dengan desain aplikasi (403 Akses Ditolak, 422 Data Tidak Lengkap, 500 kendala teknis / skema database belum sesuai).
+
+## 2. Dashboard
+
+- Statistik satu baris: jumlah santri **laki-laki / perempuan / total**.
+- Statistik tambahan: sakit (30 hari terakhir), status pulang hari ini, alpha hari ini.
+- Daftar kegiatan mendatang dari Kalender Akademik.
+
+## 3. Modul Absensi
+
+- Kartu pilihan: **Harian (Kamar)**, Halaqah Qur'an, Muhadhoroh, Olahraga, Kesenian.
+- **Absensi Harian**: filter **langsung satu dropdown Kamar** (menampilkan label "Gedung - Kamar") — tidak ada lagi filter Gender/Gedung terpisah, cukup pilih kamar langsung. Filter otomatis submit begitu kamar/tanggal dipilih, tanpa tombol.
+- **Absensi kegiatan lain**: berbasis keanggotaan grup (ekskul untuk Olahraga/Kesenian, grup kegiatan untuk Halaqah/Muhadhoroh).
+- Status absensi harian sebagian besar **terisi otomatis** dari modul lain (Poskestren → Sakit, Perizinan → Izin/Pulang/Alpha).
+
+## 4. Modul Poskestren (Klinik)
+
+- Dua jenis kunjungan: **Rawat Jalan** (konsultasi saja, tidak mengubah status absensi) dan **Perawatan** (status absensi hari itu otomatis jadi "Sakit").
+- Status "Sakit" hanya berlaku untuk tanggal itu saja — otomatis kembali "Hadir" esoknya kecuali diisi ulang.
+- Dokter melihat antrean pemeriksaan + mengisi rekam medis (diagnosa/resep/tindak lanjut).
+- **Analisis musim sakit**: tren kunjungan 6 bulan terakhir + keluhan terbanyak, membantu deteksi pola penyakit musiman.
+
+## 5. Modul Mahkamah Santri
+
+- Sekretaris input pelanggaran (kategori, keterangan, santri) → masuk antrean sidang.
+- Hakim memvonis **Ringan/Sedang/Berat**, atau melakukan **pemutihan** (soft-delete + alasan pembatalan, bukan hapus permanen — audit trail tetap ada).
+
+## 6. Modul Perizinan & Kamtib
+
+Tiga jenis izin, masing-masing basis waktu berbeda:
+
+| Jenis | Basis Waktu | Catatan |
+|---|---|---|
+| **Keluar Sementara** | Jam (hari ini) | Mulai otomatis dari jam saat input, sampai jam yang ditentukan (mis. 16:00) |
+| **Izin Dinas** | Tanggal + Jam | Bisa lintas hari (mis. berangkat besok pagi, pulang lusa sore) |
+| **Pulang** | Tanggal saja | Rentang tanggal seperti biasa |
+
+- Deteksi **overdue otomatis** (kombinasi tanggal+jam untuk Keluar Sementara/Izin Dinas) → status jadi Overdue, absensi jadi Alpha, otomatis masuk antrean Mahkamah kategori Keamanan.
+- **Cetak surat izin** — halaman print mandiri per pengajuan izin (kop surat, data santri, kolom tanda tangan).
+- Konfirmasi kembali untuk menutup izin yang sudah selesai.
+
+## 7. Modul Korespondensi
+
+- **Surat keluar: nomor diketik manual** oleh sekretaris (bukan lagi digenerate otomatis) — ditolak dengan pesan jelas kalau nomornya sudah dipakai surat lain.
+- Surat masuk: nomor manual + status disposisi (Belum Dibaca/Diteruskan/Disetujui/Diarsipkan).
+- Validasi regex lampiran: hanya menerima URL Google Docs resmi.
+
+## 8. Modul Prestasi Santri
+
+- Input: santri, nama kegiatan, lokasi, tingkat (internal/eksternal), keterangan, tanggal.
+
+## 9. Modul Kalender Akademik
+
+- Empat mode tampilan: **1 Bulan, 2 Bulan, 1 Semester, 2 Semester**.
+- **1 Semester** dan **2 Semester** ter-*anchor* otomatis ke batas Januari/Juli (bukan sekadar N bulan dari tanggal yang sedang dilihat):
+  - 1 Semester → Januari–Juni **atau** Juli–Desember, tergantung bulan yang sedang dilihat.
+  - 2 Semester → satu tahun ajaran penuh Juli–Juni.
+- Klik tanggal kosong → popup tambah agenda, kategori **Umum/Akademik/Pengasuhan** (bisa pilih 2 sekaligus), warna berbeda per kategori. Minimal satu kategori wajib dipilih (divalidasi server-side, bukan cuma di JS).
+- Bisa **dicetak** langsung dari browser.
+- Hanya **sekretaris dan admin** yang bisa menambah/mengubah agenda; role lain read-only.
+
+## 10. Kelola User
+
+- Admin bisa **edit** data user (nama, email, status, reset password) yang sudah ada.
+- **Tambah User Baru**: mengangkat santri jadi pengurus (insert `riwayat_jabatan`) sekaligus opsional langsung membuatkan akun login (insert/reaktivasi `users`, email dibuat otomatis dari NIS) — dalam satu form.
+
+## 11. Masa Jabatan / Khidmat (bukan tahun ajaran)
+
+- `periode_jabatan`: menyimpan periode dengan status `aktif`/`arsip` — **data periode lama tidak pernah dihapus**, cuma diarsipkan.
+- `riwayat_jabatan`: penghubung santri ↔ periode ↔ posisi ↔ `role_key` ↔ `punya_akses_sistem`.
+
+## 12. Serah Terima Jabatan
+
+- Halaman terpisah, otomatis menampilkan masa khidmat aktif saat ini + form isi masa khidmat baru.
+- Tombol "Serah Terima Jabatan" → popup konfirmasi **password** (tanpa menyebutkan email tujuan) → diverifikasi khusus ke akun admin utama.
+- Diproses dalam satu transaksi: arsipkan periode lama, aktifkan periode baru. Bisa juga dipakai untuk periode **pertama kali** (bukan cuma pergantian).
+
+## 13. Ekstrakurikuler
+
+- `kategori_ekskul` (Olahraga, Kesenian) → `ekstrakurikuler` (banyak cabang per kategori) → `ekskul_anggota` (keanggotaan dengan histori keluar-masuk).
+- Pelatih **bukan entitas terpisah** — cukup FK ke tabel guru/asatidz yang sudah ada.
+
+## 14. Basis Kamar (bukan Kelas)
+
+- `kamar_id` jadi filter utama di seluruh modul operasional (absensi, dsb).
+- `kelas_id` tetap ada sebagai referensi, bukan filter utama.
+
+## 15. Cari Santri & Cari Guru
+
+- Dua modul terpisah (sebelumnya digabung), masing-masing **live search** — hasil terfilter otomatis saat mengetik, tanpa tombol/reload.
+- Cari Santri punya filter tambahan berdasar kamar.
+
+## 16. Data Master
+
+- Kelola **Kelas, Kamar, Keluarga, Guru, Santri** — satuan (form manual) maupun **massal (import CSV)**.
+- Import CSV bersifat **upsert**: NIS/NIP yang sudah ada otomatis diperbarui, bukan dobel. Baris dengan referensi kelas/kamar yang tidak ditemukan tetap masuk (dikosongkan + diberi peringatan), tidak menggagalkan seluruh proses impor.
+
+## 17. Riwayat Perubahan (History)
+
+- Menampilkan `audit_logs` yang sudah tercatat otomatis dari seluruh modul sejak awal.
+- Bisa difilter **per masa jabatan** — hanya menampilkan log yang jatuh dalam rentang tanggal periode tersebut.
+
+## 18. Komponen Pencarian Santri (Typeahead)
+
+- Komponen reusable: ketik nama/NIS, klik hasil yang mendekati — menggantikan dropdown panjang di form Poskestren, Mahkamah, Perizinan, Prestasi, dan Tambah User.
+
+---
+
+## Belum Diimplementasikan (masih rencana, bukan fitur aktif)
+
+Beberapa ide yang pernah dibahas tapi **belum ada di kode**:
+
+- Portal Wali Santri (akses terpisah untuk orang tua)
+- Export laporan ke PDF/Excel
+- Notifikasi real-time (Web Push)
+- Backup otomatis terjadwal (cron job / Google Spreadsheet)
+
+---
 
 ## Instalasi (Hosting Shared / cPanel)
 
-1. Upload seluruh isi folder ini ke `public_html` (atau subfolder) lewat cPanel File Manager.
-2. Buka **cPanel → MySQL Databases**, buat database + user baru, lalu **Add User to Database** dengan centang **ALL PRIVILEGES**.
-3. Buka **phpMyAdmin**, pilih database yang baru dibuat, import `database.sql` (file ini aman diimport ke database kosong maupun yang sudah pernah berisi data lama — otomatis `DROP TABLE` dulu).
-4. Isi `config/database.php` dengan kredensial database (nama database & user **dengan prefix akun**, bukan nilai contoh).
-5. Buka `reset_password.php` sekali lewat browser untuk memastikan password akun contoh (`hisada123`) valid, **lalu hapus file itu dari server**.
-6. Login pakai salah satu akun contoh, misal `admin@daarululuumlido.com` / `hisada123`.
+1. Upload seluruh isi folder ini ke `public_html` lewat cPanel File Manager.
+2. **cPanel → MySQL Databases** → buat database + user baru → **Add User to Database** dengan **ALL PRIVILEGES**.
+3. **phpMyAdmin** → pilih database yang baru dibuat → import `database.sql` (aman diimpor ke database kosong maupun yang sudah berisi data lama — otomatis `DROP TABLE` dulu).
+4. Isi `config/database.php` dengan kredensial **asli** (nama database & user dengan prefix akun cPanel-mu — **jangan pernah commit password asli ke repo publik**).
+5. Buka `reset_password.php` sekali lewat browser (password akun contoh jadi `hisada123`), **lalu hapus file itu dari server**.
+6. Login: `admin@daarululuumlido.com` / `hisada123`.
 
 ## Struktur Folder
 
@@ -73,24 +179,13 @@ flowchart TD
 ├── index.php              # Halaman login
 ├── dashboard.php          # Seluruh modul (routing via ?modul=...)
 ├── logout.php
-├── reset_password.php     # Utilitas sekali pakai, hapus setelah dipakai
-├── database.sql           # Skema + data contoh (satu file, aman diimpor ulang)
-├── config/
-│   └── database.php       # Kredensial koneksi (isi sendiri, JANGAN commit yg asli)
+├── reset_password.php     # Utilitas sekali pakai
+├── database.sql           # Skema + data contoh (satu file)
+├── config/database.php    # Kredensial koneksi (isi sendiri)
 ├── includes/
-│   ├── auth.php           # Session, login check, RBAC
-│   ├── error_page.php      # Halaman error kustom (403/422/500) + exception handler
-│   ├── header.php / sidebar.php / footer.php
-│   └── print_surat_izin.php
-└── assets/
-    ├── css/style.css
-    ├── img/                # logo & background login
-    └── vendor/             # Bootstrap 5 + Bootstrap Icons (di-vendor lokal)
+│   ├── auth.php               # Session, login check, RBAC
+│   ├── error_page.php          # Halaman error kustom + exception handler
+│   ├── print_surat_izin.php
+│   └── header.php / sidebar.php / footer.php
+└── assets/                # CSS, logo, Bootstrap (di-vendor lokal)
 ```
-
-## Keamanan
-
-- Password di-hash dengan **Bcrypt**.
-- Semua query pakai **prepared statement** (PDO).
-- Tidak ada dependensi ke domain eksternal mana pun (semua CSS/JS/font di-vendor lokal) — dirancang agar tidak terdeteksi sebagai pola phishing oleh alat keamanan seperti Cisco Umbrella.
-- Exception tak terduga ditangani secara global — pengguna tidak pernah melihat stack trace PHP mentah.
