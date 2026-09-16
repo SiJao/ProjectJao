@@ -1,0 +1,477 @@
+/* ==========================================================
+   Hisada - stylesheet ringan (di atas Bootstrap 5, di-vendor lokal)
+   ========================================================== */
+:root {
+    --hisada-green: #1f7a4d;
+    --hisada-green-dark: #155c39;
+    --hisada-green-soft: #eaf4ee;
+    --hisada-cream: #f6f4ee;
+    --hisada-border: #e5e2da;
+    --hisada-text-muted: #7a786f;
+}
+
+html, body {
+    overflow-x: hidden;
+}
+body {
+    background-color: var(--hisada-cream);
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    color: #2e2e2b;
+}
+
+/* ---------- Login ---------- */
+.login-wrapper {
+    min-height: 100vh;
+}
+.login-image {
+    background-size: cover;
+    background-position: center;
+    min-height: 100vh;
+}
+.login-image::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(21,92,57,.15), rgba(21,92,57,.55));
+}
+.login-card {
+    max-width: 380px;
+    margin: auto;
+}
+.login-logo {
+    height: 70px;
+    margin-bottom: 16px;
+}
+
+/* ---------- Layout umum ---------- */
+.app-shell {
+    min-height: 100vh;
+    align-items: stretch;
+}
+
+/* Topbar khusus mobile (hamburger + logo) -- sidebar penuh jadi offcanvas */
+.mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background-color: var(--hisada-green-dark);
+    padding: 10px 14px;
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+}
+.btn-hamburger {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.4rem;
+    line-height: 1;
+    padding: 4px 6px;
+}
+.mobile-topbar-logo {
+    height: 30px;
+    border-radius: 6px;
+}
+
+/* Sidebar: warna & elemen dasar berlaku di semua ukuran layar */
+.sidebar {
+    /* !important wajib -- Bootstrap sendiri punya aturan
+       ".offcanvas-md{background-color:transparent!important}" pada
+       breakpoint desktop (>=768px), jadi tanpa !important warna ini
+       akan selalu kalah dan sidebar tampil transparan/putih di desktop. */
+    background-color: var(--hisada-green-dark) !important;
+    color: #fff;
+    --bs-offcanvas-width: 260px;
+}
+/* Lapisan kedua: selector ID (spesifisitas 1,0,0) -- jauh lebih tinggi
+   dari selector class manapun (0,1,0) yang dipakai Bootstrap, jadi
+   dijamin menang apa pun urutan file/cache-nya. Sidebar selalu punya
+   id="sidebarMobile" (dipakai juga sebagai target offcanvas). */
+#sidebarMobile {
+    background-color: var(--hisada-green-dark) !important;
+}
+/* Ukuran/posisi "menempel" hanya diterapkan di desktop (md+) --
+   di bawah itu, biar Bootstrap Offcanvas yang atur posisi/animasi geser */
+@media (min-width: 768px) {
+    .sidebar {
+        width: 240px;
+        flex: 0 0 240px;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow-y: auto;
+    }
+}
+.sidebar .logo-box {
+    padding: 20px 16px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,.15);
+}
+.sidebar .logo-box img {
+    height: 44px;
+    border-radius: 8px;
+}
+.sidebar a {
+    color: #e8f3ec;
+    display: flex;
+    align-items: center;
+    padding: 9px 18px;
+    text-decoration: none;
+    font-size: .89rem;
+    border-left: 3px solid transparent;
+    white-space: nowrap;
+}
+.sidebar a:hover {
+    background-color: rgba(255,255,255,.08);
+    color: #fff;
+}
+.sidebar a.active {
+    background-color: rgba(255,255,255,.14);
+    border-left-color: #ffffff;
+    font-weight: 600;
+}
+.sidebar small.section-title {
+    display: block;
+    padding: 16px 18px 6px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: rgba(255,255,255,.5);
+    font-size: .68rem;
+}
+.sidebar .user-box {
+    border-top: 1px solid rgba(255,255,255,.15);
+    padding: 14px 18px;
+    font-size: .8rem;
+    color: rgba(255,255,255,.65);
+}
+.sidebar .user-box a {
+    padding: 0;
+    display: inline-flex;
+    color: rgba(255,255,255,.85);
+}
+.sidebar .user-box a:hover { color: #fff; background: none; }
+
+.main-content {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 26px 30px;
+}
+@media (max-width: 767.98px) {
+    .main-content {
+        padding: 16px;
+    }
+}
+
+/* ---------- Kartu & elemen umum ---------- */
+.card-hisada {
+    border: 1px solid var(--hisada-border);
+    border-radius: 12px;
+    background: #fff;
+}
+.stat-box {
+    border-radius: 12px;
+    padding: 18px 20px;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.bg-green { background-color: var(--hisada-green); }
+.bg-blue  { background-color: #2f6fa0; }
+.bg-orange{ background-color: #c97a2b; }
+.bg-red   { background-color: #b5432f; }
+
+.card-select {
+    border: 1px solid var(--hisada-border);
+    border-radius: 12px;
+    padding: 24px 14px;
+    text-align: center;
+    text-decoration: none;
+    color: #2e2e2b;
+    display: block;
+    background: #fff;
+    transition: box-shadow .15s ease, transform .15s ease;
+}
+.card-select:hover {
+    box-shadow: 0 6px 16px rgba(0,0,0,.08);
+    color: var(--hisada-green-dark);
+    transform: translateY(-2px);
+}
+.card-select .icon {
+    font-size: 1.9rem;
+    margin-bottom: 8px;
+    display: block;
+    color: var(--hisada-green);
+}
+
+.badge-hadir  { background-color: #dcefe3; color: #1f7a4d; }
+.badge-sakit  { background-color: #fdeccf; color: #a5680f; }
+.badge-izin   { background-color: #dbe8f6; color: #2f6fa0; }
+.badge-pulang { background-color: #e6e0f5; color: #6a45a8; }
+.badge-alpha  { background-color: #f8dcd6; color: #b5432f; }
+
+table.table-hisada, .table {
+    font-size: .9rem;
+}
+.table > :not(caption) > * > * {
+    vertical-align: middle;
+}
+
+/* ==========================================================
+   KALENDER AKADEMIK
+   ========================================================== */
+.kalender-toolbar {
+    margin-bottom: 14px;
+}
+.kalender-nav-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid var(--hisada-border);
+    background: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #2e2e2b;
+    text-decoration: none;
+    transition: background .15s ease;
+}
+.kalender-nav-btn:hover {
+    background: var(--hisada-green-soft);
+    color: var(--hisada-green-dark);
+}
+
+.kalender-legend {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: .82rem;
+    color: var(--hisada-text-muted);
+    margin-bottom: 14px;
+}
+.kalender-legend .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+.kalender-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+}
+.kalender-grid .dow {
+    text-align: center;
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--hisada-text-muted);
+    padding-bottom: 4px;
+}
+.kalender-cell {
+    min-height: 96px;
+    border: 1px solid var(--hisada-border);
+    border-radius: 8px;
+    padding: 6px 7px;
+    background: #fff;
+    font-size: .78rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    transition: box-shadow .15s ease, border-color .15s ease;
+}
+.kalender-cell.empty {
+    background: transparent;
+    border-color: transparent;
+}
+.kalender-cell.clickable {
+    cursor: pointer;
+}
+.kalender-cell.clickable:hover {
+    border-color: var(--hisada-green);
+    box-shadow: 0 2px 8px rgba(31,122,77,.12);
+}
+.kalender-cell .tanggal {
+    font-weight: 600;
+    font-size: .82rem;
+    color: #4a4a45;
+}
+.kalender-cell.today {
+    border-color: var(--hisada-green);
+    background: var(--hisada-green-soft);
+}
+.kalender-cell.today .tanggal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--hisada-green);
+    color: #fff;
+    font-size: .74rem;
+}
+.kalender-agenda-chip {
+    border-radius: 5px;
+    padding: 2px 6px;
+    color: #fff;
+    font-size: .7rem;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.kalender-cell .tambah-hint {
+    font-size: .68rem;
+    color: #b7b5ab;
+    margin-top: auto;
+}
+.kalender-cell.clickable:hover .tambah-hint {
+    color: var(--hisada-green);
+}
+
+.agenda-umum       { background-color: #2f6fa0; }
+.agenda-akademik   { background-color: #c97a2b; }
+.agenda-pengasuhan { background-color: #6a45a8; }
+.agenda-none       { background-color: #9a988e; }
+
+/* ---------- Kalender: layout multi-bulan (1/2/6/12) ---------- */
+.kalender-multi {
+    display: grid;
+    gap: 16px;
+}
+.kalender-multi-1 { grid-template-columns: 1fr; }
+.kalender-multi-2 { grid-template-columns: repeat(2, 1fr); }
+.kalender-multi-6 { grid-template-columns: repeat(3, 1fr); }
+.kalender-multi-12 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 992px) {
+    .kalender-multi-2, .kalender-multi-6, .kalender-multi-12 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 575.98px) {
+    .kalender-multi-2, .kalender-multi-6, .kalender-multi-12 { grid-template-columns: 1fr; }
+    .kalender-cell { min-height: 64px; font-size: .68rem; padding: 4px 5px; }
+    .kalender-cell .tanggal { font-size: .74rem; }
+    .kalender-agenda-chip { font-size: .62rem; }
+    .kalender-grid { gap: 3px; }
+    .kalender-toolbar h4 { font-size: 1.1rem; }
+}
+.kalender-month-block { min-width: 0; }
+
+/* ---------- Kalender: grid versi ringkas (tampilan 6/12 bulan) ---------- */
+.kalender-grid-compact {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+.kalender-grid-compact .dow {
+    text-align: center;
+    font-size: .62rem;
+    font-weight: 600;
+    color: var(--hisada-text-muted);
+    padding-bottom: 2px;
+}
+.kalender-cell-compact {
+    min-height: 30px;
+    border-radius: 4px;
+    padding: 2px;
+    font-size: .68rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+}
+.kalender-cell-compact.empty { background: transparent; }
+.kalender-cell-compact.today .tanggal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--hisada-green);
+    color: #fff;
+    font-size: .62rem;
+}
+.kalender-cell-compact .mini-dots {
+    display: flex;
+    gap: 1px;
+}
+.kalender-cell-compact .mini-dots .dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* ---------- Cetak ---------- */
+@media print {
+    .sidebar, .no-print { display: none !important; }
+    .app-shell { display: block !important; }
+    .main-content { padding: 0 !important; flex: none !important; }
+    body { background: #fff !important; }
+    .card-hisada { border-color: #ccc !important; }
+    .kalender-month-block { page-break-inside: avoid; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+}
+
+/* ---------- Komponen pencarian santri (typeahead) ---------- */
+.santri-picker { position: relative; }
+.sp-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid var(--hisada-border);
+    border-radius: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 1050;
+    display: none;
+    box-shadow: 0 6px 16px rgba(0,0,0,.1);
+    margin-top: 2px;
+}
+.sp-item {
+    padding: 7px 12px;
+    font-size: .85rem;
+    cursor: pointer;
+}
+.sp-item:hover {
+    background: var(--hisada-green-soft);
+}
+
+/* ---------- Live search (Cari Santri/Guru) ---------- */
+.live-search-results { margin-top: 10px; }
+
+.error-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+.error-card {
+    background: #fff;
+    border: 1px solid var(--hisada-border);
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.06);
+    padding: 40px 36px;
+    max-width: 440px;
+    width: 100%;
+    text-align: center;
+}
+.error-logo {
+    height: 48px;
+    margin-bottom: 18px;
+    border-radius: 8px;
+}
+.error-code {
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--hisada-green);
+    line-height: 1;
+    margin-bottom: 6px;
+}
