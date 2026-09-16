@@ -58,6 +58,37 @@ function nama_bulan_indo(string $namaInggris): string
 }
 
 /**
+ * Kirim satu tabel (header + baris) sbg JSON ke Google Apps Script Web App
+ * yang berfungsi sbg jembatan ke Google Spreadsheet. Pakai file_get_contents
+ * + stream context (BUKAN ekstensi curl) supaya tetap jalan di hosting yg
+ * curl-nya tidak aktif -- cukup butuh allow_url_fopen (biasanya aktif
+ * default). Lihat google-apps-script/BackupSpreadsheet.gs utk skrip
+ * penerimanya.
+ */
+function kirim_ke_google_sheets(string $url, string $kunci, string $tabel, array $header, array $baris): array
+{
+    $payload = json_encode(['kunci' => $kunci, 'tabel' => $tabel, 'header' => $header, 'baris' => $baris]);
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json\r\n",
+            'content' => $payload,
+            'timeout' => 30,
+            'ignore_errors' => true, // supaya tetap bisa baca body respons walau HTTP status bukan 200
+        ],
+    ]);
+    $hasil = @file_get_contents($url, false, $context);
+    if ($hasil === false) {
+        return ['ok' => false, 'pesan' => 'Gagal menghubungi URL Apps Script (cek URL & koneksi server).'];
+    }
+    $decoded = json_decode($hasil, true);
+    if (!is_array($decoded)) {
+        return ['ok' => false, 'pesan' => 'Respons tidak valid dari Apps Script: ' . substr($hasil, 0, 200)];
+    }
+    return $decoded;
+}
+
+/**
  * Export data ke file .xlsx ASLI (bukan CSV) tanpa Composer/PhpSpreadsheet
  * -- cukup pakai ekstensi ZipArchive bawaan PHP + XML minimal, karena
  * format .xlsx pada dasarnya cuma file ZIP berisi beberapa XML.
@@ -1445,6 +1476,44 @@ elseif ($modul === 'backup') {
         }
     }
 
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'simpan_pengaturan_gs') {
+        foreach (['gs_url' => $_POST['gs_url'], 'gs_kunci' => $_POST['gs_kunci']] as $nama => $nilai) {
+            $pdo->prepare('INSERT INTO pengaturan (nama_setting, nilai) VALUES (:n, :v) ON DUPLICATE KEY UPDATE nilai = VALUES(nilai)')
+                ->execute(['n' => $nama, 'v' => $nilai]);
+        }
+        log_audit($pdo, $user['id'], 'Perbarui pengaturan Google Apps Script (backup spreadsheet)');
+        $success = 'Pengaturan Google Sheets berhasil disimpan.';
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'backup_spreadsheet') {
+        $stmtSet = $pdo->query("SELECT nama_setting, nilai FROM pengaturan WHERE nama_setting IN ('gs_url','gs_kunci')");
+        $pengaturanGs = [];
+        foreach ($stmtSet->fetchAll() as $row) {
+            $pengaturanGs[$row['nama_setting']] = $row['nilai'];
+        }
+        if (empty($pengaturanGs['gs_url'])) {
+            $error = 'URL Google Apps Script belum diatur. Isi dulu di bagian "Pengaturan Google Sheets" di bawah.';
+        } else {
+            // Tabel yg paling sering berubah & paling berguna di-mirror ke
+            // spreadsheet -- BUKAN seluruh 29 tabel (biar cepat & tidak
+            // kena limit eksekusi Google Apps Script).
+            $tabelPenting = ['students', 'teachers', 'attendances', 'violations', 'permits', 'poskestren_records', 'achievements', 'correspondences'];
+            $hasilKirim = [];
+            foreach ($tabelPenting as $tabel) {
+                $rows = $pdo->query("SELECT * FROM `$tabel` ORDER BY id DESC LIMIT 500")->fetchAll();
+                $header = $rows ? array_keys($rows[0]) : [];
+                $baris = array_map(fn($r) => array_map(fn($v) => (string) ($v ?? ''), array_values($r)), $rows);
+                $respons = kirim_ke_google_sheets($pengaturanGs['gs_url'], $pengaturanGs['gs_kunci'] ?? '', $tabel, $header, $baris);
+                $hasilKirim[] = "$tabel: " . ($respons['ok'] ? 'OK (' . count($rows) . ' baris)' : 'GAGAL - ' . $respons['pesan']);
+            }
+            $semuaOk = !array_filter($hasilKirim, fn($h) => str_contains($h, 'GAGAL'));
+            $pdo->prepare("INSERT INTO backup_logs (status, keterangan) VALUES (:status, :ket)")
+                ->execute(['status' => $semuaOk ? 'berhasil' : 'gagal', 'ket' => 'Backup ke Google Sheets: ' . implode(' | ', $hasilKirim)]);
+            log_audit($pdo, $user['id'], 'Backup ke Google Spreadsheet: ' . ($semuaOk ? 'berhasil' : 'sebagian gagal'));
+            $success = $semuaOk ? 'Backup ke Google Spreadsheet berhasil untuk semua tabel.' : 'Backup selesai, tapi ada tabel yang gagal -- lihat Riwayat Backup untuk detail.';
+        }
+    }
+
     if (isset($_GET['unduh']) && !empty($_SESSION['backup_download']) && file_exists($_SESSION['backup_download'])) {
         header('Content-Type: application/sql');
         header('Content-Disposition: attachment; filename="' . basename($_SESSION['backup_download']) . '"');
@@ -1453,6 +1522,11 @@ elseif ($modul === 'backup') {
         exit;
     }
 
+    $stmtSet = $pdo->query("SELECT nama_setting, nilai FROM pengaturan WHERE nama_setting IN ('gs_url','gs_kunci')");
+    $pengaturanGsTampil = [];
+    foreach ($stmtSet->fetchAll() as $row) {
+        $pengaturanGsTampil[$row['nama_setting']] = $row['nilai'];
+    }
     $riwayatBackup = $pdo->query('SELECT * FROM backup_logs ORDER BY waktu DESC LIMIT 30')->fetchAll();
     $adaFileSiapUnduh = !empty($_SESSION['backup_download']) && file_exists($_SESSION['backup_download']);
 }
@@ -3097,8 +3171,8 @@ elseif ($modul === 'backup'): ?>
     <h4 class="mb-4">Backup Database</h4>
     <div class="row g-3">
         <div class="col-md-5">
-            <div class="card card-hisada p-3">
-                <h6 class="mb-2">Backup Manual</h6>
+            <div class="card card-hisada p-3 mb-3">
+                <h6 class="mb-2">Backup Manual (.sql)</h6>
                 <p class="small text-muted">Membuat file <code>.sql</code> berisi seluruh isi database saat ini (struktur + data), siap diunduh.</p>
                 <form method="post">
                     <input type="hidden" name="action" value="backup_manual">
@@ -3107,11 +3181,32 @@ elseif ($modul === 'backup'): ?>
                 <?php if ($adaFileSiapUnduh): ?>
                     <a href="dashboard.php?modul=backup&unduh=1" class="btn btn-outline-success w-100 mt-2"><i class="bi bi-download me-1"></i>Unduh Backup Terakhir</a>
                 <?php endif; ?>
-                <div class="form-text mt-2">
-                    Untuk backup <strong>otomatis terjadwal</strong>, minta pengelola hosting memasang Cron Job di cPanel yang mengakses:<br>
-                    <code>https://domainmu.com/dashboard.php?modul=backup&cron_key=GANTI_DENGAN_KUNCI_RAHASIA</code><br>
-                    setiap hari (lihat catatan keamanan di README).
-                </div>
+                <div class="form-text mt-2">Tombol ini backup manual (harus diklik sendiri). Belum ada penjadwalan otomatis -- lihat catatan di README soal batasan ini.</div>
+            </div>
+
+            <div class="card card-hisada p-3 mb-3">
+                <h6 class="mb-2">Backup ke Google Spreadsheet</h6>
+                <p class="small text-muted">Mengirim 8 tabel terpenting (santri, guru, absensi, pelanggaran, perizinan, poskestren, prestasi, korespondensi -- 500 baris terbaru per tabel) ke Google Spreadsheet lewat Google Apps Script. Sheet lama ditimpa, bukan ditumpuk.</p>
+                <form method="post">
+                    <input type="hidden" name="action" value="backup_spreadsheet">
+                    <button class="btn btn-success w-100" <?= empty($pengaturanGsTampil['gs_url']) ? 'disabled' : '' ?>>Backup ke Spreadsheet Sekarang</button>
+                </form>
+                <?php if (empty($pengaturanGsTampil['gs_url'])): ?>
+                    <div class="form-text mt-2 text-danger">Atur URL Apps Script dulu di bawah sebelum bisa dipakai.</div>
+                <?php endif; ?>
+            </div>
+
+            <div class="card card-hisada p-3">
+                <h6 class="mb-2">Pengaturan Google Sheets</h6>
+                <p class="small text-muted">Setup sekali: ikuti langkah di file <code>google-apps-script/BackupSpreadsheet.gs</code> (ada di source code sistem ini), lalu tempel URL Web App &amp; kunci rahasianya di sini.</p>
+                <form method="post">
+                    <input type="hidden" name="action" value="simpan_pengaturan_gs">
+                    <div class="mb-2"><label class="form-label small">URL Web App Apps Script</label>
+                        <input type="url" name="gs_url" class="form-control form-control-sm" value="<?= htmlspecialchars($pengaturanGsTampil['gs_url'] ?? '') ?>" placeholder="https://script.google.com/macros/s/.../exec"></div>
+                    <div class="mb-2"><label class="form-label small">Kunci Rahasia</label>
+                        <input type="text" name="gs_kunci" class="form-control form-control-sm" value="<?= htmlspecialchars($pengaturanGsTampil['gs_kunci'] ?? '') ?>" placeholder="Harus SAMA PERSIS dgn KUNCI_RAHASIA di file .gs"></div>
+                    <button class="btn btn-outline-success w-100">Simpan Pengaturan</button>
+                </form>
             </div>
         </div>
         <div class="col-md-7">

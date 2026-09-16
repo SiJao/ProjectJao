@@ -33,7 +33,7 @@
 
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS
-    wali_akses, backup_logs, push_subscriptions, inventaris_barang,
+    pengaturan, wali_akses, backup_logs, push_subscriptions, inventaris_barang,
     kunjungan_tamu, health_profiles, riwayat_kamar,
     audit_logs, agendas, achievements, correspondences, permits, violations,
     poskestren_records, attendances, kegiatan_grup_anggota, kegiatan_grup,
@@ -440,6 +440,16 @@ CREATE TABLE backup_logs (
     waktu DATETIME DEFAULT CURRENT_TIMESTAMP,
     status ENUM('berhasil','gagal') NOT NULL,
     keterangan VARCHAR(255)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 22. PENGATURAN (key-value sederhana, mis. URL Google Apps Script)
+-- ---------------------------------------------------------------------
+
+CREATE TABLE pengaturan (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nama_setting VARCHAR(100) NOT NULL UNIQUE,
+    nilai TEXT
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
