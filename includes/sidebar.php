@@ -30,8 +30,6 @@ function nav_link($modulKey, $icon, $label, $currentModul)
         <small class="section-title">Kesantrian</small>
         <?php nav_link('absensi', 'bi-clipboard-check', 'Absensi', $currentModul); ?>
         <?php nav_link('perizinan', 'bi-door-open', 'Perizinan & Kamtib', $currentModul); ?>
-        <?php nav_link('kunjungan_tamu', 'bi-person-lines-fill', 'Kunjungan Tamu', $currentModul); ?>
-        <?php nav_link('inventaris', 'bi-box-seam', 'Inventaris Barang', $currentModul); ?>
     <?php endif; ?>
 
     <?php if ($isAdmin || in_array($role, ['asisten_poskestren'], true)): ?>
@@ -57,6 +55,7 @@ function nav_link($modulKey, $icon, $label, $currentModul)
         <?php nav_link('korespondensi', 'bi-envelope', 'Korespondensi', $currentModul); ?>
         <?php nav_link('prestasi', 'bi-trophy', 'Prestasi Santri', $currentModul); ?>
         <?php nav_link('rapor', 'bi-file-earmark-text', 'Rapor Kesantrian', $currentModul); ?>
+        <?php nav_link('inventaris', 'bi-box-seam', 'Inventaris Barang', $currentModul); ?>
     <?php endif; ?>
 
     <?php if ($isAdmin): ?>

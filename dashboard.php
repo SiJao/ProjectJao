@@ -34,8 +34,7 @@ $moduleAccess = [
     'serah_terima'        => [],
     'data_master'         => [],     // super admin -- kelola kelas/kamar/keluarga/guru/santri + import CSV
     'history'             => [],     // super admin -- riwayat perubahan (audit log)
-    'kunjungan_tamu'      => ['piket'],
-    'inventaris'          => ['piket'],
+    'inventaris'          => ['sekretaris'],
     'rapor'               => ['sekretaris'],
     'backup'              => [],     // super admin
     'notif_count'         => null,   // login saja -- endpoint JSON polling notifikasi
@@ -1323,65 +1322,57 @@ elseif ($modul === 'history') {
 }
 
 // ======================================================================
-// MODUL: KUNJUNGAN TAMU / BESUK
-// ======================================================================
-elseif ($modul === 'kunjungan_tamu') {
-    $page_title = 'Kunjungan Tamu';
-
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'tambah') {
-        $pdo->prepare("
-            INSERT INTO kunjungan_tamu (student_id, nama_tamu, hubungan, keperluan, tanggal, jam_datang, dicatat_oleh)
-            VALUES (:sid, :nama, :hub, :keperluan, :tgl, :jam, :uid)
-        ")->execute([
-            'sid' => $_POST['student_id'], 'nama' => $_POST['nama_tamu'], 'hub' => $_POST['hubungan'],
-            'keperluan' => $_POST['keperluan'], 'tgl' => $_POST['tanggal'], 'jam' => date('H:i:s'), 'uid' => $user['id'],
-        ]);
-        log_audit($pdo, $user['id'], 'Catat kunjungan tamu utk santri #' . $_POST['student_id']);
-        $success = 'Kunjungan tamu berhasil dicatat.';
-    }
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'pulang') {
-        $pdo->prepare("UPDATE kunjungan_tamu SET jam_pulang = :jam WHERE id = :id")
-            ->execute(['jam' => date('H:i:s'), 'id' => $_POST['kunjungan_id']]);
-        log_audit($pdo, $user['id'], 'Tandai tamu pulang #' . $_POST['kunjungan_id']);
-        $success = 'Data berhasil diperbarui.';
-    }
-
-    $students = $pdo->query("SELECT id, nis, nama FROM students WHERE status='aktif' ORDER BY nama")->fetchAll();
-    $daftarKunjungan = $pdo->query("
-        SELECT k.*, s.nama AS nama_santri, s.nis FROM kunjungan_tamu k
-        JOIN students s ON s.id = k.student_id ORDER BY k.tanggal DESC, k.id DESC LIMIT 100
-    ")->fetchAll();
-}
-
-// ======================================================================
 // MODUL: INVENTARIS BARANG SANTRI
 // ======================================================================
 elseif ($modul === 'inventaris') {
     $page_title = 'Inventaris Barang';
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'tambah') {
-        $pdo->prepare("
-            INSERT INTO inventaris_barang (student_id, nama_barang, jumlah, tanggal_titip, keterangan, status)
-            VALUES (:sid, :nama, :jml, :tgl, :ket, 'dititipkan')
-        ")->execute([
-            'sid' => $_POST['student_id'], 'nama' => $_POST['nama_barang'], 'jml' => $_POST['jumlah'] ?: 1,
-            'tgl' => $_POST['tanggal_titip'], 'ket' => $_POST['keterangan'],
-        ]);
-        log_audit($pdo, $user['id'], 'Catat barang titipan: ' . $_POST['nama_barang']);
-        $success = 'Barang berhasil dicatat.';
-    }
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'ambil') {
-        $pdo->prepare("UPDATE inventaris_barang SET status='diambil', tanggal_diambil=CURDATE() WHERE id=:id")
-            ->execute(['id' => $_POST['barang_id']]);
-        log_audit($pdo, $user['id'], 'Tandai barang diambil #' . $_POST['barang_id']);
-        $success = 'Data berhasil diperbarui.';
+        $kategoriArr = $_POST['kategori'] ?? [];
+        $tingkatArr = $_POST['tingkat'] ?? [];
+        if (empty($_POST['kode_barang']) || empty($_POST['nama_barang']) || !$kategoriArr) {
+            $error = 'Kode barang, nama barang, dan detail tiap unit wajib diisi.';
+        } else {
+            try {
+                $pdo->beginTransaction();
+                $pdo->prepare("INSERT INTO inventaris_kode (kode_barang, nama_barang, jumlah, keterangan) VALUES (:kode, :nama, :jml, :ket)")
+                    ->execute([
+                        'kode' => $_POST['kode_barang'], 'nama' => $_POST['nama_barang'],
+                        'jml' => count($kategoriArr), 'ket' => $_POST['keterangan'] ?: null,
+                    ]);
+                $kodeId = $pdo->lastInsertId();
+                $stmtUnit = $pdo->prepare('INSERT INTO inventaris_unit (inventaris_kode_id, kategori, tingkat) VALUES (:kid, :kat, :tkt)');
+                foreach ($kategoriArr as $i => $kat) {
+                    $stmtUnit->execute(['kid' => $kodeId, 'kat' => $kat, 'tkt' => $tingkatArr[$i] ?? 'bagus']);
+                }
+                $pdo->commit();
+                log_audit($pdo, $user['id'], 'Tambah inventaris: ' . $_POST['kode_barang'] . ' - ' . $_POST['nama_barang'] . ' (' . count($kategoriArr) . ' unit)');
+                $success = 'Barang berhasil dicatat.';
+            } catch (PDOException $e) {
+                $pdo->rollBack();
+                $error = $e->getCode() === '23000'
+                    ? 'Kode barang "' . htmlspecialchars($_POST['kode_barang']) . '" sudah dipakai. Gunakan kode lain.'
+                    : 'Gagal menyimpan: ' . $e->getMessage();
+            }
+        }
     }
 
-    $students = $pdo->query("SELECT id, nis, nama FROM students WHERE status='aktif' ORDER BY nama")->fetchAll();
-    $daftarBarang = $pdo->query("
-        SELECT b.*, s.nama AS nama_santri, s.nis FROM inventaris_barang b
-        JOIN students s ON s.id = b.student_id ORDER BY b.status = 'dititipkan' DESC, b.tanggal_titip DESC LIMIT 100
-    ")->fetchAll();
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_unit') {
+        $pdo->prepare('UPDATE inventaris_unit SET kategori = :kat, tingkat = :tkt WHERE id = :id')
+            ->execute(['kat' => $_POST['kategori_unit'], 'tkt' => $_POST['tingkat_unit'], 'id' => $_POST['unit_id']]);
+        log_audit($pdo, $user['id'], 'Perbarui unit inventaris #' . $_POST['unit_id']);
+        $success = 'Unit berhasil diperbarui.';
+    }
+
+    $daftarKode = $pdo->query('SELECT * FROM inventaris_kode ORDER BY id DESC LIMIT 100')->fetchAll();
+    $unitPerKode = [];
+    if ($daftarKode) {
+        $ids = implode(',', array_map('intval', array_column($daftarKode, 'id')));
+        $unitRows = $pdo->query("SELECT * FROM inventaris_unit WHERE inventaris_kode_id IN ($ids) ORDER BY id")->fetchAll();
+        foreach ($unitRows as $u) {
+            $unitPerKode[$u['inventaris_kode_id']][] = $u;
+        }
+    }
 }
 
 // ======================================================================
@@ -1455,11 +1446,28 @@ elseif ($modul === 'backup') {
             foreach ($tabelSemua as $tabel) {
                 $create = $pdo->query("SHOW CREATE TABLE `$tabel`")->fetch();
                 fwrite($fh, "DROP TABLE IF EXISTS `$tabel`;\n" . $create['Create Table'] . ";\n\n");
-                $rows = $pdo->query("SELECT * FROM `$tabel`")->fetchAll();
-                foreach ($rows as $row) {
-                    $cols = array_map(fn($c) => "`$c`", array_keys($row));
+
+                // Bulk INSERT per batch (200 baris/statement) jauh lebih cepat
+                // drpd 1 INSERT per baris -- penting utk tabel yg sudah berisi
+                // banyak data di server produksi (salah satu penyebab timeout
+                // 524 sebelumnya). Query TANPA fetchAll() supaya tidak perlu
+                // menampung seluruh tabel di memori sekaligus.
+                $stmt = $pdo->query("SELECT * FROM `$tabel`");
+                $batch = [];
+                $cols = null;
+                while ($row = $stmt->fetch()) {
+                    if ($cols === null) {
+                        $cols = array_map(fn($c) => "`$c`", array_keys($row));
+                    }
                     $vals = array_map(fn($v) => $v === null ? 'NULL' : $pdo->quote($v), array_values($row));
-                    fwrite($fh, "INSERT INTO `$tabel` (" . implode(',', $cols) . ") VALUES (" . implode(',', $vals) . ");\n");
+                    $batch[] = '(' . implode(',', $vals) . ')';
+                    if (count($batch) >= 200) {
+                        fwrite($fh, "INSERT INTO `$tabel` (" . implode(',', $cols) . ") VALUES\n" . implode(",\n", $batch) . ";\n");
+                        $batch = [];
+                    }
+                }
+                if ($batch) {
+                    fwrite($fh, "INSERT INTO `$tabel` (" . implode(',', $cols) . ") VALUES\n" . implode(",\n", $batch) . ";\n");
                 }
                 fwrite($fh, "\n");
             }
@@ -1485,33 +1493,45 @@ elseif ($modul === 'backup') {
         $success = 'Pengaturan Google Sheets berhasil disimpan.';
     }
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'backup_spreadsheet') {
+    // -------- Backup ke Google Sheets: PER TABEL lewat AJAX --------
+    // Sengaja TIDAK lagi memproses 8 tabel dlm satu request PHP -- kalau
+    // Google Apps Script lambat (cold start dsb), 8 panggilan berurutan
+    // gampang melebihi batas waktu PHP/hosting (muncul sbg error 524).
+    // Browser yg meloop tiap tabel via fetch() satu-satu, jadi tiap
+    // request PHP cuma menangani SATU tabel & selesai cepat.
+    define('TABEL_BACKUP_SHEETS', ['students', 'teachers', 'attendances', 'violations', 'permits', 'poskestren_records', 'achievements', 'correspondences']);
+
+    if (isset($_GET['ajax_tabel'])) {
+        header('Content-Type: application/json');
+        $tabel = $_GET['ajax_tabel'];
+        if (!in_array($tabel, TABEL_BACKUP_SHEETS, true)) {
+            echo json_encode(['ok' => false, 'pesan' => 'Nama tabel tidak dikenali.']);
+            exit;
+        }
         $stmtSet = $pdo->query("SELECT nama_setting, nilai FROM pengaturan WHERE nama_setting IN ('gs_url','gs_kunci')");
         $pengaturanGs = [];
         foreach ($stmtSet->fetchAll() as $row) {
             $pengaturanGs[$row['nama_setting']] = $row['nilai'];
         }
         if (empty($pengaturanGs['gs_url'])) {
-            $error = 'URL Google Apps Script belum diatur. Isi dulu di bagian "Pengaturan Google Sheets" di bawah.';
-        } else {
-            // Tabel yg paling sering berubah & paling berguna di-mirror ke
-            // spreadsheet -- BUKAN seluruh 29 tabel (biar cepat & tidak
-            // kena limit eksekusi Google Apps Script).
-            $tabelPenting = ['students', 'teachers', 'attendances', 'violations', 'permits', 'poskestren_records', 'achievements', 'correspondences'];
-            $hasilKirim = [];
-            foreach ($tabelPenting as $tabel) {
-                $rows = $pdo->query("SELECT * FROM `$tabel` ORDER BY id DESC LIMIT 500")->fetchAll();
-                $header = $rows ? array_keys($rows[0]) : [];
-                $baris = array_map(fn($r) => array_map(fn($v) => (string) ($v ?? ''), array_values($r)), $rows);
-                $respons = kirim_ke_google_sheets($pengaturanGs['gs_url'], $pengaturanGs['gs_kunci'] ?? '', $tabel, $header, $baris);
-                $hasilKirim[] = "$tabel: " . ($respons['ok'] ? 'OK (' . count($rows) . ' baris)' : 'GAGAL - ' . $respons['pesan']);
-            }
-            $semuaOk = !array_filter($hasilKirim, fn($h) => str_contains($h, 'GAGAL'));
-            $pdo->prepare("INSERT INTO backup_logs (status, keterangan) VALUES (:status, :ket)")
-                ->execute(['status' => $semuaOk ? 'berhasil' : 'gagal', 'ket' => 'Backup ke Google Sheets: ' . implode(' | ', $hasilKirim)]);
-            log_audit($pdo, $user['id'], 'Backup ke Google Spreadsheet: ' . ($semuaOk ? 'berhasil' : 'sebagian gagal'));
-            $success = $semuaOk ? 'Backup ke Google Spreadsheet berhasil untuk semua tabel.' : 'Backup selesai, tapi ada tabel yang gagal -- lihat Riwayat Backup untuk detail.';
+            echo json_encode(['ok' => false, 'pesan' => 'URL Google Apps Script belum diatur.']);
+            exit;
         }
+        $limit = max(50, min(1000, (int) ($_GET['limit'] ?? 200)));
+        $rows = $pdo->query("SELECT * FROM `$tabel` ORDER BY id DESC LIMIT $limit")->fetchAll();
+        $header = $rows ? array_keys($rows[0]) : [];
+        $baris = array_map(fn($r) => array_map(fn($v) => (string) ($v ?? ''), array_values($r)), $rows);
+        $respons = kirim_ke_google_sheets($pengaturanGs['gs_url'], $pengaturanGs['gs_kunci'] ?? '', $tabel, $header, $baris);
+        echo json_encode(['ok' => $respons['ok'], 'pesan' => $respons['pesan'], 'jumlah' => count($rows)]);
+        exit;
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'catat_hasil_backup_sheets') {
+        $pdo->prepare("INSERT INTO backup_logs (status, keterangan) VALUES (:status, :ket)")
+            ->execute(['status' => $_POST['semua_ok'] === '1' ? 'berhasil' : 'gagal', 'ket' => 'Backup ke Google Sheets: ' . $_POST['ringkasan']]);
+        log_audit($pdo, $user['id'], 'Backup ke Google Spreadsheet: ' . ($_POST['semua_ok'] === '1' ? 'berhasil' : 'sebagian gagal'));
+        echo json_encode(['ok' => true]);
+        exit;
     }
 
     if (isset($_GET['unduh']) && !empty($_SESSION['backup_download']) && file_exists($_SESSION['backup_download'])) {
@@ -3004,47 +3024,73 @@ elseif ($modul === 'history'): ?>
 
 <?php
 // ======================================================================
-// RENDER: KUNJUNGAN TAMU
+// RENDER: INVENTARIS BARANG
 // ======================================================================
-elseif ($modul === 'kunjungan_tamu'): ?>
-    <h4 class="mb-4">Kunjungan Tamu / Besuk</h4>
+elseif ($modul === 'inventaris'): ?>
+    <h4 class="mb-4">Inventaris Barang</h4>
     <div class="row g-3">
         <div class="col-md-5">
             <div class="card card-hisada p-3">
-                <h6 class="mb-3">Catat Kunjungan Baru</h6>
-                <form method="post">
+                <h6 class="mb-3">Catat Barang Baru</h6>
+                <form method="post" id="formInventaris">
                     <input type="hidden" name="action" value="tambah">
-                    <div class="mb-2"><label class="form-label small">Santri</label><?php render_santri_picker('student_id', $students, 'tamu'); ?></div>
-                    <div class="mb-2"><label class="form-label small">Nama Tamu</label><input type="text" name="nama_tamu" class="form-control form-control-sm" required></div>
-                    <div class="mb-2"><label class="form-label small">Hubungan</label><input type="text" name="hubungan" class="form-control form-control-sm" placeholder="Contoh: Ayah, Kakak, Paman" required></div>
-                    <div class="mb-2"><label class="form-label small">Keperluan</label><input type="text" name="keperluan" class="form-control form-control-sm"></div>
-                    <div class="mb-3"><label class="form-label small">Tanggal</label><input type="date" name="tanggal" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>" required></div>
-                    <button class="btn btn-success w-100">Simpan (Jam Datang Otomatis)</button>
+                    <div class="mb-2"><label class="form-label small">Kode Barang</label><input type="text" name="kode_barang" id="kodeBarangInput" class="form-control form-control-sm" placeholder="Contoh: HSD-DH-EPS" required></div>
+                    <div class="mb-2"><label class="form-label small">Nama Barang</label><input type="text" name="nama_barang" class="form-control form-control-sm" placeholder="Contoh: Printer" required></div>
+                    <div class="mb-2"><label class="form-label small">Jumlah</label><input type="number" id="jumlahBarangInput" class="form-control form-control-sm" value="1" min="1" max="50"></div>
+                    <div class="mb-2"><label class="form-label small">Keterangan</label><input type="text" name="keterangan" class="form-control form-control-sm"></div>
+
+                    <label class="form-label small d-block">Detail Tiap Unit</label>
+                    <div id="daftarUnit"></div>
+
+                    <button class="btn btn-success w-100 mt-2">Simpan</button>
                 </form>
             </div>
+            <script>
+            (function () {
+                var jumlahInput = document.getElementById('jumlahBarangInput');
+                var wadah = document.getElementById('daftarUnit');
+                function gambarUnit() {
+                    var jml = Math.max(1, Math.min(50, parseInt(jumlahInput.value, 10) || 1));
+                    wadah.innerHTML = '';
+                    for (var i = 0; i < jml; i++) {
+                        var baris = document.createElement('div');
+                        baris.className = 'row g-1 mb-1 align-items-center';
+                        baris.innerHTML =
+                            '<div class="col-auto small text-muted">#' + (i + 1) + '</div>' +
+                            '<div class="col"><select name="kategori[]" class="form-select form-select-sm"><option value="baru">Baru</option><option value="lama">Lama</option></select></div>' +
+                            '<div class="col"><select name="tingkat[]" class="form-select form-select-sm">' +
+                            '<option value="bagus">Bagus</option><option value="rusak_ringan">Rusak Ringan</option><option value="rusak_berat">Rusak Berat</option><option value="hilang">Hilang</option>' +
+                            '</select></div>';
+                        wadah.appendChild(baris);
+                    }
+                }
+                jumlahInput.addEventListener('input', gambarUnit);
+                gambarUnit();
+            })();
+            </script>
         </div>
         <div class="col-md-7">
             <div class="card card-hisada p-3">
-                <h6 class="mb-3">Daftar Kunjungan (100 terbaru)</h6>
+                <h6 class="mb-3">Daftar Barang</h6>
                 <div class="table-responsive">
                 <table class="table table-sm">
-                    <thead><tr><th>Santri</th><th>Tamu</th><th>Hubungan</th><th>Datang</th><th>Pulang</th><th></th></tr></thead>
+                    <thead><tr><th>Kode</th><th>Nama</th><th>Jml</th><th>Rincian Unit</th><th></th></tr></thead>
                     <tbody>
-                    <?php foreach ($daftarKunjungan as $k): ?>
+                    <?php foreach ($daftarKode as $k): ?>
                         <tr>
-                            <td><?= htmlspecialchars($k['nama_santri']) ?></td>
-                            <td><?= htmlspecialchars($k['nama_tamu']) ?></td>
-                            <td class="small"><?= htmlspecialchars($k['hubungan']) ?></td>
-                            <td class="small"><?= date('d/m H:i', strtotime($k['tanggal'].' '.$k['jam_datang'])) ?></td>
-                            <td class="small"><?= $k['jam_pulang'] ? substr($k['jam_pulang'],0,5) : '<span class="badge badge-izin">Masih di dalam</span>' ?></td>
-                            <td>
-                                <?php if (!$k['jam_pulang']): ?>
-                                <form method="post"><input type="hidden" name="action" value="pulang"><input type="hidden" name="kunjungan_id" value="<?= $k['id'] ?>"><button class="btn btn-sm btn-outline-success">Tandai Pulang</button></form>
-                                <?php endif; ?>
+                            <td><?= htmlspecialchars($k['kode_barang']) ?></td>
+                            <td><?= htmlspecialchars($k['nama_barang']) ?></td>
+                            <td><?= $k['jumlah'] ?></td>
+                            <td class="small">
+                                <?php foreach ($unitPerKode[$k['id']] ?? [] as $u): ?>
+                                    <span class="badge <?= $u['kategori']==='baru' ? 'badge-hadir' : 'badge-izin' ?>"><?= ucfirst($u['kategori']) ?></span>
+                                    <span class="badge <?= ['bagus'=>'badge-hadir','rusak_ringan'=>'badge-sakit','rusak_berat'=>'badge-alpha','hilang'=>'badge-alpha'][$u['tingkat']] ?>"><?= ucwords(str_replace('_',' ',$u['tingkat'])) ?></span><br>
+                                <?php endforeach; ?>
                             </td>
+                            <td><button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalUnit<?= $k['id'] ?>">Edit</button></td>
                         </tr>
                     <?php endforeach; ?>
-                    <?php if (!$daftarKunjungan): ?><tr><td colspan="6" class="text-muted small">Belum ada data.</td></tr><?php endif; ?>
+                    <?php if (!$daftarKode): ?><tr><td colspan="5" class="text-muted small">Belum ada data.</td></tr><?php endif; ?>
                     </tbody>
                 </table>
                 </div>
@@ -3052,54 +3098,41 @@ elseif ($modul === 'kunjungan_tamu'): ?>
         </div>
     </div>
 
-<?php
-// ======================================================================
-// RENDER: INVENTARIS BARANG
-// ======================================================================
-elseif ($modul === 'inventaris'): ?>
-    <h4 class="mb-4">Inventaris Barang Santri</h4>
-    <div class="row g-3">
-        <div class="col-md-5">
-            <div class="card card-hisada p-3">
-                <h6 class="mb-3">Catat Barang Titipan</h6>
-                <form method="post">
-                    <input type="hidden" name="action" value="tambah">
-                    <div class="mb-2"><label class="form-label small">Santri</label><?php render_santri_picker('student_id', $students, 'barang'); ?></div>
-                    <div class="mb-2"><label class="form-label small">Nama Barang</label><input type="text" name="nama_barang" class="form-control form-control-sm" required></div>
-                    <div class="mb-2"><label class="form-label small">Jumlah</label><input type="number" name="jumlah" class="form-control form-control-sm" value="1" min="1"></div>
-                    <div class="mb-2"><label class="form-label small">Tanggal Titip</label><input type="date" name="tanggal_titip" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>" required></div>
-                    <div class="mb-3"><label class="form-label small">Keterangan</label><input type="text" name="keterangan" class="form-control form-control-sm"></div>
-                    <button class="btn btn-success w-100">Simpan</button>
-                </form>
-            </div>
-        </div>
-        <div class="col-md-7">
-            <div class="card card-hisada p-3">
-                <h6 class="mb-3">Daftar Barang</h6>
-                <div class="table-responsive">
-                <table class="table table-sm">
-                    <thead><tr><th>Santri</th><th>Barang</th><th>Jml</th><th>Status</th><th></th></tr></thead>
-                    <tbody>
-                    <?php foreach ($daftarBarang as $b): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($b['nama_santri']) ?></td>
-                            <td><?= htmlspecialchars($b['nama_barang']) ?></td>
-                            <td><?= $b['jumlah'] ?></td>
-                            <td><span class="badge <?= $b['status']==='dititipkan' ? 'badge-izin' : 'badge-hadir' ?>"><?= ucfirst($b['status']) ?></span></td>
-                            <td>
-                                <?php if ($b['status'] === 'dititipkan'): ?>
-                                <form method="post"><input type="hidden" name="action" value="ambil"><input type="hidden" name="barang_id" value="<?= $b['id'] ?>"><button class="btn btn-sm btn-outline-success">Tandai Diambil</button></form>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    <?php if (!$daftarBarang): ?><tr><td colspan="5" class="text-muted small">Belum ada data.</td></tr><?php endif; ?>
-                    </tbody>
-                </table>
+    <?php foreach ($daftarKode as $k): ?>
+        <div class="modal fade" id="modalUnit<?= $k['id'] ?>" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header"><h6 class="modal-title">Unit &mdash; <?= htmlspecialchars($k['kode_barang']) ?> (<?= htmlspecialchars($k['nama_barang']) ?>)</h6></div>
+                    <div class="modal-body">
+                        <?php foreach ($unitPerKode[$k['id']] ?? [] as $idx => $u): ?>
+                            <form method="post" class="row g-2 align-items-end mb-2 border-bottom pb-2">
+                                <input type="hidden" name="action" value="update_unit">
+                                <input type="hidden" name="unit_id" value="<?= $u['id'] ?>">
+                                <div class="col-auto small text-muted">Unit #<?= $idx + 1 ?></div>
+                                <div class="col">
+                                    <select name="kategori_unit" class="form-select form-select-sm">
+                                        <option value="baru" <?= $u['kategori']==='baru'?'selected':'' ?>>Baru</option>
+                                        <option value="lama" <?= $u['kategori']==='lama'?'selected':'' ?>>Lama</option>
+                                    </select>
+                                </div>
+                                <div class="col">
+                                    <select name="tingkat_unit" class="form-select form-select-sm">
+                                        <?php foreach (['bagus'=>'Bagus','rusak_ringan'=>'Rusak Ringan','rusak_berat'=>'Rusak Berat','hilang'=>'Hilang'] as $val => $lbl): ?>
+                                            <option value="<?= $val ?>" <?= $u['tingkat']===$val?'selected':'' ?>><?= $lbl ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-auto"><button class="btn btn-sm btn-outline-success">Simpan</button></div>
+                            </form>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+    <?php endforeach; ?>
 
 <?php
 // ======================================================================
@@ -3186,15 +3219,54 @@ elseif ($modul === 'backup'): ?>
 
             <div class="card card-hisada p-3 mb-3">
                 <h6 class="mb-2">Backup ke Google Spreadsheet</h6>
-                <p class="small text-muted">Mengirim 8 tabel terpenting (santri, guru, absensi, pelanggaran, perizinan, poskestren, prestasi, korespondensi -- 500 baris terbaru per tabel) ke Google Spreadsheet lewat Google Apps Script. Sheet lama ditimpa, bukan ditumpuk.</p>
-                <form method="post">
-                    <input type="hidden" name="action" value="backup_spreadsheet">
-                    <button class="btn btn-success w-100" <?= empty($pengaturanGsTampil['gs_url']) ? 'disabled' : '' ?>>Backup ke Spreadsheet Sekarang</button>
-                </form>
+                <p class="small text-muted">Mengirim 8 tabel terpenting (santri, guru, absensi, pelanggaran, perizinan, poskestren, prestasi, korespondensi -- 200 baris terbaru per tabel) ke Google Spreadsheet lewat Google Apps Script. Sheet lama ditimpa, bukan ditumpuk. Dikirim <strong>satu tabel per permintaan</strong> (bukan sekaligus) supaya tidak memicu timeout di hosting.</p>
+                <button type="button" id="btnBackupSheets" class="btn btn-success w-100" <?= empty($pengaturanGsTampil['gs_url']) ? 'disabled' : '' ?>>Backup ke Spreadsheet Sekarang</button>
+                <div id="progressBackupSheets" class="mt-2 d-none">
+                    <div class="progress" style="height:8px"><div class="progress-bar bg-success" id="progressBarSheets" style="width:0%"></div></div>
+                    <div class="small text-muted mt-1" id="statusBackupSheets"></div>
+                </div>
                 <?php if (empty($pengaturanGsTampil['gs_url'])): ?>
                     <div class="form-text mt-2 text-danger">Atur URL Apps Script dulu di bawah sebelum bisa dipakai.</div>
                 <?php endif; ?>
             </div>
+            <script>
+            (function () {
+                var btn = document.getElementById('btnBackupSheets');
+                if (!btn) return;
+                var tabelList = <?= json_encode(TABEL_BACKUP_SHEETS) ?>;
+                btn.addEventListener('click', async function () {
+                    btn.disabled = true;
+                    var progressWrap = document.getElementById('progressBackupSheets');
+                    var bar = document.getElementById('progressBarSheets');
+                    var status = document.getElementById('statusBackupSheets');
+                    progressWrap.classList.remove('d-none');
+                    var ringkasan = [];
+                    var semuaOk = true;
+                    for (var i = 0; i < tabelList.length; i++) {
+                        var tabel = tabelList[i];
+                        status.textContent = 'Mengirim tabel "' + tabel + '" (' + (i + 1) + '/' + tabelList.length + ')...';
+                        try {
+                            var resp = await fetch('dashboard.php?modul=backup&ajax_tabel=' + encodeURIComponent(tabel) + '&limit=200');
+                            var data = await resp.json();
+                            if (!data.ok) semuaOk = false;
+                            ringkasan.push(tabel + ': ' + (data.ok ? 'OK (' + data.jumlah + ' baris)' : 'GAGAL - ' + data.pesan));
+                        } catch (e) {
+                            semuaOk = false;
+                            ringkasan.push(tabel + ': GAGAL - koneksi terputus');
+                        }
+                        bar.style.width = Math.round(((i + 1) / tabelList.length) * 100) + '%';
+                    }
+                    status.textContent = semuaOk ? 'Selesai -- semua tabel berhasil dikirim.' : 'Selesai, tapi ada tabel yang gagal.';
+                    var form = new FormData();
+                    form.append('action', 'catat_hasil_backup_sheets');
+                    form.append('semua_ok', semuaOk ? '1' : '0');
+                    form.append('ringkasan', ringkasan.join(' | '));
+                    await fetch('dashboard.php?modul=backup', { method: 'POST', body: form });
+                    btn.disabled = false;
+                    setTimeout(function () { window.location.reload(); }, 1500);
+                });
+            })();
+            </script>
 
             <div class="card card-hisada p-3">
                 <h6 class="mb-2">Pengaturan Google Sheets</h6>

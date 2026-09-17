@@ -33,8 +33,8 @@
 
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS
-    pengaturan, wali_akses, backup_logs, push_subscriptions, inventaris_barang,
-    kunjungan_tamu, health_profiles, riwayat_kamar,
+    pengaturan, wali_akses, backup_logs, push_subscriptions, inventaris_unit, inventaris_kode,
+    health_profiles, riwayat_kamar,
     audit_logs, agendas, achievements, correspondences, permits, violations,
     poskestren_records, attendances, kegiatan_grup_anggota, kegiatan_grup,
     ekskul_agenda, ekskul_anggota, ekstrakurikuler, riwayat_jabatan,
@@ -384,37 +384,28 @@ CREATE TABLE health_profiles (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
--- 17. KUNJUNGAN TAMU / BESUK
--- ---------------------------------------------------------------------
-
-CREATE TABLE kunjungan_tamu (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    student_id INT NOT NULL,
-    nama_tamu VARCHAR(100) NOT NULL,
-    hubungan VARCHAR(50) NOT NULL,
-    keperluan VARCHAR(255),
-    tanggal DATE NOT NULL,
-    jam_datang TIME NOT NULL,
-    jam_pulang TIME NULL,
-    dicatat_oleh INT NULL,
-    FOREIGN KEY (student_id) REFERENCES students(id),
-    FOREIGN KEY (dicatat_oleh) REFERENCES users(id)
-) ENGINE=InnoDB;
-
--- ---------------------------------------------------------------------
 -- 18. INVENTARIS BARANG SANTRI (barang titipan)
 -- ---------------------------------------------------------------------
 
-CREATE TABLE inventaris_barang (
+CREATE TABLE inventaris_kode (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    student_id INT NOT NULL,
+    kode_barang VARCHAR(50) NOT NULL UNIQUE,   -- diketik manual, mis. HSD-DH-EPS
     nama_barang VARCHAR(150) NOT NULL,
-    jumlah INT DEFAULT 1,
-    tanggal_titip DATE NOT NULL,
-    tanggal_diambil DATE NULL,
-    status ENUM('dititipkan','diambil') DEFAULT 'dititipkan',
+    jumlah INT NOT NULL DEFAULT 1,
     keterangan VARCHAR(255),
-    FOREIGN KEY (student_id) REFERENCES students(id)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Satu baris di sini = SATU UNIT fisik dari suatu kode barang. Kalau
+-- jumlah=2, ada 2 baris inventaris_unit yg terhubung ke 1 inventaris_kode
+-- yg sama -- masing-masing unit bisa beda kategori (lama/baru) & tingkat
+-- kondisinya sendiri (bagus/rusak ringan/rusak berat/hilang).
+CREATE TABLE inventaris_unit (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    inventaris_kode_id INT NOT NULL,
+    kategori ENUM('lama','baru') NOT NULL,
+    tingkat ENUM('bagus','rusak_ringan','rusak_berat','hilang') NOT NULL DEFAULT 'bagus',
+    FOREIGN KEY (inventaris_kode_id) REFERENCES inventaris_kode(id)
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------

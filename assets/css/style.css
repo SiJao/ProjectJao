@@ -92,6 +92,15 @@ body {
 }
 /* Ukuran/posisi "menempel" hanya diterapkan di desktop (md+) --
    di bawah itu, biar Bootstrap Offcanvas yang atur posisi/animasi geser */
+.sidebar {
+    /* overflow-y:auto WAJIB berlaku di SEMUA ukuran layar (bukan cuma
+       desktop) -- di mode mobile/offcanvas, Bootstrap sendiri tidak
+       otomatis membuat sidebar bisa discroll kalau isinya lebih
+       panjang dari layar; tanpa ini sidebar "macet" di HP begitu
+       daftar menu lebih panjang dari tinggi layar. */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
 @media (min-width: 768px) {
     .sidebar {
         width: 240px;
@@ -99,7 +108,6 @@ body {
         position: sticky;
         top: 0;
         height: 100vh;
-        overflow-y: auto;
     }
 }
 .sidebar .logo-box {

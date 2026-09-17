@@ -26,6 +26,19 @@
     cekNotifikasi();
     setInterval(cekNotifikasi, 30000);
 })();
+
+/**
+ * Begitu halaman modul baru dimuat, pastikan tautan menu yang sedang
+ * aktif (.sidebar a.active) langsung terlihat di area sidebar yang bisa
+ * discroll -- supaya kalau menu itu posisinya jauh di bawah daftar,
+ * pengguna tidak perlu scroll manual dulu tiap ganti modul.
+ */
+(function () {
+    var aktif = document.querySelector('.sidebar a.active');
+    if (aktif) {
+        aktif.scrollIntoView({ block: 'nearest' });
+    }
+})();
 </script>
 </body>
 </html>
