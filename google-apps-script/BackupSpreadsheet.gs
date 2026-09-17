@@ -24,11 +24,28 @@ const SPREADSHEET_ID = 'GANTI_DENGAN_ID_SPREADSHEET_KAMU';
 const KUNCI_RAHASIA = 'GANTI_DENGAN_KATA_SANDI_RAHASIA_BEBAS';
 
 /**
+ * PENTING -- JEBAKAN PALING UMUM: kalau kamu mengedit file ini LAGI
+ * setelah sudah pernah Deploy sebelumnya (misal ganti KUNCI_RAHASIA atau
+ * SPREADSHEET_ID), URL Web App yang LAMA TIDAK OTOMATIS ikut ter-update.
+ * Kamu harus buka Deploy -> Manage deployments -> klik ikon pensil (Edit)
+ * di deployment yang aktif -> Version: pilih "New version" -> Deploy.
+ * Kalau cuma bikin "New deployment" baru (bukan edit yg lama), kamu akan
+ * dapat URL BARU YANG BERBEDA -- dan URL lama di halaman Backup Hisada
+ * jadi tidak nyambung ke kode terbaru sama sekali (inilah salah satu
+ * penyebab paling sering "kelihatan terkirim tapi data tidak masuk").
+ */
+
+/**
  * Menerima POST dari server Hisada berisi:
  *   { kunci: "...", tabel: "nama_tabel", header: [...], baris: [[...], ...] }
  * Setiap tabel ditulis ke sheet (tab) dengan nama yang sama, ISI SHEET
  * DIHAPUS DULU lalu ditulis ulang (jadi selalu cerminan data terbaru,
  * bukan menumpuk/append tanpa batas).
+ *
+ * tabel="__ping__" khusus utk TES KONEKSI dari halaman Backup Hisada --
+ * cuma validasi kunci, TIDAK menyentuh spreadsheet sama sekali. Dipakai
+ * supaya bisa tahu apakah URL & kunci sudah benar SEBELUM proses backup
+ * sungguhan mulai (biar tidak "kelihatan jalan" tapi ternyata gagal diam2).
  */
 function doPost(e) {
   try {
@@ -36,6 +53,10 @@ function doPost(e) {
 
     if (data.kunci !== KUNCI_RAHASIA) {
       return jsonResponse({ ok: false, pesan: 'Kunci rahasia tidak cocok.' });
+    }
+
+    if (data.tabel === '__ping__') {
+      return jsonResponse({ ok: true, pesan: 'Koneksi berhasil, kunci rahasia cocok.' });
     }
 
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -59,6 +80,17 @@ function doPost(e) {
   } catch (err) {
     return jsonResponse({ ok: false, pesan: 'Error: ' + err.message });
   }
+}
+
+/**
+ * doGet dipakai utk cek paling dasar: kalau kamu tempel URL Web App ini
+ * langsung di address bar browser dan muncul pesan di bawah (bukan error
+ * Google/halaman login/404), berarti DEPLOYMENT-nya sendiri sudah benar
+ * dan aktif -- baru lanjut cek lewat "Test Koneksi" di halaman Backup
+ * Hisada (yg juga mengetes kunci rahasia & jalur POST-nya).
+ */
+function doGet(e) {
+  return jsonResponse({ ok: true, pesan: 'Script Apps Script ini aktif & bisa diakses. Gunakan tombol "Test Koneksi" di halaman Backup Hisada utk mengetes jalur POST + kunci rahasia.' });
 }
 
 function jsonResponse(obj) {

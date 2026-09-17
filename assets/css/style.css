@@ -108,6 +108,13 @@ body {
         position: sticky;
         top: 0;
         height: 100vh;
+        /* WAJIB: flex item defaultnya "min-height: auto", yg di banyak
+           browser bikin overflow-y:auto gagal membatasi tinggi konten --
+           kontennya malah "meluber" melewati 100vh alih-alih discroll
+           (inilah penyebab item paling bawah sidebar terlihat terpotong
+           tanpa scrollbar muncul). min-height:0 memaksa flex item benar2
+           dibatasi height:100vh, baru overflow-y:auto bisa bekerja. */
+        min-height: 0;
     }
 }
 .sidebar .logo-box {
@@ -148,7 +155,7 @@ body {
 }
 .sidebar .user-box {
     border-top: 1px solid rgba(255,255,255,.15);
-    padding: 14px 18px;
+    padding: 14px 18px 24px;
     font-size: .8rem;
     color: rgba(255,255,255,.65);
 }

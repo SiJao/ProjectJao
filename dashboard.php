@@ -64,7 +64,7 @@ function nama_bulan_indo(string $namaInggris): string
  * default). Lihat google-apps-script/BackupSpreadsheet.gs utk skrip
  * penerimanya.
  */
-function kirim_ke_google_sheets(string $url, string $kunci, string $tabel, array $header, array $baris): array
+function kirim_ke_google_sheets(string $url, string $kunci, string $tabel, array $header, array $baris, int $sisaRedirect = 5): array
 {
     $payload = json_encode(['kunci' => $kunci, 'tabel' => $tabel, 'header' => $header, 'baris' => $baris]);
     $context = stream_context_create([
@@ -74,17 +74,61 @@ function kirim_ke_google_sheets(string $url, string $kunci, string $tabel, array
             'content' => $payload,
             'timeout' => 30,
             'ignore_errors' => true, // supaya tetap bisa baca body respons walau HTTP status bukan 200
+            // follow_location DIMATIKAN SENGAJA -- terbukti lewat pengujian
+            // langsung: kalau PHP yg mengikuti redirect otomatis, method-nya
+            // ikut berubah jadi GET dan BODY JSON-NYA HILANG SELURUHNYA.
+            // Google Apps Script Web App (URL /exec) HAMPIR SELALU melakukan
+            // redirect 302 ke domain script.googleusercontent.com sebelum
+            // benar2 menjalankan kode -- inilah akar penyebab nyata
+            // "kelihatan terkirim tapi data tidak pernah masuk sama sekali".
+            'follow_location' => 0,
         ],
     ]);
     $hasil = @file_get_contents($url, false, $context);
+    $kodeHttp = null;
+    $lokasiRedirect = null;
+    if (isset($http_response_header) && is_array($http_response_header)) {
+        foreach ($http_response_header as $h) {
+            if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $m)) {
+                $kodeHttp = (int) $m[1];
+            }
+            if (preg_match('#^Location:\s*(.+)$#i', $h, $m)) {
+                $lokasiRedirect = trim($m[1]);
+            }
+        }
+    }
+
+    // Kalau server merespons redirect (3xx), ikuti SENDIRI secara manual
+    // dgn method+body yg TETAP SAMA (POST + payload JSON) -- bukan lewat
+    // follow_location bawaan PHP yg sudah terbukti menghilangkan body.
+    if ($kodeHttp !== null && $kodeHttp >= 300 && $kodeHttp < 400 && $lokasiRedirect && $sisaRedirect > 0) {
+        return kirim_ke_google_sheets($lokasiRedirect, $kunci, $tabel, $header, $baris, $sisaRedirect - 1);
+    }
+
     if ($hasil === false) {
-        return ['ok' => false, 'pesan' => 'Gagal menghubungi URL Apps Script (cek URL & koneksi server).'];
+        return ['ok' => false, 'pesan' => 'Gagal menghubungi URL Apps Script sama sekali (cek URL sudah benar & server bisa akses internet keluar). Kode HTTP: ' . ($kodeHttp ?? 'tidak ada respons')];
     }
     $decoded = json_decode($hasil, true);
     if (!is_array($decoded)) {
-        return ['ok' => false, 'pesan' => 'Respons tidak valid dari Apps Script: ' . substr($hasil, 0, 200)];
+        return [
+            'ok' => false,
+            'pesan' => 'Respons dari Apps Script bukan JSON yang valid (kode HTTP: ' . ($kodeHttp ?? '?') . '). '
+                . 'Kemungkinan URL belum di-deploy ulang setelah edit kode (lihat catatan di BackupSpreadsheet.gs), '
+                . 'atau "Who has access" belum diset ke "Anyone". Cuplikan respons: ' . substr(strip_tags($hasil), 0, 500),
+        ];
     }
     return $decoded;
+}
+
+/**
+ * Tes ringan: cuma cek apakah URL bisa dihubungi & kunci rahasia cocok,
+ * TANPA menyentuh spreadsheet sama sekali (tabel="__ping__" ditangani
+ * khusus di BackupSpreadsheet.gs). Dipakai sbg langkah "coba hubungkan
+ * dulu" SEBELUM proses backup sungguhan berjalan.
+ */
+function tes_koneksi_google_sheets(string $url, string $kunci): array
+{
+    return kirim_ke_google_sheets($url, $kunci, '__ping__', [], []);
 }
 
 /**
@@ -1500,6 +1544,22 @@ elseif ($modul === 'backup') {
     // Browser yg meloop tiap tabel via fetch() satu-satu, jadi tiap
     // request PHP cuma menangani SATU tabel & selesai cepat.
     define('TABEL_BACKUP_SHEETS', ['students', 'teachers', 'attendances', 'violations', 'permits', 'poskestren_records', 'achievements', 'correspondences']);
+
+    if (isset($_GET['test_koneksi'])) {
+        header('Content-Type: application/json');
+        $stmtSet = $pdo->query("SELECT nama_setting, nilai FROM pengaturan WHERE nama_setting IN ('gs_url','gs_kunci')");
+        $pengaturanGs = [];
+        foreach ($stmtSet->fetchAll() as $row) {
+            $pengaturanGs[$row['nama_setting']] = $row['nilai'];
+        }
+        if (empty($pengaturanGs['gs_url'])) {
+            echo json_encode(['ok' => false, 'pesan' => 'URL Google Apps Script belum diatur.']);
+            exit;
+        }
+        $respons = tes_koneksi_google_sheets($pengaturanGs['gs_url'], $pengaturanGs['gs_kunci'] ?? '');
+        echo json_encode($respons);
+        exit;
+    }
 
     if (isset($_GET['ajax_tabel'])) {
         header('Content-Type: application/json');
@@ -3220,6 +3280,10 @@ elseif ($modul === 'backup'): ?>
             <div class="card card-hisada p-3 mb-3">
                 <h6 class="mb-2">Backup ke Google Spreadsheet</h6>
                 <p class="small text-muted">Mengirim 8 tabel terpenting (santri, guru, absensi, pelanggaran, perizinan, poskestren, prestasi, korespondensi -- 200 baris terbaru per tabel) ke Google Spreadsheet lewat Google Apps Script. Sheet lama ditimpa, bukan ditumpuk. Dikirim <strong>satu tabel per permintaan</strong> (bukan sekaligus) supaya tidak memicu timeout di hosting.</p>
+
+                <button type="button" id="btnTestKoneksi" class="btn btn-outline-success w-100 mb-2" <?= empty($pengaturanGsTampil['gs_url']) ? 'disabled' : '' ?>><i class="bi bi-broadcast me-1"></i>Test Koneksi</button>
+                <div id="hasilTestKoneksi" class="small mb-2"></div>
+
                 <button type="button" id="btnBackupSheets" class="btn btn-success w-100" <?= empty($pengaturanGsTampil['gs_url']) ? 'disabled' : '' ?>>Backup ke Spreadsheet Sekarang</button>
                 <div id="progressBackupSheets" class="mt-2 d-none">
                     <div class="progress" style="height:8px"><div class="progress-bar bg-success" id="progressBarSheets" style="width:0%"></div></div>
@@ -3231,6 +3295,30 @@ elseif ($modul === 'backup'): ?>
             </div>
             <script>
             (function () {
+                async function testKoneksi() {
+                    var resp = await fetch('dashboard.php?modul=backup&test_koneksi=1');
+                    return await resp.json();
+                }
+
+                var btnTest = document.getElementById('btnTestKoneksi');
+                var hasilTest = document.getElementById('hasilTestKoneksi');
+                if (btnTest) {
+                    btnTest.addEventListener('click', async function () {
+                        btnTest.disabled = true;
+                        hasilTest.className = 'small mb-2 text-muted';
+                        hasilTest.textContent = 'Menghubungi Apps Script...';
+                        try {
+                            var data = await testKoneksi();
+                            hasilTest.className = 'small mb-2 ' + (data.ok ? 'text-success' : 'text-danger');
+                            hasilTest.textContent = (data.ok ? '\u2713 ' : '\u2717 ') + data.pesan;
+                        } catch (e) {
+                            hasilTest.className = 'small mb-2 text-danger';
+                            hasilTest.textContent = '\u2717 Tidak bisa menghubungi server sendiri (cek koneksi browser).';
+                        }
+                        btnTest.disabled = false;
+                    });
+                }
+
                 var btn = document.getElementById('btnBackupSheets');
                 if (!btn) return;
                 var tabelList = <?= json_encode(TABEL_BACKUP_SHEETS) ?>;
@@ -3240,6 +3328,24 @@ elseif ($modul === 'backup'): ?>
                     var bar = document.getElementById('progressBarSheets');
                     var status = document.getElementById('statusBackupSheets');
                     progressWrap.classList.remove('d-none');
+                    bar.style.width = '0%';
+
+                    // WAJIB tes koneksi dulu -- kalau URL/kunci salah, jangan
+                    // lanjut ke 8 tabel (dulu inilah yg bikin "kelihatan
+                    // proses tapi ternyata semua gagal diam-diam").
+                    status.textContent = 'Mengecek koneksi ke Apps Script...';
+                    var cekAwal;
+                    try {
+                        cekAwal = await testKoneksi();
+                    } catch (e) {
+                        cekAwal = { ok: false, pesan: 'Tidak bisa menghubungi server.' };
+                    }
+                    if (!cekAwal.ok) {
+                        status.textContent = 'Dibatalkan -- koneksi ke Apps Script gagal: ' + cekAwal.pesan;
+                        btn.disabled = false;
+                        return;
+                    }
+
                     var ringkasan = [];
                     var semuaOk = true;
                     for (var i = 0; i < tabelList.length; i++) {
