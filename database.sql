@@ -48,7 +48,8 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 CREATE TABLE classes (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    nama VARCHAR(50) NOT NULL
+    nama VARCHAR(50) NOT NULL,
+    wali_kelas_teacher_id INT NULL   -- FK ke teachers ditambahkan di bawah (teachers dibuat belakangan)
 ) ENGINE=InnoDB;
 
 CREATE TABLE rooms (
@@ -75,6 +76,8 @@ CREATE TABLE teachers (
     FOREIGN KEY (wali_kamar_room_id) REFERENCES rooms(id)
 ) ENGINE=InnoDB;
 
+ALTER TABLE classes ADD FOREIGN KEY (wali_kelas_teacher_id) REFERENCES teachers(id);
+
 CREATE TABLE kategori_ekskul (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nama VARCHAR(50) NOT NULL   -- Olahraga, Kesenian
@@ -88,6 +91,7 @@ CREATE TABLE kategori_ekskul (
 CREATE TABLE students (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nis VARCHAR(20) UNIQUE NOT NULL,
+    nisn VARCHAR(20),          -- Nomor Induk Siswa Nasional (opsional, beda dari NIS internal)
     nama VARCHAR(100) NOT NULL,
     jenis_kelamin ENUM('L','P') NOT NULL,
     tempat_lahir VARCHAR(50),
@@ -96,7 +100,7 @@ CREATE TABLE students (
     class_id INT,
     room_id INT,
     family_id INT,
-    status ENUM('aktif','alumni','keluar') DEFAULT 'aktif',
+    status ENUM('aktif','alumni','keluar','skorsing','meninggal') DEFAULT 'aktif',
     FOREIGN KEY (class_id) REFERENCES classes(id),
     FOREIGN KEY (room_id) REFERENCES rooms(id),
     FOREIGN KEY (family_id) REFERENCES families(id)
@@ -450,75 +454,3 @@ CREATE TABLE wali_akses (
 ) ENGINE=InnoDB;
 
 -- =====================================================================
--- DATA AWAL (SEED) -- supaya sistem bisa langsung dicoba
--- =====================================================================
-
-INSERT INTO classes (nama) VALUES ('Kelas 1'),('Kelas 2'),('Kelas 3'),('Kelas 4'),('Kelas 5'),('Kelas 6');
-
-INSERT INTO rooms (nama_kamar, gedung, gender) VALUES
-('Al-Falah 1','Gedung Al-Falah','L'),
-('Al-Falah 2','Gedung Al-Falah','L'),
-('Al-Badr 1','Gedung Al-Badr','P'),
-('Al-Badr 2','Gedung Al-Badr','P');
-
-INSERT INTO families (nama_ayah, nama_ibu, no_hp) VALUES
-('Bapak Ahmad','Ibu Siti','081200000001'),
-('Bapak Yusuf','Ibu Aminah','081200000002');
-
-INSERT INTO teachers (nip, nama, jenis_kelamin, no_hp) VALUES
-('T001','Ust. Fauzan','L','081300000001'),
-('T002','Usth. Halimah','P','081300000002'),
-('T003','dr. Rizki','L','081300000003');
-
-INSERT INTO kategori_ekskul (nama) VALUES ('Olahraga'),('Kesenian');
-
-INSERT INTO ekstrakurikuler (kategori_id, nama, pelatih_id) VALUES
-(1,'Futsal',1),
-(1,'Silat',1),
-(2,'Hadroh',2),
-(2,'Kaligrafi',2);
-
-INSERT INTO kegiatan_grup (jenis_kegiatan, nama_grup, pembimbing_id) VALUES
-('halaqah','Halaqah A',1),
-('halaqah','Halaqah B',2),
-('muhadhoroh','Muhadhoroh Putra',1),
-('muhadhoroh','Muhadhoroh Putri',2);
-
-INSERT INTO students (nis, nama, jenis_kelamin, tempat_lahir, tanggal_lahir, tanggal_masuk, class_id, room_id, family_id, status) VALUES
-('2024001','Muhammad Fajar','L','Bogor','2012-01-10','2024-07-01',5,1,1,'aktif'),
-('2024002','Nurul Aisyah','P','Bogor','2012-03-15','2024-07-01',5,3,2,'aktif'),
-('2024003','Rizky Ramadhan','L','Depok','2011-11-20','2023-07-01',6,2,1,'aktif');
-
-INSERT INTO kegiatan_grup_anggota (grup_id, student_id, status) VALUES
-(1, 1, 'aktif'), (1, 3, 'aktif'), (3, 1, 'aktif'), (3, 3, 'aktif'),
-(2, 2, 'aktif'), (4, 2, 'aktif');
-
-INSERT INTO ekskul_anggota (ekskul_id, student_id, tanggal_gabung, status) VALUES
-(1, 1, '2025-07-01', 'aktif'),
-(3, 2, '2025-07-01', 'aktif');
-
--- Masa khidmat aktif
-INSERT INTO periode_jabatan (nama_periode, tanggal_mulai, tanggal_selesai, status) VALUES
-('Khidmat 2025/2026','2025-07-01',NULL,'aktif');
-
--- Jabatan contoh (student_id 1 = Sekretaris Mahkamah, 3 = Hakim) dgn akses sistem
-INSERT INTO riwayat_jabatan (student_id, periode_id, posisi, role_key, punya_akses_sistem, tanggal_mulai, status) VALUES
-(1, 1, 'Sekretaris Mahkamah', 'sekretaris_mahkamah', 1, '2025-07-01', 'aktif'),
-(3, 1, 'Hakim Mahkamah', 'hakim', 1, '2025-07-01', 'aktif'),
-(2, 1, 'Asisten Poskestren', 'asisten_poskestren', 1, '2025-07-01', 'aktif');
-
--- Akun user: password default untuk semua akun contoh = "hisada123"
--- (hash di bawah adalah hasil password_hash('hisada123', PASSWORD_BCRYPT) yang
--- SUDAH DIUJI valid dengan password_verify() -- tidak perlu lagi menjalankan
--- reset_password.php kecuali kamu ingin mengganti passwordnya sendiri)
-INSERT INTO users (email, password, student_id, nama, is_super_admin, status) VALUES
-('admin@daarululuumlido.com', '$2y$10$mOK/1ovGZHeLo/436DHsw.FKLnWkP2kqnrQVfrK8kWvkYYAOQ6bOa', NULL, 'Super Admin', 1, 'aktif'),
-('2024001@daarululuumlido.com', '$2y$10$mOK/1ovGZHeLo/436DHsw.FKLnWkP2kqnrQVfrK8kWvkYYAOQ6bOa', 1, 'Muhammad Fajar', 0, 'aktif'),
-('2024003@daarululuumlido.com', '$2y$10$mOK/1ovGZHeLo/436DHsw.FKLnWkP2kqnrQVfrK8kWvkYYAOQ6bOa', 3, 'Rizky Ramadhan', 0, 'aktif'),
-('2024002@daarululuumlido.com', '$2y$10$mOK/1ovGZHeLo/436DHsw.FKLnWkP2kqnrQVfrK8kWvkYYAOQ6bOa', 2, 'Nurul Aisyah', 0, 'aktif');
-
--- CATATAN: hash password contoh di atas SUDAH DIUJI valid (password_verify()
--- mengembalikan true untuk "hisada123") dan bisa langsung dipakai login tanpa
--- langkah tambahan apapun. Hash bcrypt bersifat portable -- tidak bergantung
--- server tempat ia dibuat. Jalankan reset_password.php HANYA jika kamu ingin
--- mengganti password akun contoh ke sesuatu selain "hisada123".
