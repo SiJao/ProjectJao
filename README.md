@@ -151,16 +151,45 @@ Tiga jenis izin, masing-masing basis waktu berbeda:
 
 - Komponen reusable: ketik nama/NIS, klik hasil yang mendekati — menggantikan dropdown panjang di form Poskestren, Mahkamah, Perizinan, Prestasi, dan Tambah User.
 
+## 19. Riwayat Mutasi Kamar & Profil Kesehatan Tetap
+
+- Bagian dari Data Master (Edit Santri). Pindah kamar **tidak menimpa** data lama — riwayat lama otomatis diarsipkan, baris baru dibuat (pola sama dengan `riwayat_jabatan`).
+- Profil kesehatan (golongan darah, alergi, penyakit kronis) tersimpan permanen per santri, terpisah dari log kunjungan Poskestren.
+- Perubahan status santri ke Alumni/Keluar otomatis menonaktifkan akun login santri tsb (kalau ada).
+
+## 20. Inventaris Barang
+
+- Berbasis **kode barang → banyak unit fisik**: satu kode (mis. `HSD-DH-EPS`) bisa mewakili beberapa unit, masing-masing punya kategori (lama/baru) dan tingkat kondisi sendiri (bagus/rusak ringan/rusak berat/hilang).
+
+## 21. Rapor Kesantrian
+
+- Laporan gabungan per santri: rekap kehadiran 90 hari, catatan pelanggaran, prestasi, dan ekskul aktif — satu halaman, bisa langsung dicetak dari browser.
+
+## 22. Notifikasi
+
+- Polling ringan di sidebar (cek tiap 30 detik) — badge muncul kalau ada pelanggaran menunggu sidang (hakim), santri menunggu diperiksa dokter, atau perizinan overdue (piket).
+
+## 23. Backup Database
+
+- **Backup Manual (.sql)** — dump seluruh database (skema + data, bulk INSERT), siap diunduh & diimpor ulang.
+- **Backup CSV (.zip)** — 8 tabel terpenting sebagai file `.csv` terpisah dalam satu ZIP, siap dibuka manual di Excel/Google Sheets. Dipakai sbg gantinya integrasi otomatis ke Google Sheets, yang gagal dicoba — Google Apps Script Web App tidak konsisten menjaga method+body POST saat redirect internal, baik dari server (PHP) maupun langsung dari browser.
+
+## 24. Portal Wali Santri
+
+- Login terpisah (`wali.php`) berbasis keluarga, bukan lewat sistem staf. Satu akun bisa melihat semua anak dalam satu keluarga (read-only): kehadiran, profil kesehatan, status izin aktif, prestasi.
+- Akun dibuat lewat Data Master → tab Keluarga → tombol "Buat/Reset Akun Wali".
+
+## 25. Export Excel
+
+- File `.xlsx` asli (bukan CSV) dibuat native pakai `ZipArchive` bawaan PHP, tanpa Composer/PhpSpreadsheet. Tersedia di Prestasi, Korespondensi, dan rekap Absensi Kamar.
+
 ---
 
 ## Belum Diimplementasikan (masih rencana, bukan fitur aktif)
 
-Beberapa ide yang pernah dibahas tapi **belum ada di kode**:
-
-- Portal Wali Santri (akses terpisah untuk orang tua)
-- Export laporan ke PDF/Excel
-- Notifikasi real-time (Web Push)
-- Backup otomatis terjadwal (cron job / Google Spreadsheet)
+- Export laporan ke **PDF** (Excel sudah ada — lihat §25; PDF belum, karena butuh library rendering yang tidak tersedia tanpa Composer)
+- Backup **otomatis terjadwal** (cron job) — saat ini backup masih manual (harus diklik)
+- CSV import untuk Kelas/Kamar/Keluarga baru tersedia di Data Master; belum ada validasi duplikat sekuat Santri/Guru
 
 ---
 

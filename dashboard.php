@@ -57,81 +57,6 @@ function nama_bulan_indo(string $namaInggris): string
 }
 
 /**
- * Kirim satu tabel (header + baris) sbg JSON ke Google Apps Script Web App
- * yang berfungsi sbg jembatan ke Google Spreadsheet. Pakai file_get_contents
- * + stream context (BUKAN ekstensi curl) supaya tetap jalan di hosting yg
- * curl-nya tidak aktif -- cukup butuh allow_url_fopen (biasanya aktif
- * default). Lihat google-apps-script/BackupSpreadsheet.gs utk skrip
- * penerimanya.
- */
-function kirim_ke_google_sheets(string $url, string $kunci, string $tabel, array $header, array $baris, int $sisaRedirect = 5): array
-{
-    $payload = json_encode(['kunci' => $kunci, 'tabel' => $tabel, 'header' => $header, 'baris' => $baris]);
-    $context = stream_context_create([
-        'http' => [
-            'method' => 'POST',
-            'header' => "Content-Type: application/json\r\n",
-            'content' => $payload,
-            'timeout' => 30,
-            'ignore_errors' => true, // supaya tetap bisa baca body respons walau HTTP status bukan 200
-            // follow_location DIMATIKAN SENGAJA -- terbukti lewat pengujian
-            // langsung: kalau PHP yg mengikuti redirect otomatis, method-nya
-            // ikut berubah jadi GET dan BODY JSON-NYA HILANG SELURUHNYA.
-            // Google Apps Script Web App (URL /exec) HAMPIR SELALU melakukan
-            // redirect 302 ke domain script.googleusercontent.com sebelum
-            // benar2 menjalankan kode -- inilah akar penyebab nyata
-            // "kelihatan terkirim tapi data tidak pernah masuk sama sekali".
-            'follow_location' => 0,
-        ],
-    ]);
-    $hasil = @file_get_contents($url, false, $context);
-    $kodeHttp = null;
-    $lokasiRedirect = null;
-    if (isset($http_response_header) && is_array($http_response_header)) {
-        foreach ($http_response_header as $h) {
-            if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $m)) {
-                $kodeHttp = (int) $m[1];
-            }
-            if (preg_match('#^Location:\s*(.+)$#i', $h, $m)) {
-                $lokasiRedirect = trim($m[1]);
-            }
-        }
-    }
-
-    // Kalau server merespons redirect (3xx), ikuti SENDIRI secara manual
-    // dgn method+body yg TETAP SAMA (POST + payload JSON) -- bukan lewat
-    // follow_location bawaan PHP yg sudah terbukti menghilangkan body.
-    if ($kodeHttp !== null && $kodeHttp >= 300 && $kodeHttp < 400 && $lokasiRedirect && $sisaRedirect > 0) {
-        return kirim_ke_google_sheets($lokasiRedirect, $kunci, $tabel, $header, $baris, $sisaRedirect - 1);
-    }
-
-    if ($hasil === false) {
-        return ['ok' => false, 'pesan' => 'Gagal menghubungi URL Apps Script sama sekali (cek URL sudah benar & server bisa akses internet keluar). Kode HTTP: ' . ($kodeHttp ?? 'tidak ada respons')];
-    }
-    $decoded = json_decode($hasil, true);
-    if (!is_array($decoded)) {
-        return [
-            'ok' => false,
-            'pesan' => 'Respons dari Apps Script bukan JSON yang valid (kode HTTP: ' . ($kodeHttp ?? '?') . '). '
-                . 'Kemungkinan URL belum di-deploy ulang setelah edit kode (lihat catatan di BackupSpreadsheet.gs), '
-                . 'atau "Who has access" belum diset ke "Anyone". Cuplikan respons: ' . substr(strip_tags($hasil), 0, 500),
-        ];
-    }
-    return $decoded;
-}
-
-/**
- * Tes ringan: cuma cek apakah URL bisa dihubungi & kunci rahasia cocok,
- * TANPA menyentuh spreadsheet sama sekali (tabel="__ping__" ditangani
- * khusus di BackupSpreadsheet.gs). Dipakai sbg langkah "coba hubungkan
- * dulu" SEBELUM proses backup sungguhan berjalan.
- */
-function tes_koneksi_google_sheets(string $url, string $kunci): array
-{
-    return kirim_ke_google_sheets($url, $kunci, '__ping__', [], []);
-}
-
-/**
  * Export data ke file .xlsx ASLI (bukan CSV) tanpa Composer/PhpSpreadsheet
  * -- cukup pakai ekstensi ZipArchive bawaan PHP + XML minimal, karena
  * format .xlsx pada dasarnya cuma file ZIP berisi beberapa XML.
@@ -1528,70 +1453,49 @@ elseif ($modul === 'backup') {
         }
     }
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'simpan_pengaturan_gs') {
-        foreach (['gs_url' => $_POST['gs_url'], 'gs_kunci' => $_POST['gs_kunci']] as $nama => $nilai) {
-            $pdo->prepare('INSERT INTO pengaturan (nama_setting, nilai) VALUES (:n, :v) ON DUPLICATE KEY UPDATE nilai = VALUES(nilai)')
-                ->execute(['n' => $nama, 'v' => $nilai]);
-        }
-        log_audit($pdo, $user['id'], 'Perbarui pengaturan Google Apps Script (backup spreadsheet)');
-        $success = 'Pengaturan Google Sheets berhasil disimpan.';
-    }
+    // -------- Backup CSV (ZIP berisi 8 tabel terpenting) --------
+    // Diganti dari integrasi Google Apps Script krn TERBUKTI gagal di dua
+    // jalur berbeda: (1) PHP file_get_contents diblokir hosting (allow_url_fopen
+    // mati), (2) bahkan fetch() dari browser pun kena masalah yg sama --
+    // redirect 302 Google Apps Script mengubah POST jadi GET & menghapus
+    // body-nya (terbukti lewat pengujian langsung, log server menunjukkan
+    // method jadi GET dgn body kosong). CSV tidak butuh koneksi eksternal
+    // sama sekali, jadi 100% pasti bekerja di hosting manapun.
+    define('TABEL_BACKUP_CSV', ['students', 'teachers', 'attendances', 'violations', 'permits', 'poskestren_records', 'achievements', 'correspondences']);
 
-    // -------- Backup ke Google Sheets: PER TABEL lewat AJAX --------
-    // Sengaja TIDAK lagi memproses 8 tabel dlm satu request PHP -- kalau
-    // Google Apps Script lambat (cold start dsb), 8 panggilan berurutan
-    // gampang melebihi batas waktu PHP/hosting (muncul sbg error 524).
-    // Browser yg meloop tiap tabel via fetch() satu-satu, jadi tiap
-    // request PHP cuma menangani SATU tabel & selesai cepat.
-    define('TABEL_BACKUP_SHEETS', ['students', 'teachers', 'attendances', 'violations', 'permits', 'poskestren_records', 'achievements', 'correspondences']);
-
-    if (isset($_GET['test_koneksi'])) {
-        header('Content-Type: application/json');
-        $stmtSet = $pdo->query("SELECT nama_setting, nilai FROM pengaturan WHERE nama_setting IN ('gs_url','gs_kunci')");
-        $pengaturanGs = [];
-        foreach ($stmtSet->fetchAll() as $row) {
-            $pengaturanGs[$row['nama_setting']] = $row['nilai'];
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'backup_csv') {
+        $zipFile = sys_get_temp_dir() . '/hisada_backup_csv_' . date('Ymd_His') . '.zip';
+        try {
+            $zip = new ZipArchive();
+            $zip->open($zipFile, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+            foreach (TABEL_BACKUP_CSV as $tabel) {
+                $stmt = $pdo->query("SELECT * FROM `$tabel` ORDER BY id DESC LIMIT 1000");
+                $fh = fopen('php://temp', 'r+');
+                $header = null;
+                while ($row = $stmt->fetch()) {
+                    if ($header === null) {
+                        $header = array_keys($row);
+                        fputcsv($fh, $header);
+                    }
+                    fputcsv($fh, $row);
+                }
+                if ($header === null) {
+                    fputcsv($fh, ['(tidak ada data)']);
+                }
+                rewind($fh);
+                $zip->addFromString($tabel . '.csv', stream_get_contents($fh));
+                fclose($fh);
+            }
+            $zip->close();
+            $pdo->prepare("INSERT INTO backup_logs (status, keterangan) VALUES ('berhasil', :ket)")
+                ->execute(['ket' => basename($zipFile) . ' (' . round(filesize($zipFile) / 1024, 1) . ' KB, ' . count(TABEL_BACKUP_CSV) . ' tabel CSV)']);
+            log_audit($pdo, $user['id'], 'Backup CSV (ZIP) berhasil dibuat');
+            $_SESSION['backup_csv_download'] = $zipFile;
+            $success = 'Backup CSV berhasil dibuat. Klik "Unduh Backup CSV" untuk mengunduhnya.';
+        } catch (Exception $e) {
+            $pdo->prepare("INSERT INTO backup_logs (status, keterangan) VALUES ('gagal', :ket)")->execute(['ket' => $e->getMessage()]);
+            $error = 'Backup CSV gagal: ' . $e->getMessage();
         }
-        if (empty($pengaturanGs['gs_url'])) {
-            echo json_encode(['ok' => false, 'pesan' => 'URL Google Apps Script belum diatur.']);
-            exit;
-        }
-        $respons = tes_koneksi_google_sheets($pengaturanGs['gs_url'], $pengaturanGs['gs_kunci'] ?? '');
-        echo json_encode($respons);
-        exit;
-    }
-
-    if (isset($_GET['ajax_tabel'])) {
-        header('Content-Type: application/json');
-        $tabel = $_GET['ajax_tabel'];
-        if (!in_array($tabel, TABEL_BACKUP_SHEETS, true)) {
-            echo json_encode(['ok' => false, 'pesan' => 'Nama tabel tidak dikenali.']);
-            exit;
-        }
-        $stmtSet = $pdo->query("SELECT nama_setting, nilai FROM pengaturan WHERE nama_setting IN ('gs_url','gs_kunci')");
-        $pengaturanGs = [];
-        foreach ($stmtSet->fetchAll() as $row) {
-            $pengaturanGs[$row['nama_setting']] = $row['nilai'];
-        }
-        if (empty($pengaturanGs['gs_url'])) {
-            echo json_encode(['ok' => false, 'pesan' => 'URL Google Apps Script belum diatur.']);
-            exit;
-        }
-        $limit = max(50, min(1000, (int) ($_GET['limit'] ?? 200)));
-        $rows = $pdo->query("SELECT * FROM `$tabel` ORDER BY id DESC LIMIT $limit")->fetchAll();
-        $header = $rows ? array_keys($rows[0]) : [];
-        $baris = array_map(fn($r) => array_map(fn($v) => (string) ($v ?? ''), array_values($r)), $rows);
-        $respons = kirim_ke_google_sheets($pengaturanGs['gs_url'], $pengaturanGs['gs_kunci'] ?? '', $tabel, $header, $baris);
-        echo json_encode(['ok' => $respons['ok'], 'pesan' => $respons['pesan'], 'jumlah' => count($rows)]);
-        exit;
-    }
-
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'catat_hasil_backup_sheets') {
-        $pdo->prepare("INSERT INTO backup_logs (status, keterangan) VALUES (:status, :ket)")
-            ->execute(['status' => $_POST['semua_ok'] === '1' ? 'berhasil' : 'gagal', 'ket' => 'Backup ke Google Sheets: ' . $_POST['ringkasan']]);
-        log_audit($pdo, $user['id'], 'Backup ke Google Spreadsheet: ' . ($_POST['semua_ok'] === '1' ? 'berhasil' : 'sebagian gagal'));
-        echo json_encode(['ok' => true]);
-        exit;
     }
 
     if (isset($_GET['unduh']) && !empty($_SESSION['backup_download']) && file_exists($_SESSION['backup_download'])) {
@@ -1601,14 +1505,17 @@ elseif ($modul === 'backup') {
         readfile($_SESSION['backup_download']);
         exit;
     }
-
-    $stmtSet = $pdo->query("SELECT nama_setting, nilai FROM pengaturan WHERE nama_setting IN ('gs_url','gs_kunci')");
-    $pengaturanGsTampil = [];
-    foreach ($stmtSet->fetchAll() as $row) {
-        $pengaturanGsTampil[$row['nama_setting']] = $row['nilai'];
+    if (isset($_GET['unduh_csv']) && !empty($_SESSION['backup_csv_download']) && file_exists($_SESSION['backup_csv_download'])) {
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . basename($_SESSION['backup_csv_download']) . '"');
+        header('Content-Length: ' . filesize($_SESSION['backup_csv_download']));
+        readfile($_SESSION['backup_csv_download']);
+        exit;
     }
+
     $riwayatBackup = $pdo->query('SELECT * FROM backup_logs ORDER BY waktu DESC LIMIT 30')->fetchAll();
     $adaFileSiapUnduh = !empty($_SESSION['backup_download']) && file_exists($_SESSION['backup_download']);
+    $adaFileCsvSiapUnduh = !empty($_SESSION['backup_csv_download']) && file_exists($_SESSION['backup_csv_download']);
 }
 
 // --------------------------------------------------------------------
@@ -3277,114 +3184,16 @@ elseif ($modul === 'backup'): ?>
                 <div class="form-text mt-2">Tombol ini backup manual (harus diklik sendiri). Belum ada penjadwalan otomatis -- lihat catatan di README soal batasan ini.</div>
             </div>
 
-            <div class="card card-hisada p-3 mb-3">
-                <h6 class="mb-2">Backup ke Google Spreadsheet</h6>
-                <p class="small text-muted">Mengirim 8 tabel terpenting (santri, guru, absensi, pelanggaran, perizinan, poskestren, prestasi, korespondensi -- 200 baris terbaru per tabel) ke Google Spreadsheet lewat Google Apps Script. Sheet lama ditimpa, bukan ditumpuk. Dikirim <strong>satu tabel per permintaan</strong> (bukan sekaligus) supaya tidak memicu timeout di hosting.</p>
-
-                <button type="button" id="btnTestKoneksi" class="btn btn-outline-success w-100 mb-2" <?= empty($pengaturanGsTampil['gs_url']) ? 'disabled' : '' ?>><i class="bi bi-broadcast me-1"></i>Test Koneksi</button>
-                <div id="hasilTestKoneksi" class="small mb-2"></div>
-
-                <button type="button" id="btnBackupSheets" class="btn btn-success w-100" <?= empty($pengaturanGsTampil['gs_url']) ? 'disabled' : '' ?>>Backup ke Spreadsheet Sekarang</button>
-                <div id="progressBackupSheets" class="mt-2 d-none">
-                    <div class="progress" style="height:8px"><div class="progress-bar bg-success" id="progressBarSheets" style="width:0%"></div></div>
-                    <div class="small text-muted mt-1" id="statusBackupSheets"></div>
-                </div>
-                <?php if (empty($pengaturanGsTampil['gs_url'])): ?>
-                    <div class="form-text mt-2 text-danger">Atur URL Apps Script dulu di bawah sebelum bisa dipakai.</div>
-                <?php endif; ?>
-            </div>
-            <script>
-            (function () {
-                async function testKoneksi() {
-                    var resp = await fetch('dashboard.php?modul=backup&test_koneksi=1');
-                    return await resp.json();
-                }
-
-                var btnTest = document.getElementById('btnTestKoneksi');
-                var hasilTest = document.getElementById('hasilTestKoneksi');
-                if (btnTest) {
-                    btnTest.addEventListener('click', async function () {
-                        btnTest.disabled = true;
-                        hasilTest.className = 'small mb-2 text-muted';
-                        hasilTest.textContent = 'Menghubungi Apps Script...';
-                        try {
-                            var data = await testKoneksi();
-                            hasilTest.className = 'small mb-2 ' + (data.ok ? 'text-success' : 'text-danger');
-                            hasilTest.textContent = (data.ok ? '\u2713 ' : '\u2717 ') + data.pesan;
-                        } catch (e) {
-                            hasilTest.className = 'small mb-2 text-danger';
-                            hasilTest.textContent = '\u2717 Tidak bisa menghubungi server sendiri (cek koneksi browser).';
-                        }
-                        btnTest.disabled = false;
-                    });
-                }
-
-                var btn = document.getElementById('btnBackupSheets');
-                if (!btn) return;
-                var tabelList = <?= json_encode(TABEL_BACKUP_SHEETS) ?>;
-                btn.addEventListener('click', async function () {
-                    btn.disabled = true;
-                    var progressWrap = document.getElementById('progressBackupSheets');
-                    var bar = document.getElementById('progressBarSheets');
-                    var status = document.getElementById('statusBackupSheets');
-                    progressWrap.classList.remove('d-none');
-                    bar.style.width = '0%';
-
-                    // WAJIB tes koneksi dulu -- kalau URL/kunci salah, jangan
-                    // lanjut ke 8 tabel (dulu inilah yg bikin "kelihatan
-                    // proses tapi ternyata semua gagal diam-diam").
-                    status.textContent = 'Mengecek koneksi ke Apps Script...';
-                    var cekAwal;
-                    try {
-                        cekAwal = await testKoneksi();
-                    } catch (e) {
-                        cekAwal = { ok: false, pesan: 'Tidak bisa menghubungi server.' };
-                    }
-                    if (!cekAwal.ok) {
-                        status.textContent = 'Dibatalkan -- koneksi ke Apps Script gagal: ' + cekAwal.pesan;
-                        btn.disabled = false;
-                        return;
-                    }
-
-                    var ringkasan = [];
-                    var semuaOk = true;
-                    for (var i = 0; i < tabelList.length; i++) {
-                        var tabel = tabelList[i];
-                        status.textContent = 'Mengirim tabel "' + tabel + '" (' + (i + 1) + '/' + tabelList.length + ')...';
-                        try {
-                            var resp = await fetch('dashboard.php?modul=backup&ajax_tabel=' + encodeURIComponent(tabel) + '&limit=200');
-                            var data = await resp.json();
-                            if (!data.ok) semuaOk = false;
-                            ringkasan.push(tabel + ': ' + (data.ok ? 'OK (' + data.jumlah + ' baris)' : 'GAGAL - ' + data.pesan));
-                        } catch (e) {
-                            semuaOk = false;
-                            ringkasan.push(tabel + ': GAGAL - koneksi terputus');
-                        }
-                        bar.style.width = Math.round(((i + 1) / tabelList.length) * 100) + '%';
-                    }
-                    status.textContent = semuaOk ? 'Selesai -- semua tabel berhasil dikirim.' : 'Selesai, tapi ada tabel yang gagal.';
-                    var form = new FormData();
-                    form.append('action', 'catat_hasil_backup_sheets');
-                    form.append('semua_ok', semuaOk ? '1' : '0');
-                    form.append('ringkasan', ringkasan.join(' | '));
-                    await fetch('dashboard.php?modul=backup', { method: 'POST', body: form });
-                    btn.disabled = false;
-                    setTimeout(function () { window.location.reload(); }, 1500);
-                });
-            })();
-            </script>
-
             <div class="card card-hisada p-3">
-                <h6 class="mb-2">Pengaturan Google Sheets</h6>
-                <p class="small text-muted">Setup sekali: ikuti langkah di file <code>google-apps-script/BackupSpreadsheet.gs</code> (ada di source code sistem ini), lalu tempel URL Web App &amp; kunci rahasianya di sini.</p>
+                <h6 class="mb-2">Backup ke CSV (ZIP)</h6>
+                <p class="small text-muted">Membuat file <code>.zip</code> berisi 8 file <code>.csv</code> terpisah (santri, guru, absensi, pelanggaran, perizinan, poskestren, prestasi, korespondensi -- 1000 baris terbaru per tabel). Setiap file CSV bisa langsung dibuka/diimpor ke Excel atau Google Sheets secara manual.</p>
                 <form method="post">
-                    <input type="hidden" name="action" value="simpan_pengaturan_gs">
-                    <div class="mb-2"><label class="form-label small">URL Web App Apps Script</label>
-                        <input type="url" name="gs_url" class="form-control form-control-sm" value="<?= htmlspecialchars($pengaturanGsTampil['gs_url'] ?? '') ?>" placeholder="https://script.google.com/macros/s/.../exec"></div>
-                    <div class="mb-2"><label class="form-label small">Kunci Rahasia</label>
-                        <input type="text" name="gs_kunci" class="form-control form-control-sm" value="<?= htmlspecialchars($pengaturanGsTampil['gs_kunci'] ?? '') ?>" placeholder="Harus SAMA PERSIS dgn KUNCI_RAHASIA di file .gs"></div>
-                    <button class="btn btn-outline-success w-100">Simpan Pengaturan</button>
+                    <input type="hidden" name="action" value="backup_csv">
+                    <button class="btn btn-success w-100">Buat Backup CSV Sekarang</button>
                 </form>
+                <?php if ($adaFileCsvSiapUnduh): ?>
+                    <a href="dashboard.php?modul=backup&unduh_csv=1" class="btn btn-outline-success w-100 mt-2"><i class="bi bi-download me-1"></i>Unduh Backup CSV</a>
+                <?php endif; ?>
             </div>
         </div>
         <div class="col-md-7">
