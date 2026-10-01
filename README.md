@@ -172,6 +172,22 @@ Tiga jenis izin, masing-masing basis waktu berbeda (Keluar Sementara dikonfirmas
 - Begitu CSV diproses: jabatan baru langsung aktif + akun login dibuat otomatis (email dari NIS + `@daarululuumlido.com`, pola yang sama seperti Tambah User biasa).
 - **Jeda yang disengaja**: pengurus baru hasil CSV ini belum punya role/akses apa pun sampai Moderator menetapkannya manual satu per satu lewat Kelola User, menyusul kapan saja setelahnya — bukan bug, ini waktu yang disengaja untuk Moderator mempertimbangkan pembagian modul yang pas untuk tiap orang, bukan asal isi buru-buru.
 
+**Alur lengkap:**
+
+```mermaid
+flowchart TD
+    Start(["Moderator tekan<br/>Serah Terima Jabatan"]) --> Check{"Kenaikan kelas<br/>tahunan sudah diproses?"}
+    Check -- "belum" --> Stop["Dibatalkan --<br/>naikkan kelas dulu"]
+    Check -- "sudah" --> Cabut["Cabut SEMUA jabatan<br/>Kelas 6 saat ini<br/>(diarsipkan, bukan dihapus)"]
+    Cabut --> CSV["Moderator siapkan & upload CSV:<br/>NIS + jabatan saja<br/>(role/akses TIDAK ikut)"]
+    CSV --> Jabatan["Jabatan baru aktif<br/>(riwayat_jabatan)"]
+    CSV --> Akun["Akun login dibuat/aktif<br/>email = NIS@daarululuumlido.com"]
+    Jabatan --> Jeda["Pengurus baru BELUM<br/>punya role/akses apa pun"]
+    Akun --> Jeda
+    Jeda -. "disengaja -- Moderator<br/>pertimbangkan dulu" .-> Role["Moderator tetapkan role<br/>satu per satu lewat Kelola User<br/>(menyusul kapan saja)"]
+    Role --> Aktif(["Pengurus baru<br/>siap pakai sistem"])
+```
+
 ## 13. Ekstrakurikuler
 
 - `kategori_ekskul` (Olahraga, Kesenian) → `ekstrakurikuler` (banyak cabang per kategori) → `ekskul_anggota` (keanggotaan dengan histori keluar-masuk).
