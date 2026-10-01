@@ -4,6 +4,12 @@ Abaikan jabatan, fokus kepada objek (sistem yang abadi tetap berjalan dan diperl
 ### Ringkasan Singkat Alur
 (Software Development Life Cycle (SDLC)) : Mindmap (Ide Besar) ➔ Analisis (Detail Fitur) ➔ Flowchart (Logika Jalannya Program) ➔ Desain Database (Penyimpanan Data) ➔ Coding (Pembuatan Program) ➔ Testing (Pengecekan Error) ➔ Deployment (Rilis Aplikasi).
 
+# Perkuat dari dasar (flowchart)
+### Silahan revisi ulang flowchartnya
+Abaikan jabatan, fokus kepada objek (sistem yang abadi tetap berjalan dan diperlukan dalam kegiatan HISADA)
+### Ringkasan Singkat Alur
+(Software Development Life Cycle (SDLC)) : Mindmap (Ide Besar) ➔ Analisis (Detail Fitur) ➔ Flowchart (Logika Jalannya Program) ➔ Desain Database (Penyimpanan Data) ➔ Coding (Pembuatan Program) ➔ Testing (Pengecekan Error) ➔ Deployment (Rilis Aplikasi).
+
 # Sistem Hisada
 ### Himpunan Santri Daarul Uluum Lido — Sistem Informasi Manajemen Kesantrian
 
@@ -21,7 +27,6 @@ flowchart TD
     B -- "tidak aktif" --> Z["Ditolak login"]
     B -- "aktif" --> C{"Role (langsung di user,<br/>terpisah dari jabatan)"}
 
-    C -- Pengurus --> D2["Perizinan"]
     C -- Kesehatan --> D3["Modul Kesehatan<br/>(Input Kunjungan / Rekam Medis)"]
     C -- Kedisiplinan --> D5["Modul Kedisiplinan Santri<br/>(Input Pelanggaran / Sidang & Vonis)"]
     C -- Sekretaris --> D7["Korespondensi / Prestasi /<br/>Inventaris / Rapor / Kalender (edit)"]
@@ -29,21 +34,25 @@ flowchart TD
 
     C -- Sekretaris --> D1["Absensi"]
     C -- Moderator --> D1
-    C -. "Pengurus/Kesehatan/Kedisiplinan -- hanya kalau dipilih admin satu per satu" .-> D1
+    C -. "Piket/Kesehatan/Kedisiplinan -- hanya kalau dipilih admin satu per satu" .-> D1
+
+    D9["Perizinan<br/>(BELUM ADA ROLE -- menunggu keputusan)"]
 
     D1 --> E[("Database MySQL")]
-    D2 --> E
     D3 --> E
     D5 --> E
     D7 --> E
     D8 --> E
+    D9 --> E
 
-    D2 -. "overdue terdeteksi" .-> D5
+    D9 -. "overdue terdeteksi" .-> D5
     D3 -. "status Perawatan" .-> D1
-    D2 -. "status Izin/Pulang" .-> D1
+    D9 -. "status Izin/Pulang" .-> D1
     E --> F["Riwayat Perubahan (audit_logs)"]
 
     J["Jabatan & Masa Khidmat<br/>(riwayat_jabatan, Serah Terima Jabatan)"] -. "cuma label/riwayat,<br/>TIDAK menggerbangi akses" .-> C
+
+    style D9 fill:#fdeccf,stroke:#a5680f,stroke-dasharray: 5 5
 ```
 
 ---
@@ -55,13 +64,13 @@ flowchart TD
 
   | Role | Cakupan modul |
   |---|---|
-  | **Pengurus** | Perizinan |
+  | **Piket** | Absensi saja (lihat aturan khusus di bawah — tidak otomatis, perlu dipilih admin) |
   | **Kesehatan** | Modul Kesehatan (gabungan eks Asisten Poskestren + Dokter) |
   | **Kedisiplinan** | Modul Kedisiplinan Santri (gabungan eks Sekretaris Mahkamah + Hakim) |
   | **Sekretaris** | Korespondensi, Prestasi, Inventaris, Rapor Kesantrian, Kalender (edit), **+ Absensi penuh otomatis** |
   | **Moderator** | Seluruh modul tanpa kecuali (dulu disebut Super Admin) |
 
-- **Absensi** aturan khusus (bukan murni ikut role): **Sekretaris** dan **Moderator** otomatis dapat akses penuh; role lain (**Pengurus, Kesehatan, Kedisiplinan**) baru dapat akses kalau orangnya **dipilih manual satu per satu oleh admin** — bukan otomatis dari role-nya.
+- **Absensi** aturan khusus (bukan murni ikut role): **Sekretaris** dan **Moderator** otomatis dapat akses penuh; role lain (**Piket, Kesehatan, Kedisiplinan**) baru dapat akses kalau orangnya **dipilih manual satu per satu oleh admin** — bukan otomatis dari role-nya.
 - **Jabatan (judul teks bebas, mis. "Sekretaris Mahkamah") dan Masa Khidmat (`riwayat_jabatan`, `periode_jabatan`, Serah Terima Jabatan) kini terpisah total dari akses** — murni label/riwayat organisasi. Serah Terima Jabatan **tidak lagi otomatis mengubah hak akses siapa pun** (beda dari perilaku lama).
 - Password di-hash **Bcrypt**.
 - Error tak terduga ditangani lewat *global exception handler* — halaman error kustom (403/422/500) konsisten dengan desain aplikasi.
@@ -100,7 +109,7 @@ flowchart TD
 
 ## 6. Modul Perizinan
 
-*(nama modul tetap, akses sekarang lewat role **Pengurus**, bukan lagi "piket")*
+> **⚠️ Belum ada role yang memegang modul ini.** Piket (sebelumnya disebut Pengurus) sempat direncanakan untuk ini, lalu dibatalkan — Piket sekarang **hanya** pegang Absensi (lihat §1 dan §3). Sekretaris juga sempat direncanakan pegang ini, lalu dibatalkan lagi. **Menunggu instruksi lanjutan** siapa yang akan memegang Perizinan.
 
 Tiga jenis izin, masing-masing basis waktu berbeda:
 
@@ -207,7 +216,7 @@ Tiga jenis izin, masing-masing basis waktu berbeda:
 
 ## 22. Notifikasi
 
-- Polling ringan di sidebar (cek tiap 30 detik) — badge muncul kalau ada pelanggaran menunggu sidang (role **Kedisiplinan**), santri menunggu diperiksa (role **Kesehatan**), atau perizinan overdue (role **Pengurus**).
+- Polling ringan di sidebar (cek tiap 30 detik) — badge muncul kalau ada pelanggaran menunggu sidang (role **Kedisiplinan**), santri menunggu diperiksa (role **Kesehatan**), atau perizinan overdue (*role penerima notifikasi ini masih menggantung, mengikuti §6 — belum ditentukan siapa yang pegang Perizinan*).
 
 ## 23. Backup Database
 
