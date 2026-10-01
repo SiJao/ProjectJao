@@ -13,6 +13,58 @@ Dibangun dengan PHP native + MySQL/MariaDB, tanpa framework, tanpa build-tool Ja
 
 ---
 
+## Mindmap (Ide Besar)
+
+Mindmap ini mengelompokkan sistem berdasar **objek/domain yang permanen** — bukan jabatan (yang bisa berganti tiap Serah Terima Jabatan) — sesuai arahan di awal dokumen ini.
+
+```mermaid
+mindmap
+  root((HISADA))
+    Data Induk
+      Santri
+      Guru/Asatidz
+      Kelas
+      Kamar
+      Keluarga/Wali
+      Jabatan dan Posisi
+        label informasi saja
+        Serah Terima Jabatan
+          alur CSV, Kelas 6 ke 5
+    Kesantrian Harian
+      Absensi
+        akses hybrid
+      Perizinan
+        belum ada role
+        template Gate Pass
+      Kesehatan
+    Kedisiplinan
+      Pelanggaran
+      Sidang dan Vonis
+    Pengembangan Diri
+      Prestasi
+      Ekstrakurikuler
+    Administrasi
+      Korespondensi
+      Kalender/Agenda
+    Manajemen Aset
+      Inventaris Barang
+    Pelaporan
+      Rapor Kesantrian
+        90 hari atau 1 tahun ajaran
+      Riwayat Perubahan
+    Akses Sistem
+      Role Piket
+        hanya Absensi
+      Role Kesehatan
+      Role Kedisiplinan
+      Role Sekretaris
+      Role Moderator
+      Portal Wali
+    Keberlanjutan
+      Backup Database
+      Notifikasi
+```
+
 ## Flowchart Sistem
 
 ```mermaid
