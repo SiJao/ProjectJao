@@ -105,7 +105,7 @@ flowchart TD
 
 > **⚠️ Belum ada role yang memegang modul ini.** Piket (sebelumnya disebut Pengurus) sempat direncanakan untuk ini, lalu dibatalkan — Piket sekarang **hanya** pegang Absensi (lihat §1 dan §3). Sekretaris juga sempat direncanakan pegang ini, lalu dibatalkan lagi. **Menunggu instruksi lanjutan** siapa yang akan memegang Perizinan.
 
-Tiga jenis izin, masing-masing basis waktu berbeda:
+Tiga jenis izin, masing-masing basis waktu berbeda (Keluar Sementara dikonfirmasi tetap seperti sekarang — mulai otomatis, tidak dibuat bisa dipilih):
 
 | Jenis | Basis Waktu | Catatan |
 |---|---|---|
@@ -114,8 +114,19 @@ Tiga jenis izin, masing-masing basis waktu berbeda:
 | **Pulang** | Tanggal saja | Rentang tanggal seperti biasa |
 
 - Deteksi **overdue otomatis** → status jadi Overdue, absensi jadi Alpha, otomatis masuk antrean **Kedisiplinan Santri** kategori Keamanan.
-- **Cetak surat izin** — halaman print mandiri per pengajuan izin.
 - Konfirmasi kembali untuk menutup izin yang sudah selesai.
+
+**Cetak surat izin** — mengikuti template "Official Gate Pass" (dokumen: *Template Perizinan*, pemilik `jaohongk@gmail.com`), satu desain dipakai untuk ketiga jenis izin:
+
+- Field: Name, Class, Room, Reason, Departure Time, Return Time, kolom tanda tangan Security Department & Dormitory Guardian.
+- **Name/Class/Room** diisi otomatis dari data santri. **Reason** = field keterangan yang sudah ada.
+- **Label "Departure Time"/"Return Time" sama persis untuk ketiga jenis izin** — yang berbeda cuma format isinya, menyesuaikan basis waktu tiap jenis:
+
+  | Jenis | Isi "Departure Time" / "Return Time" |
+  |---|---|
+  | Keluar Sementara | Jam saja (mis. "14:30") |
+  | Izin Dinas | Tanggal + jam (mis. "15 Okt 2026, 08:00") |
+  | Pulang | Tanggal saja (mis. "15 Okt 2026") |
 
 ## 7. Modul Korespondensi
 
@@ -152,10 +163,14 @@ Tiga jenis izin, masing-masing basis waktu berbeda:
 
 ## 12. Serah Terima Jabatan
 
-- Halaman terpisah, otomatis menampilkan masa khidmat aktif saat ini + form isi masa khidmat baru.
-- Tombol "Serah Terima Jabatan" → popup konfirmasi password → diverifikasi khusus ke akun Moderator utama.
-- Diproses dalam satu transaksi: arsipkan periode lama, aktifkan periode baru. Bisa juga dipakai untuk periode pertama kali.
-- **Penting (beda dari sebelumnya)**: proses ini sekarang **murni mengganti catatan jabatan organisasi** — tidak lagi otomatis mengubah hak akses siapa pun. Role tetap melekat di akun masing-masing sampai diubah manual oleh Moderator.
+*(akses: hanya Moderator — tidak ada pengecualian)*
+
+- **Jabatan pengurus dibatasi Kelas 5 dan Kelas 6 saja** — kelas 4 ke bawah tidak pernah menjabat. Karena kenaikan kelas terjadi tiap tahun, siapa pun yang mulai menjabat dari Kelas 5 otomatis sudah jadi Kelas 6 di gilirannya nanti — alurnya selalu **Kelas 6 (keluar) → Kelas 5 (masuk)**, konsisten tiap tahun.
+- **Prasyarat urutan proses**: kenaikan kelas tahunan santri harus sudah diproses lebih dulu, baru Serah Terima Jabatan dijalankan. Kalau terbalik, sistem masih melihat kelas lama (belum naik), jadi validasi "Kelas 6" bisa salah.
+- Tombol "Serah Terima Jabatan" ditekan Moderator → **seluruh pengurus Kelas 6 saat ini dicabut jabatannya sekaligus** (diarsipkan ke riwayat — **bukan dihapus**, tetap bisa dilihat di Riwayat Perubahan/riwayat organisasi).
+- Moderator menyiapkan **CSV pengganti**: NIS + jabatan (teks bebas, mis. "Sekretaris Mahkamah") untuk setiap posisi yang perlu diisi dari Kelas 5. **Role/hak akses sengaja TIDAK ikut di CSV ini** — murni soal jabatan organisasi.
+- Begitu CSV diproses: jabatan baru langsung aktif + akun login dibuat otomatis (email dari NIS + `@daarululuumlido.com`, pola yang sama seperti Tambah User biasa).
+- **Jeda yang disengaja**: pengurus baru hasil CSV ini belum punya role/akses apa pun sampai Moderator menetapkannya manual satu per satu lewat Kelola User, menyusul kapan saja setelahnya — bukan bug, ini waktu yang disengaja untuk Moderator mempertimbangkan pembagian modul yang pas untuk tiap orang, bukan asal isi buru-buru.
 
 ## 13. Ekstrakurikuler
 
@@ -206,7 +221,8 @@ Tiga jenis izin, masing-masing basis waktu berbeda:
 
 *(akses: role Sekretaris)*
 
-- Laporan gabungan per santri: rekap kehadiran 90 hari, catatan pelanggaran, prestasi, dan ekskul aktif — bisa dicetak.
+- Laporan gabungan per santri: rekap kehadiran, catatan pelanggaran, prestasi, dan ekskul aktif — bisa dicetak.
+- Dua pilihan rentang: **90 Hari Terakhir** (default) atau **1 Tahun Ajaran** (mengikuti pola tahun ajaran sekolah Indonesia pada umumnya, **Juli–Juni** — konsisten dengan logika anchor yang sudah dipakai di Kalender Akademik §9, bukan Januari–Desember).
 
 ## 22. Notifikasi
 
