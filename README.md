@@ -16,6 +16,7 @@ Dibangun dengan PHP native + MySQL/MariaDB, tanpa framework, tanpa build-tool Ja
 ## Daftar Isi
 
 - [Posisi Tahap SDLC](#posisi-tahap-sdlc)
+- [Lingkungan Pondok](#lingkungan-pondok)
 - [Mindmap (Ide Besar)](#mindmap-ide-besar)
 - [Flowchart Sistem](#flowchart-sistem)
 - [Role, Akses Khusus & Cakupan Data](#role-akses-khusus--cakupan-data)
@@ -46,6 +47,101 @@ Dibangun dengan PHP native + MySQL/MariaDB, tanpa framework, tanpa build-tool Ja
 | Flowchart | ✅ Selesai untuk alur utama |
 | Desain Database | ⏳ Berikutnya |
 | Coding · Testing · Deployment | ⬜ Belum dimulai |
+
+---
+
+## Lingkungan Pondok
+
+> Hasil brainstorming **lingkungan nyata** pondok (8 Oktober 2026): siapa saja pelakunya, unit apa saja yang ada, kegiatan apa yang berjalan, dan siapa yang mencatat apa. Bagian ini menjadi **dasar** desain sistem; bagian yang belum sejalan dengan desain di bawah dikumpulkan di [Belum Diputuskan](#belum-diputuskan).
+
+### Pelaku
+
+| Pelaku | Keterangan |
+|---|---|
+| **Santri** | Peserta semua kegiatan dan yang dinilai. Tidak punya akses sistem. |
+| **Pengurus** | Santri juga: tetap tinggal di kamar, ikut kelas, dan **tetap dinilai** di beberapa kegiatan. Bekerja per **bagian** (Perbadatan, Bahasa, Keamanan, Dapur, dst.); bagian adalah pembagian kerja, **bukan** patokan role. |
+| **Guru** | Lazim memegang **banyak peran sekaligus** tanpa batasan: wali kamar, wali kelas, pengajar, guru tahsin, pelatih, pengontrol kegiatan, guru pengasuhan, hakim. |
+| **Lembaga guru** | BPPS, BPK-TMI, BPPK, Mabikori (Pramuka), Bidang Pengajaran TMI, Bidang Pembinaan & Pengasuhan. Khusus guru, bagian dari pesantren. |
+| **Dokter** | Datang pada jadwal tertentu atau saat darurat. |
+
+Seluruh lingkungan **dipisah putra dan putri**.
+
+### Unit & kelompok
+
+| Unit | Anggota | Penyusun anggota |
+|---|---|---|
+| **Rayon** (asrama) → kamar | Santri + guru wali kamar | Pengurus |
+| **Kelas** (1A, 1B, …) | Santri + wali kelas + pengajar materi | Pengurus |
+| **Kelompok tahsin** | Santri + pengurus + guru pengoreksi | Pengurus |
+| **Kelompok muhadhoroh** | Santri + pengurus pengatur + guru pengontrol | Pengurus |
+| **Ekskul** | Santri + guru pelatih | Pengurus |
+| **Pramuka**: DLT 1, 2, … → sub-kelompok | Santri + pengurus pembimbing + guru pengontrol | Pengurus |
+| **Marhalah** | Pengelompokan fleksibel (per kelas, per grup, dll.) | — |
+
+- Perubahan anggota bersifat **insidentil**, mengikuti ketentuan masing-masing bagian.
+- Santri yang pindah kelompok membawa **catatan/nilainya**, lalu berlanjut di kelompok baru.
+
+### Kegiatan & absensi
+
+| Kegiatan | Waktu | Diabsen oleh |
+|---|---|---|
+| Shalat berjamaah (5 waktu) | — | Tidak diabsen |
+| Tasywidul mufrodat / muhadatsah | Ba'da subuh | Pengurus |
+| KBM (pagi & siang) | Pagi & siang | Guru |
+| Kegiatan sore / ekskul | Sore | Guru |
+| Halaqoh tadarus (tahsin), per kelompok | Ba'da maghrib | Guru |
+| Belajar malam, di kelas | Ba'da isya | Wali kelas |
+| Muhadhoroh | Senin malam & Jumat siang | Pengurus |
+| Pramuka | Sabtu siang | Pengurus |
+| Absensi malam / harian | Sebelum tidur | Wali kamar atau pengurus, bergantian |
+
+- Santri yang melewatkan kegiatan karena sakit dicatat **tidak hadir**.
+- Keaktifan ekskul **disatukan dengan absensi**.
+
+### Penilaian
+
+| Bidang | Yang dinilai |
+|---|---|
+| **Ekskul** | Prestasi lomba + keaktifan (absensi) |
+| **Syakia** | Setoran surat/doa yang ditentukan **per kelas**; setoran fleksibel, **wajib 2 jenis per semester** |
+| **Tahsin** | Bacaan dari halaman sampai halaman, dan jumlah khatam (dicatat guru) |
+| **Muhadhoroh** | Bahasa (Indonesia, Arab, Inggris) + kelancaran; tampil bergiliran per grup |
+| **Pramuka** | Keaktifan menyetor SKU & SKK |
+
+### Mahkamah
+
+- **Santri:** pengurus mengajukan tuntutan → guru **hakim** menimbang dan menentukan hukuman.
+- **Pengurus:** pelanggarannya dicatat oleh **guru pengasuhan** yang memiliki hak menginput pelanggaran.
+- **Pembatalan:** setiap penginput dapat membatalkan inputnya dalam **1 jam**. Setelah santri dihukum, **pemutihan hanya oleh hakim**.
+- Setiap malam ba'da isya, **Bagian Bahasa membacakan nama** seluruh pelanggar hari itu berdasarkan data hakim. Ini bukan mahkamah tersendiri.
+
+### Layanan santri
+
+- **Kesehatan:** santri sakit dibawa ke pusat kesehatan → didata pengurus jaga → diperiksa dokter (diagnosa + resep).
+- **Makan:** sesuai menu harian. Santri yang tidak bisa makan menu biasa melapor ke dapur pusat, atau dibelikan oleh guru/pengurus.
+
+### Jadwal harian
+
+Mengacu pada *Jadwal Kegiatan Harian Santri* dalam Risalah HISADA 2025/2026, dengan perubahan terbaru. Jadwal disesuaikan bila ketetapan baru terbit.
+
+| Jam | Senin–Sabtu | Variasi |
+|---|---|---|
+| 04.00–05.20 | Bangun, subuh berjamaah, wirid | Jumat Al-Kahfi |
+| 05.20–05.45 | Tasywidul mufrodat | Rabu & Ahad muhadatsah |
+| 05.45–07.00 | Mandi, sarapan, persiapan & bel masuk KBM | Ahad olahraga |
+| 07.10–12.00 | KBM | Jumat s.d. 10.40; Ahad kerja bakti & latihan ekskul |
+| 12.00–13.40 | Dzuhur, istirahat, makan siang | |
+| 13.40–15.00 | KBM siang | Jumat muhadhoroh; Sabtu Pramuka; Ahad istirahat |
+| 15.00–16.00 | Ashar, wirid, maklumat Bagian Bahasa | |
+| 16.00–17.00 | Kegiatan sore / ekskul | |
+| 17.00–18.30 | Mandi, makan malam, maghrib | |
+| 18.30–19.15 | Halaqoh tadarus per kelompok | Kamis tahlil & yasinan; Ahad maulid |
+| 19.15–19.45 | Isya, pembacaan nama pelanggar | |
+| 19.45–21.00 | Belajar malam di kelas | Senin muhadhoroh; Kamis & Sabtu kajian kitab per marhalah |
+| 21.00–22.00 | Muraja'ah mufrodat, tadarus qobla naum, absensi malam | |
+| 22.00–04.00 | Wajib tidur | |
+
+Kegiatan mingguan, semesteran, dan tahunan cukup dicatat di [Kalender Akademik](#17-kalender-akademik).
 
 ---
 
@@ -602,6 +698,12 @@ flowchart TD
 | Export Excel | Role mana yang boleh mengekspor data? |
 | Backup | Berapa banyak backup yang disimpan? |
 | Server produksi | Server pesantren sendiri atau hosting yang lebih layak (hosting saat ini hanya untuk testing) |
+| Peran guru di sistem | Banyak kegiatan dicatat langsung oleh guru (absensi KBM, tahsin, ekskul, belajar malam, penilaian, putusan hakim), sedangkan role Asatidz saat ini hanya melihat. Bagaimana akses guru yang memegang banyak peran sekaligus? |
+| Alur Kedisiplinan | Lingkungan: pengurus menuntut → guru hakim memutus; pelanggaran pengurus dicatat guru pengasuhan; pembatalan ≤ 1 jam. Bagaimana menyesuaikan role Kedisiplinan yang saat ini dipegang pengurus? |
+| Dokter | Diagnosa & resep diinput dokter sendiri atau oleh pengurus jaga? Bagaimana perlindungan data medis santri? |
+| Serah Terima & kelompok kegiatan | Penempatan pengurus di kelompok (tahsin, muhadhoroh, pramuka) ikut berganti saat Serah Terima? |
+| Kegiatan baru | Kelas & pengajar, tahsin, syakia, muhadhoroh, pramuka, belajar malam, menu makan: masuk sistem sekaligus atau bertahap? |
+| Perizinan & wali santri | Alur nyata di lingkungan (yang mengizinkan, Gate Pass, keterlambatan, kunjungan) belum dikonfirmasi |
 
 ---
 
