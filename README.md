@@ -120,6 +120,20 @@ Seluruh lingkungan **dipisah putra dan putri**.
 - **Kesehatan:** santri sakit dibawa ke pusat kesehatan → didata pengurus jaga → diperiksa dokter (diagnosa + resep).
 - **Makan:** sesuai menu harian. Santri yang tidak bisa makan menu biasa melapor ke dapur pusat, atau dibelikan oleh guru/pengurus.
 
+### Perizinan
+
+- **Bagian Keamanan** memegang seluruh perizinan: menerima pengajuan, mengizinkan, mencetak dan menandatangani Gate Pass, serta mencatat jam keluar dan jam kembali. Guru pengasuhan dan pihak terkait **hanya menerima notifikasi**.
+- **Izin keluar** (beberapa jam) dan **izin pulang** (beberapa hari). Izin pulang **wajib didampingi wali santri**. Libur pondok bersifat massal, mengikuti kalender HISADA.
+- **Terlambat kembali:** tanpa masa tenggang; kegiatan yang terlewat dicatat tidak hadir; keterlambatan **masuk mahkamah**; wali santri **segera diberi tahu**.
+
+### Wali santri
+
+- Santri **tidak boleh membawa HP**; komunikasi wali ↔ santri lewat **wali asuh** (perannya seperti wali santri / wali kelas).
+- Titik kontak wali ke pondok: **wali kamar** dan **wali kelas**.
+- Wali diberi tahu **per kejadian** (santri sakit, divonis hukuman berat, terlambat kembali, dll.), bukan rekap harian.
+- **Kunjungan** waktunya tidak menentu, tetapi tetap dicatat.
+- **Kiriman** uang/barang disimpan di tempat penitipan yang dijaga pengurus keamanan, dan dicatat.
+
 ### Jadwal harian
 
 Mengacu pada *Jadwal Kegiatan Harian Santri* dalam Risalah HISADA 2025/2026, dengan perubahan terbaru. Jadwal disesuaikan bila ketetapan baru terbit.
@@ -703,7 +717,7 @@ flowchart TD
 | Dokter | Diagnosa & resep diinput dokter sendiri atau oleh pengurus jaga? Bagaimana perlindungan data medis santri? |
 | Serah Terima & kelompok kegiatan | Penempatan pengurus di kelompok (tahsin, muhadhoroh, pramuka) ikut berganti saat Serah Terima? |
 | Kegiatan baru | Kelas & pengajar, tahsin, syakia, muhadhoroh, pramuka, belajar malam, menu makan: masuk sistem sekaligus atau bertahap? |
-| Perizinan & wali santri | Alur nyata di lingkungan (yang mengizinkan, Gate Pass, keterlambatan, kunjungan) belum dikonfirmasi |
+| Info ke wali santri | Kenyataan: per kejadian (sakit, vonis berat, terlambat kembali). Desain sebelumnya: rekap harian 20.00 (K-45/K-51). Mana yang dipakai di sistem? |
 
 ---
 
