@@ -161,64 +161,80 @@ Kegiatan mingguan, semesteran, dan tahunan cukup dicatat di [Kalender Akademik](
 
 ## Mindmap (Ide Besar)
 
-Sistem dikelompokkan berdasarkan **objek/proses yang permanen**, bukan jabatan (jabatan berganti setiap Serah Terima).
+Sistem dikelompokkan berdasarkan **objek/proses yang permanen**, bukan jabatan (jabatan berganti setiap Serah Terima). Pohon dipisah menjadi dua: **Administrasi** (urusan yang dicatat) dan **Fungsi** (kemampuan sistem). Nomor modul sama dengan bagian modul di bawah.
 
-```mermaid
-mindmap
-  root((HISADA))
-    Akun dan Organisasi
-      Login dan Akun
-        password sementara NIS dan tanggal lahir
-        wajib ganti saat login pertama
-      Role
-        Piket
-        Kesehatan
-        Kedisiplinan
-        Sekretaris
-        Asatidz
-        Moderator
-      Akses Khusus
-        Absensi
-        Kesehatan
-        Perizinan
-      Masa Khidmat
-        Serah Terima Jabatan
-        Pergantian Antar Waktu
-    Data Induk
-      Santri
-      Guru dan Asatidz
-      Kelas
-        tingkat 1 sampai 6 dan rombel
-      Kamar
-      Keluarga dan Wali
-      Tahun Ajaran
-        Kenaikan Kelas
-      Penempatan Kamar Massal
-    Kesantrian Harian
-      Absensi
-      Perizinan
-        Gate Pass
-      Kesehatan
-    Kedisiplinan
-      Pelanggaran
-      Sidang dan Vonis
-    Pengembangan Diri
-      Prestasi
-      Kegiatan dan Ekskul
-    Administrasi
-      Korespondensi
-      Kalender Akademik
-      Inventaris
-    Pelaporan
-      Dashboard dan Statistik
-      Rapor Kesantrian
-      Riwayat Perubahan
-    Komunikasi
-      Notifikasi Email
-      Portal Wali
-    Keberlanjutan
-      Backup Database
-      Export Excel
+### Administrasi
+
+Urusan kesantrian yang **dicatat** di sistem.
+
+```text
+Administrasi HISADA
+├── 5. Data Master
+│   ├── Data Santri
+│   │   ├── Biodata & status
+│   │   └── Keluarga & kontak wali
+│   ├── Data Guru / Asatidz
+│   ├── Data Kelas
+│   │   ├── Tingkat 1–6 + rombel
+│   │   └── Wali kelas (per tahun ajaran)
+│   ├── Data Kamar
+│   └── Tahun Ajaran: persiapan · aktif · arsip
+├── Kesantrian Harian
+│   ├── 10. Absensi
+│   │   ├── Absensi Harian (per kamar)
+│   │   └── Absensi Kegiatan (per grup)
+│   ├── 11. Perizinan
+│   │   ├── Keluar Sementara · Izin Dinas · Pulang
+│   │   ├── Gate Pass
+│   │   └── Overdue
+│   └── 12. Kesehatan
+│       ├── Kunjungan: Rawat Jalan · Perawatan
+│       ├── Pemeriksaan: diagnosa, resep, tindak lanjut
+│       └── Analisis musim sakit
+├── Kedisiplinan
+│   └── 13. Kedisiplinan Santri
+│       ├── Input Pelanggaran
+│       └── Sidang & Vonis: Ringan · Sedang · Berat · Pemutihan
+├── Pengembangan Diri
+│   ├── 14. Prestasi Santri
+│   └── 15. Kegiatan & Ekskul
+│       └── Halaqah Qur'an · Muhadhoroh · Olahraga · Kesenian
+├── Kesekretariatan
+│   ├── 16. Korespondensi: surat keluar · surat masuk
+│   ├── 17. Kalender Akademik
+│   └── 18. Inventaris Barang: kode barang → unit fisik
+└── Laporan Santri
+    └── 20. Rapor Kesantrian: 90 hari · 1 tahun ajaran
+```
+
+### Fungsi
+
+Kemampuan **sistem** yang melayani seluruh administrasi di atas.
+
+```text
+Fungsi Sistem HISADA
+├── Akses
+│   ├── 1. Login & Akun
+│   │   ├── Password sementara: NIS + tanggal lahir
+│   │   └── Wajib ganti saat login pertama
+│   └── 2. Kelola User & Role
+│       ├── Role: Piket · Kesehatan · Kedisiplinan · Sekretaris · Asatidz · Moderator
+│       └── Akses khusus: Absensi · Kesehatan · Perizinan
+├── Pengolahan Data
+│   ├── 8. Update Data & Import
+│   │   ├── Upload file (CSV)
+│   │   ├── Pilih banyak → ubah satu kategori (mis. kelas, kamar)
+│   │   └── Jabatan pengurus: Serah Terima (semua) · PAW (satu orang)
+│   └── 9. Cari Santri & Cari Guru
+├── Pemantauan
+│   ├── 19. Dashboard & Statistik
+│   └── 21. Riwayat Perubahan
+├── Komunikasi
+│   ├── 22. Notifikasi (email)
+│   └── 23. Portal Wali Santri
+└── Keberlanjutan
+    ├── 24. Backup Database
+    └── 25. Export Excel
 ```
 
 ---
