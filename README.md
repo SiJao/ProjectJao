@@ -1,5 +1,5 @@
-# Perkuat dari dasar (flowchart)
-### Silahan revisi ulang flowchartnya
+# Perkuat dari dasar (Mindmap & flowchart)
+### Perkuat konsep inti
 Abaikan jabatan, fokus kepada objek (sistem yang abadi tetap berjalan dan diperlukan dalam kegiatan HISADA)
 ### Ringkasan Singkat Alur
 (Software Development Life Cycle (SDLC)) : Mindmap (Ide Besar) ➔ Analisis (Detail Fitur) ➔ Flowchart (Logika Jalannya Program) ➔ Desain Database (Penyimpanan Data) ➔ Coding (Pembuatan Program) ➔ Testing (Pengecekan Error) ➔ Deployment (Rilis Aplikasi).
@@ -33,7 +33,7 @@ Administrasi HISADA
 │   │   └── Wali kelas (per tahun ajaran)
 │   ├── Data Kamar
 │   └── Tahun Ajaran: persiapan · aktif · arsip
-├── Kesantrian Harian
+├── Kesantrian
 │   ├── Absensi
 │   │   ├── Absensi Harian (per kamar)
 │   │   └── Absensi Kegiatan (per grup)
@@ -41,24 +41,23 @@ Administrasi HISADA
 │   │   ├── Keluar Sementara · Izin Dinas · Pulang
 │   │   ├── Gate Pass
 │   │   └── Overdue
-│   └── Kesehatan
-│       ├── Kunjungan: Rawat Jalan · Perawatan
-│       ├── Pemeriksaan: diagnosa, resep, tindak lanjut
-│       └── Analisis musim sakit
-├── Kedisiplinan
-│   └── Kedisiplinan Santri
-│       ├── Input Pelanggaran
-│       └── Sidang & Vonis: Ringan · Sedang · Berat · Pemutihan
-├── Pengembangan Diri
-│   ├── Prestasi Santri
-│   └── Kegiatan & Ekskul
-│       └── Halaqah Qur'an · Muhadhoroh · Olahraga · Kesenian
-├── Kesekretariatan
-│   ├── Korespondensi: surat keluar · surat masuk
-│   ├── Kalender Akademik
-│   └── Inventaris Barang: kode barang → unit fisik
-└── Laporan Santri
-    └── Rapor Kesantrian: 90 hari · 1 tahun ajaran
+│   ├── Kesehatan
+│   │   ├── Kunjungan: Rawat Jalan · Perawatan
+│   │   ├── Pemeriksaan: diagnosa, resep, tindak lanjut
+│   │   └── Analisis musim sakit
+│	├── Kedisiplinan
+│	│	├── Input Pelanggaran
+│	│	└── Sidang & Vonis: Ringan · Sedang · Berat · Pemutihan
+│	├── Pengembangan Diri
+│  	│	├── Prestasi Santri 
+│   │   └── Kegiatan & Ekstrakurikuler
+│	│		└── Halaqah Qur'an · Muhadhoroh · Olahraga · Kesenian
+│   └── Laporan Santri 
+│		└── Rapor Kesantrian: 90 hari · 1 tahun ajaran	   
+└── Tata Warkat
+	├── Kalender Akademik
+	├── Korespondensi: surat keluar · surat masuk
+	└── Inventaris Barang: kode barang → unit fisik
 ```
 
 ### Fungsi
