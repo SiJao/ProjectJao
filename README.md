@@ -51,7 +51,7 @@ Administrasi HISADA
 │	├── Pengembangan Diri
 │  	│	├── Prestasi Santri 
 │   │   └── Kegiatan & Ekstrakurikuler
-│	│		└── Halaqah Qur'an · Muhadhoroh · Olahraga · Kesenian
+│	│		└── Pramuka · Muhadhoroh · Halaqah Qur'an · Olahraga · Kesenian
 │   └── Laporan Santri 
 │		└── Rapor Kesantrian: 90 hari · 1 tahun ajaran	   
 └── Tata Warkat
