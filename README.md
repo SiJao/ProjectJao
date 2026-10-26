@@ -45,19 +45,19 @@ Administrasi HISADA
 │   │   ├── Kunjungan: Rawat Jalan · Perawatan
 │   │   ├── Pemeriksaan: diagnosa, resep, tindak lanjut
 │   │   └── Analisis musim sakit
-│	├── Kedisiplinan
-│	│	├── Input Pelanggaran
-│	│	└── Sidang & Vonis: Ringan · Sedang · Berat · Pemutihan
-│	├── Pengembangan Diri
-│  	│	├── Prestasi Santri 
+│   ├── Kedisiplinan
+│   │   ├── Input Pelanggaran
+│   │   └── Sidang & Vonis: Ringan · Sedang · Berat · Pemutihan
+│   ├── Pengembangan Diri
+│   │   ├── Prestasi Santri
 │   │   └── Kegiatan & Ekstrakurikuler
-│	│		└── Pramuka · Muhadhoroh · Halaqah Qur'an · Olahraga · Kesenian
-│   └── Laporan Santri 
-│		└── Rapor Kesantrian: 90 hari · 1 tahun ajaran	   
+│   │       └── Pramuka · Muhadhoroh · Halaqah Qur'an · Olahraga · Kesenian
+│   └── Laporan Santri
+│       └── Rapor Kesantrian: 90 hari · 1 tahun ajaran
 └── Tata Warkat
-	├── Kalender Akademik
-	├── Korespondensi: surat keluar · surat masuk
-	└── Inventaris Barang: kode barang → unit fisik
+    ├── Kalender Akademik
+    ├── Korespondensi: surat keluar · surat masuk
+    └── Inventaris Barang: kode barang → unit fisik
 ```
 
 ### Fungsi
@@ -100,16 +100,16 @@ Fungsi Sistem HISADA
 - [Flowchart Sistem](#flowchart-sistem)
 - [Role, Akses Khusus & Cakupan Data](#role-akses-khusus--cakupan-data)
 - [Siklus Tahunan](#siklus-tahunan)
-- **Modul**
-  - A. Akun & Organisasi — [1. Login & Akun](#1-login--akun) · [2. Kelola User & Role](#2-kelola-user--role) · [3. Masa Khidmat & Serah Terima Jabatan](#3-masa-khidmat--serah-terima-jabatan) · [4. Pergantian Antar-Waktu (PAW)](#4-pergantian-antar-waktu-paw)
-  - B. Data Induk — [5. Data Master](#5-data-master) · [6. Tahun Ajaran & Kenaikan Kelas](#6-tahun-ajaran--kenaikan-kelas) · [7. Penempatan Kamar Massal](#7-penempatan-kamar-massal) · [8. Ubah Massal & Import](#8-ubah-massal--import) · [9. Cari Santri & Cari Guru](#9-cari-santri--cari-guru)
-  - C. Kesantrian Harian — [10. Absensi](#10-absensi) · [11. Perizinan](#11-perizinan) · [12. Kesehatan](#12-kesehatan)
-  - D. Kedisiplinan — [13. Kedisiplinan Santri](#13-kedisiplinan-santri)
-  - E. Pengembangan Diri — [14. Prestasi Santri](#14-prestasi-santri) · [15. Kegiatan & Ekskul](#15-kegiatan--ekskul)
-  - F. Administrasi — [16. Korespondensi](#16-korespondensi) · [17. Kalender Akademik](#17-kalender-akademik) · [18. Inventaris Barang](#18-inventaris-barang)
-  - G. Pelaporan — [19. Dashboard & Statistik](#19-dashboard--statistik) · [20. Rapor Kesantrian](#20-rapor-kesantrian) · [21. Riwayat Perubahan](#21-riwayat-perubahan)
-  - H. Komunikasi — [22. Notifikasi](#22-notifikasi) · [23. Portal Wali Santri](#23-portal-wali-santri)
-  - I. Keberlanjutan — [24. Backup Database](#24-backup-database) · [25. Export Excel](#25-export-excel)
+- **Modul — Administrasi**
+  - Data Master — [Data Master](#data-master) · [Tahun Ajaran](#tahun-ajaran)
+  - Kesantrian — [Absensi](#absensi) · [Perizinan](#perizinan-1) · [Kesehatan](#kesehatan) · [Kedisiplinan](#kedisiplinan) · [Prestasi Santri](#prestasi-santri) · [Kegiatan & Ekstrakurikuler](#kegiatan--ekstrakurikuler) · [Rapor Kesantrian](#rapor-kesantrian)
+  - Tata Warkat — [Kalender Akademik](#kalender-akademik) · [Korespondensi](#korespondensi) · [Inventaris Barang](#inventaris-barang)
+- **Modul — Fungsi**
+  - Akses — [Login & Akun](#login--akun) · [Kelola User & Role](#kelola-user--role)
+  - Pengolahan Data — [Update Data & Import](#update-data--import) · [Update Kelas Tahunan](#update-kelas-tahunan) · [Update Kamar](#update-kamar) · [Masa Khidmat & Serah Terima Jabatan](#masa-khidmat--serah-terima-jabatan) · [Pergantian Antar-Waktu (PAW)](#pergantian-antar-waktu-paw) · [Cari Santri & Cari Guru](#cari-santri--cari-guru)
+  - Pemantauan — [Dashboard & Statistik](#dashboard--statistik) · [Riwayat Perubahan](#riwayat-perubahan)
+  - Komunikasi — [Notifikasi](#notifikasi) · [Portal Wali Santri](#portal-wali-santri)
+  - Keberlanjutan — [Backup Database](#backup-database) · [Export Excel](#export-excel)
 - [Belum Diputuskan](#belum-diputuskan)
 - [Status Implementasi](#status-implementasi)
 - [Instalasi](#instalasi-kode-saat-ini)
@@ -234,7 +234,7 @@ Mengacu pada *Jadwal Kegiatan Harian Santri* dalam Risalah HISADA 2025/2026, den
 | 21.00–22.00 | Muraja'ah mufrodat, tadarus qobla naum, absensi malam | |
 | 22.00–04.00 | Wajib tidur | |
 
-Kegiatan mingguan, semesteran, dan tahunan cukup dicatat di [Kalender Akademik](#17-kalender-akademik).
+Kegiatan mingguan, semesteran, dan tahunan cukup dicatat di [Kalender Akademik](#kalender-akademik).
 
 ---
 
@@ -256,7 +256,7 @@ flowchart TD
     C -- "Piket jika dicentang" --> M2["Perizinan & Gate Pass"]
     C -- "Kesehatan jika dicentang" --> M3["Kesehatan"]
     C -- "Kedisiplinan" --> M4["Kedisiplinan Santri"]
-    C -- "Sekretaris" --> M5["Korespondensi, Prestasi, Inventaris,<br/>Rapor, Kalender, Kegiatan & Ekskul,<br/>bagian pengurus, pengumuman"]
+    C -- "Sekretaris" --> M5["Korespondensi, Prestasi, Inventaris,<br/>Rapor, Kalender, Kegiatan & Ekstrakurikuler,<br/>bagian pengurus, pengumuman"]
     C -- "Asatidz" --> M6["Lihat data santri<br/>di lingkungannya"]
     C -- "Moderator" --> M7["Semua modul"]
 
@@ -287,7 +287,7 @@ flowchart TD
 | **Piket** | Pengurus santri | Absensi (otomatis) · Perizinan & Gate Pass (jika dicentang Moderator) |
 | **Kesehatan** | Pengurus santri | Kesehatan (jika dicentang Moderator) · Absensi (jika dicentang) |
 | **Kedisiplinan** | Pengurus santri | Kedisiplinan Santri · Absensi (jika dicentang) |
-| **Sekretaris** | Pengurus santri | Korespondensi, Prestasi, Inventaris, Rapor, Kalender (edit), Absensi, Kegiatan & Ekskul, Riwayat Perubahan (masa jabatannya), isi bagian pengurus, kontak wali, pengumuman email |
+| **Sekretaris** | Pengurus santri | Korespondensi, Prestasi, Inventaris, Rapor, Kalender (edit), Absensi, Kegiatan & Ekstrakurikuler, Riwayat Perubahan (masa jabatannya), isi bagian pengurus, kontak wali, pengumuman email |
 | **Asatidz** | Guru | Lihat data santri di lingkungannya (tanpa data Kesehatan) |
 | **Moderator** | Pihak pondok / tim IT (**bukan santri**) | Semua modul |
 
@@ -323,12 +323,12 @@ Keterangan: ✔ otomatis · ☑ jika dicentang Moderator · 👁 lihat saja · �
 | Kedisiplinan: vonis & pemutihan | ✖ | ✖ | ✔ (bukan kasus yang ia catat) | ✖ | 👁 (hasil vonis) | ✔ |
 | Korespondensi, Inventaris | ✖ | ✖ | ✖ | ✔ | ✖ | ✔ |
 | Prestasi, Rapor | ✖ | ✖ | ✖ | ✔ | 👁 | ✔ |
-| Kegiatan & Ekskul (kelola) | ✖ | ✖ | ✖ | ✔ | ✖ | ✔ |
+| Kegiatan & Ekstrakurikuler (kelola) | ✖ | ✖ | ✖ | ✔ | ✖ | ✔ |
 | Riwayat Perubahan | ✖ | ✖ | ✖ | ✔ (masa jabatannya) | ✖ | ✔ (semua) |
 | Isi bagian pengurus, kontak wali, pengumuman email | ✖ | ✖ | ✖ | ✔ | ✖ | ✔ |
 | Data Master, profil kesehatan | ✖ | ⏳ | ✖ | ⏳ | ✖ | ✔ |
-| Penempatan Kamar Massal, PAW | ⏳ | ⏳ | ⏳ | ⏳ | ✖ | ✔ |
-| Kenaikan Kelas, Serah Terima, role & akses, backup, email ke wali tertentu, tautkan wali manual | ✖ | ✖ | ✖ | ✖ | ✖ | ✔ |
+| Update Kamar, PAW | ⏳ | ⏳ | ⏳ | ⏳ | ✖ | ✔ |
+| Update Kelas Tahunan, Serah Terima, role & akses, backup, email ke wali tertentu, tautkan wali manual | ✖ | ✖ | ✖ | ✖ | ✖ | ✔ |
 
 ---
 
@@ -336,87 +336,20 @@ Keterangan: ✔ otomatis · ☑ jika dicentang Moderator · 👁 lihat saja · �
 
 ```mermaid
 flowchart LR
-    A["Kenaikan Kelas<br/>± Juli"] --> B["Santri baru Kelas 1<br/>diinput massal"]
-    B --> C["Penempatan Kamar<br/>1-2x setahun"]
+    A["Update Kelas Tahunan<br/>± Juli"] --> B["Santri baru Kelas 1<br/>diinput massal"]
+    B --> C["Update Kamar<br/>1-2x setahun"]
     C --> D["Serah Terima Jabatan<br/>akhir Semester 1"]
     D --> E["Moderator tetapkan role<br/>pengurus baru"]
     E --> A
 ```
 
-**Perjalanan satu angkatan pengurus:** diangkat di akhir Semester 1 saat **Kelas 5** → naik ke Kelas 6 dan **tetap menjabat** → diganti pada Serah Terima berikutnya, tetap santri aktif Kelas 6 tanpa jabatan → menjadi **Alumni** saat Kenaikan Kelas.
+**Perjalanan satu angkatan pengurus:** diangkat di akhir Semester 1 saat **Kelas 5** → naik ke Kelas 6 dan **tetap menjabat** → diganti pada Serah Terima berikutnya, tetap santri aktif Kelas 6 tanpa jabatan → menjadi **Alumni** saat Update Kelas Tahunan.
 
 ---
 
-# Modul
+# Modul — Administrasi
 
-## A. Akun & Organisasi
-
-### 1. Login & Akun
-
-- **Login:** email + password. Pengurus santri memakai `(NIS)@daarululuumlido.com` (kotak surat aktif di Google Workspace pondok).
-- **Password sementara** akun baru = **NIS + tanggal lahir** (contoh format: `12345` + `01022010`), **wajib diganti saat login pertama**.
-- **Tautan aktivasi via email** tersedia sebagai **opsi kedua**.
-- **Akun tertahan:** jika tanggal lahir santri kosong, akun tidak dibuat sampai data dilengkapi. Sekretaris & Moderator melihat daftar akun tertahan.
-- **Reset password mandiri** lewat tautan ke email.
-- Password disimpan dengan hash **Bcrypt**.
-
-### 2. Kelola User & Role
-
-*(akses: Moderator)*
-
-- Menetapkan **satu role** per user dan mencentang **akses khusus** (Absensi, Kesehatan, Perizinan).
-- Dashboard Moderator menampilkan **"N pengurus menunggu role"** setelah Serah Terima.
-- Pilihan role Moderator **tidak tersedia** untuk akun yang terhubung ke data santri.
-- Setiap perubahan role/akses tercatat di Riwayat Perubahan dan diberitahukan ke pemilik akun lewat email.
-
-### 3. Masa Khidmat & Serah Terima Jabatan
-
-- **Masa khidmat ±1 tahun** (paling cepat 7–8 bulan), dari akhir Semester 1 ke akhir Semester 1 berikutnya.
-- Masa khidmat juga menjadi **acuan "tahun" organisasi** untuk statistik dan tampilan Kalender 2 Semester.
-- Jabatan pengurus diambil dari **santri aktif Kelas 5**.
-
-**Alur Serah Terima** — tiga pelaku: **Moderator** (tombol + tunjuk Sekretaris) → **Sekretaris baru** (isi bagian) → **Moderator** (tetapkan role).
-
-1. **Moderator** menekan **Serah Terima Jabatan** dan menunjuk **1–2 Sekretaris baru**.
-2. **Peringatan** selalu muncul (jumlah pengurus lama, waktu Serah Terima terakhir), lalu **password Moderator yang sedang login**.
-3. Dalam satu proses: masa khidmat lama & semua jabatan **diarsipkan** (bukan dihapus), akun pengurus lama **dinonaktifkan** (santrinya tetap aktif), masa khidmat baru dibuat, Sekretaris baru langsung aktif.
-4. **Sekretaris baru** mengisi bagian/jabatan pengurus lain — lewat **upload file** (NIS + jabatan) **atau pilih banyak sekaligus**. Hanya santri aktif Kelas 5; baris yang tidak valid **ditolak** dan proses tidak lanjut sampai diperbaiki.
-5. Akun pengurus dibuat otomatis (`NIS@daarululuumlido.com`, password sementara NIS + tanggal lahir).
-6. **Moderator** menetapkan role & akses khusus tiap pengurus.
-
-Selama menunggu langkah 6, **Absensi tetap berjalan** karena Sekretaris otomatis memiliki akses Absensi.
-
-```mermaid
-flowchart TD
-    Start(["MODERATOR tekan<br/>Serah Terima Jabatan"]) --> Tunjuk["Moderator pilih 1-2<br/>Sekretaris baru (santri aktif Kelas 5)"]
-    Tunjuk --> Peringatan{"PERINGATAN:<br/>pengurus lama dinonaktifkan,<br/>serah terima terakhir X bulan lalu.<br/>Yakin?"}
-    Peringatan -- "batal" --> Batal(["Tidak ada perubahan"])
-    Peringatan -- "yakin" --> Password{"Password Moderator<br/>yang sedang login"}
-    Password -- "salah" --> Batal
-    Password -- "benar" --> Proses["Satu proses:<br/>1. Arsipkan masa khidmat lama + semua jabatan<br/>2. Nonaktifkan akun pengurus lama<br/>(santri tetap aktif Kelas 6)<br/>3. Buat masa khidmat baru<br/>4. Aktifkan Sekretaris baru"]
-    Proses --> Login1["Sekretaris baru login<br/>password sementara = NIS + tgl lahir<br/>wajib ganti saat login pertama"]
-    Login1 --> Absensi["Absensi tetap berjalan<br/>(Sekretaris otomatis akses Absensi)"]
-    Login1 --> Bagian["SEKRETARIS isi bagian pengurus lain:<br/>upload file ATAU pilih banyak sekaligus<br/>(hanya santri aktif Kelas 5)"]
-    Bagian --> Akun["Akun pengurus dibuat<br/>NIS@daarululuumlido.com"]
-    Akun --> Badge["Dashboard Moderator:<br/>N pengurus menunggu role"]
-    Badge --> Role["MODERATOR tetapkan role<br/>+ akses khusus"]
-    Role --> Aktif(["Semua pengurus baru bekerja"])
-```
-
-### 4. Pergantian Antar-Waktu (PAW)
-
-Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mis. mundur, skorsing).
-
-1. Nonaktifkan jabatan satu orang (**alasan wajib**).
-2. Angkat satu santri aktif Kelas 5/6 ke jabatan tersebut.
-3. Tetapkan role.
-4. Peringatan + password, tercatat di Riwayat Perubahan.
-
----
-
-## B. Data Induk
-
-### 5. Data Master
+## Data Master
 
 *(akses: Moderator; bagian tertentu oleh Sekretaris — lihat di bawah)*
 
@@ -434,89 +367,28 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
 - **Riwayat kamar** — setiap perpindahan kamar.
 - **Status santri** — perubahan ke Alumni/Keluar otomatis **menonaktifkan akun login**.
 
-### 6. Tahun Ajaran & Kenaikan Kelas
+### Tahun Ajaran
 
 *(akses: Moderator)*
 
-- **Tahun ajaran** berstatus *persiapan* / *aktif* / *arsip*; hanya satu yang aktif. Tanggalnya **tidak tetap** (± Juli–Juni): tanggal mulai terisi saat Kenaikan Kelas dijalankan, tanggal selesai saat Kenaikan Kelas berikutnya.
-- **Kenaikan Kelas = satu proses tahunan** yang sekaligus:
-  1. menjadikan semua santri **Kelas 6** aktif sebagai **Alumni** (akun login nonaktif) — **tanpa proses wisuda terpisah**;
-  2. menaikkan Kelas 1–5 sesuai **file penempatan** (`nis, kelas`), karena **rombel dibagi ulang setiap tahun**;
-  3. **menahan** santri aktif yang tidak tercantum di file (status "menunggu penempatan", tetap di kelas lama).
-
-**Aturan file penempatan:**
-
-| Kondisi baris | Hasil |
-|---|---|
-| Tingkat tujuan = tingkat sekarang + 1 | Naik kelas |
-| Tingkat tujuan = tingkat sekarang | Boleh, dengan peringatan *"Santri atas nama … tidak dinyatakan naik kelas"* |
-| Lompat tingkat atau turun tingkat | Ditolak |
-| NIS tidak ada / santri tidak aktif / kelas tidak ada / NIS dobel | Ditolak |
-| Penulisan "5B MIA" | Dibaca 5B (label diabaikan) |
-
-- Santri **Kelas 6 yang tidak lulus** dikecualikan manual di layar pratinjau → tetap **Kelas 6 aktif** di tahun ajaran berikutnya.
-- Status Alumni bisa **dibatalkan per santri** (alasan wajib); akun login tetap nonaktif sampai diaktifkan Moderator.
-- **Santri baru Kelas 1** diinput massal **setelah** Kenaikan Kelas.
-- Daftar **"menunggu penempatan"** diselesaikan Moderator satu per satu (tempatkan / tinggal kelas / ubah status).
-- Satu Kenaikan Kelas per tahun ajaran.
-
-```mermaid
-flowchart TD
-    Start(["Moderator buka<br/>Kenaikan Kelas"]) --> Prasyarat{"Tahun ajaran baru<br/>sudah dibuat (persiapan)?"}
-    Prasyarat -- "belum" --> Buat["Buat tahun ajaran baru<br/>+ siapkan rombel"]
-    Buat --> Prasyarat
-    Prasyarat -- "sudah" --> Upload["Unggah file penempatan:<br/>nis, kelas (Kelas 1-5 saja)"]
-    Upload --> Validasi{"Ada baris ditolak?"}
-    Validasi -- "ada" --> Perbaiki["Tampilkan baris ditolak<br/>perbaiki file"]
-    Perbaiki --> Upload
-    Validasi -- "tidak ada" --> Pratinjau["Pratinjau 4 daftar:<br/>Naik/Tinggal - Menjadi Alumni -<br/>Ditahan - Ditolak (0)"]
-    Pratinjau --> Kecuali["Moderator centang Kelas 6<br/>yang TIDAK lulus"]
-    Kecuali --> Peringatan{"PERINGATAN:<br/>ringkasan jumlah + nama santri<br/>yang tidak naik kelas. Yakin?"}
-    Peringatan -- "batal" --> Batal(["Tidak ada perubahan"])
-    Peringatan -- "yakin" --> Password{"Password Moderator<br/>yang sedang login"}
-    Password -- "salah" --> Batal
-    Password -- "benar" --> Eksekusi["Satu proses:<br/>tutup tahun lama, catat riwayat kelas baru,<br/>Kelas 6 jadi Alumni + akun nonaktif,<br/>tahun baru jadi aktif"]
-    Eksekusi --> Tahan["Daftar Menunggu Penempatan<br/>diselesaikan satu per satu"]
-    Tahan --> Selesai(["Tahun ajaran baru berjalan"])
-```
-
-### 7. Penempatan Kamar Massal
-
-- Rotasi kamar **1–2 kali setahun** (tidak dibatasi sekali per tahun).
-- Lewat **upload file** atau **pilih banyak santri → pindahkan ke satu kamar**.
-- Pratinjau → peringatan + password → satu proses; setiap perpindahan tercatat di **riwayat kamar**.
-- Santri hanya bisa ditempatkan di kamar yang **sesuai gender**.
-
-### 8. Ubah Massal & Import
-
-Semua proses massal memakai dua cara:
-1. **Upload file** (CSV) → pratinjau → konfirmasi.
-2. **Pilih banyak → ubah satu kategori.** Contoh: centang 20 santri dari kamar yang berbeda-beda → "pindahkan ke Kamar X".
-
-Kedua cara tetap mencatat riwayat (kelas/kamar) dan Riwayat Perubahan.
-
-### 9. Cari Santri & Cari Guru
-
-- **Live search**: hasil tersaring otomatis saat mengetik. Cari Santri punya filter kamar.
-- Komponen **pencarian santri (typeahead)** dipakai di semua form yang memilih santri.
-- Hasil mengikuti **cakupan putra/putri** pengguna.
+- **Tahun ajaran** berstatus *persiapan* / *aktif* / *arsip*; hanya satu yang aktif. Tanggalnya **tidak tetap** (± Juli–Juni): tanggal mulai terisi saat Update Kelas Tahunan dijalankan, tanggal selesai saat Update Kelas Tahunan berikutnya.
 
 ---
 
-## C. Kesantrian Harian
+## Kesantrian
 
-### 10. Absensi
+### Absensi
 
 *(akses: Piket otomatis · Sekretaris & Moderator otomatis · Kesehatan & Kedisiplinan jika dicentang)*
 
 - **Absensi Harian** berbasis **kamar**: pilih kamar + tanggal, isi status semua penghuni sekaligus.
-- **Absensi Kegiatan**: Halaqah Qur'an, Muhadhoroh, Olahraga, Kesenian — berbasis anggota grup dari modul [Kegiatan & Ekskul](#15-kegiatan--ekskul).
+- **Absensi Kegiatan**: Pramuka, Muhadhoroh, Halaqah Qur'an, Olahraga, Kesenian — berbasis anggota grup dari modul [Kegiatan & Ekstrakurikuler](#kegiatan--ekstrakurikuler).
 - Status **terisi otomatis** dari modul lain:
   - Kesehatan (Perawatan) → **Sakit**
   - Perizinan → **Izin / Pulang**, overdue → **Alpha**
 - Tidak ada peringatan "lupa isi absensi".
 
-### 11. Perizinan
+### Perizinan
 
 *(akses: Piket yang dicentang Moderator · Moderator)*
 
@@ -554,7 +426,7 @@ flowchart TD
     I --> L["Email segera ke wali<br/>+ notifikasi Piket & Kedisiplinan"]
 ```
 
-### 12. Kesehatan
+### Kesehatan
 
 *(sebelumnya "Poskestren" · akses: role Kesehatan **dan** dicentang Moderator · Moderator)*
 
@@ -564,11 +436,7 @@ flowchart TD
   - **Analisis musim sakit**: tren kunjungan 6 bulan + keluhan terbanyak.
 - Wali hanya menerima kabar **"sedang sakit / dirawat"** di rekap harian — **tanpa diagnosa**.
 
----
-
-## D. Kedisiplinan
-
-### 13. Kedisiplinan Santri
+### Kedisiplinan
 
 *(sebelumnya "Mahkamah Santri" · akses: role Kedisiplinan · Moderator)*
 
@@ -577,59 +445,20 @@ flowchart TD
 - **Pencatat tidak boleh memvonis atau memutihkan kasus yang ia catat sendiri.** Pelanggaran otomatis dari overdue boleh divonis siapa pun yang ber-role Kedisiplinan.
 - Vonis **Berat** masuk rekap harian wali (tanpa isi vonis). Ringan/Sedang tidak dikirim.
 
----
-
-## E. Pengembangan Diri
-
-### 14. Prestasi Santri
+### Prestasi Santri
 
 *(akses: Sekretaris · Moderator · Asatidz lihat)*
 
 - Input: santri, nama kegiatan, lokasi, tingkat (internal/eksternal), keterangan, tanggal.
 
-### 15. Kegiatan & Ekskul
+### Kegiatan & Ekstrakurikuler
 
 *(akses: Sekretaris · Moderator)*
 
-- Kelola grup **Halaqah Qur'an, Muhadhoroh, Olahraga, Kesenian**: cabang/grup, **pembimbing/pelatih** (guru), dan **anggota**.
+- Kelola grup **Pramuka, Muhadhoroh, Halaqah Qur'an, Olahraga, Kesenian**: cabang/grup, **pembimbing/pelatih** (guru), dan **anggota**.
 - Menjadi dasar **Absensi Kegiatan** dan bagian ekskul di **Rapor**.
 
----
-
-## F. Administrasi
-
-### 16. Korespondensi
-
-*(akses: Sekretaris · Moderator)*
-
-- **Surat keluar**: nomor surat diketik manual.
-- **Surat masuk**: nomor sesuai fisik + status disposisi.
-- Lampiran: tautan Google Docs.
-
-### 17. Kalender Akademik
-
-*(lihat: semua · edit: Sekretaris & Moderator)*
-
-- Tampilan **1 Bulan, 2 Bulan, 1 Semester, 2 Semester**. Tampilan 2 Semester mengikuti **rentang masa khidmat**.
-- Agenda berkategori **Umum / Akademik / Pengasuhan** (minimal satu wajib).
-- Bisa dicetak.
-
-### 18. Inventaris Barang
-
-*(akses: Sekretaris · Moderator)*
-
-- **Kode barang → banyak unit fisik**; tiap unit punya kategori (lama/baru) dan kondisi (bagus, rusak ringan, rusak berat, hilang).
-
----
-
-## G. Pelaporan
-
-### 19. Dashboard & Statistik
-
-- Ringkasan: jumlah santri putra / putri / total, sakit 30 hari, pulang hari ini, alpha hari ini, agenda mendatang.
-- **Statistik tahunan** memakai rentang **masa khidmat**.
-
-### 20. Rapor Kesantrian
+### Rapor Kesantrian
 
 *(akses: Sekretaris · Moderator · Asatidz lihat)*
 
@@ -637,17 +466,189 @@ flowchart TD
 - Rentang: **90 hari terakhir** atau **1 Tahun Ajaran** (mengikuti tanggal tahun ajaran).
 - Kelas yang tercetak diambil dari **riwayat kelas** pada periode itu (bukan kelas saat ini). Label MIA/IIS tidak tercetak.
 
-### 21. Riwayat Perubahan
+---
 
-- **Sekretaris**: melihat riwayat **masa jabatannya sendiri**.
-- **Moderator**: melihat **seluruh** riwayat, dengan **filter opsional per masa jabatan**.
-- Mencatat semua aksi penting, termasuk pindah rombel, Serah Terima, Kenaikan Kelas, perubahan role.
+## Tata Warkat
+
+### Kalender Akademik
+
+*(lihat: semua · edit: Sekretaris & Moderator)*
+
+- Tampilan **1 Bulan, 2 Bulan, 1 Semester, 2 Semester**. Tampilan 2 Semester mengikuti **rentang masa khidmat**.
+- Agenda berkategori **Umum / Akademik / Pengasuhan** (minimal satu wajib).
+- Bisa dicetak.
+
+### Korespondensi
+
+*(akses: Sekretaris · Moderator)*
+
+- **Surat keluar**: nomor surat diketik manual.
+- **Surat masuk**: nomor sesuai fisik + status disposisi.
+- Lampiran: tautan Google Docs.
+
+### Inventaris Barang
+
+*(akses: Sekretaris · Moderator)*
+
+- **Kode barang → banyak unit fisik**; tiap unit punya kategori (lama/baru) dan kondisi (bagus, rusak ringan, rusak berat, hilang).
 
 ---
 
-## H. Komunikasi
+# Modul — Fungsi
 
-### 22. Notifikasi
+## Akses
+
+### Login & Akun
+
+- **Login:** email + password. Pengurus santri memakai `(NIS)@daarululuumlido.com` (kotak surat aktif di Google Workspace pondok).
+- **Password sementara** akun baru = **NIS + tanggal lahir** (contoh format: `12345` + `01022010`), **wajib diganti saat login pertama**.
+- **Tautan aktivasi via email** tersedia sebagai **opsi kedua**.
+- **Akun tertahan:** jika tanggal lahir santri kosong, akun tidak dibuat sampai data dilengkapi. Sekretaris & Moderator melihat daftar akun tertahan.
+- **Reset password mandiri** lewat tautan ke email.
+- Password disimpan dengan hash **Bcrypt**.
+
+### Kelola User & Role
+
+*(akses: Moderator)*
+
+- Menetapkan **satu role** per user dan mencentang **akses khusus** (Absensi, Kesehatan, Perizinan).
+- Dashboard Moderator menampilkan **"N pengurus menunggu role"** setelah Serah Terima.
+- Pilihan role Moderator **tidak tersedia** untuk akun yang terhubung ke data santri.
+- Setiap perubahan role/akses tercatat di Riwayat Perubahan dan diberitahukan ke pemilik akun lewat email.
+
+---
+
+## Pengolahan Data
+
+### Update Data & Import
+
+Semua proses massal memakai dua cara:
+1. **Upload file** (CSV) → pratinjau → konfirmasi.
+2. **Pilih banyak → ubah satu kategori.** Contoh: centang 20 santri dari kamar yang berbeda-beda → "pindahkan ke Kamar X".
+
+Kedua cara tetap mencatat riwayat (kelas/kamar) dan Riwayat Perubahan.
+
+#### Update Kelas Tahunan
+
+*(akses: Moderator)*
+
+- **Update Kelas Tahunan = satu proses tahunan** yang sekaligus:
+  1. menjadikan semua santri **Kelas 6** aktif sebagai **Alumni** (akun login nonaktif) — **tanpa proses wisuda terpisah**;
+  2. menaikkan Kelas 1–5 sesuai **file penempatan** (`nis, kelas`), karena **rombel dibagi ulang setiap tahun**;
+  3. **menahan** santri aktif yang tidak tercantum di file (status "menunggu penempatan", tetap di kelas lama).
+
+**Aturan file penempatan:**
+
+| Kondisi baris | Hasil |
+|---|---|
+| Tingkat tujuan = tingkat sekarang + 1 | Naik kelas |
+| Tingkat tujuan = tingkat sekarang | Boleh, dengan peringatan *"Santri atas nama … tidak dinyatakan naik kelas"* |
+| Lompat tingkat atau turun tingkat | Ditolak |
+| NIS tidak ada / santri tidak aktif / kelas tidak ada / NIS dobel | Ditolak |
+| Penulisan "5B MIA" | Dibaca 5B (label diabaikan) |
+
+- Santri **Kelas 6 yang tidak lulus** dikecualikan manual di layar pratinjau → tetap **Kelas 6 aktif** di tahun ajaran berikutnya.
+- Status Alumni bisa **dibatalkan per santri** (alasan wajib); akun login tetap nonaktif sampai diaktifkan Moderator.
+- **Santri baru Kelas 1** diinput massal **setelah** Update Kelas Tahunan.
+- Daftar **"menunggu penempatan"** diselesaikan Moderator satu per satu (tempatkan / tinggal kelas / ubah status).
+- Satu Update Kelas Tahunan per tahun ajaran.
+
+```mermaid
+flowchart TD
+    Start(["Moderator buka<br/>Update Kelas Tahunan"]) --> Prasyarat{"Tahun ajaran baru<br/>sudah dibuat (persiapan)?"}
+    Prasyarat -- "belum" --> Buat["Buat tahun ajaran baru<br/>+ siapkan rombel"]
+    Buat --> Prasyarat
+    Prasyarat -- "sudah" --> Upload["Unggah file penempatan:<br/>nis, kelas (Kelas 1-5 saja)"]
+    Upload --> Validasi{"Ada baris ditolak?"}
+    Validasi -- "ada" --> Perbaiki["Tampilkan baris ditolak<br/>perbaiki file"]
+    Perbaiki --> Upload
+    Validasi -- "tidak ada" --> Pratinjau["Pratinjau 4 daftar:<br/>Naik/Tinggal - Menjadi Alumni -<br/>Ditahan - Ditolak (0)"]
+    Pratinjau --> Kecuali["Moderator centang Kelas 6<br/>yang TIDAK lulus"]
+    Kecuali --> Peringatan{"PERINGATAN:<br/>ringkasan jumlah + nama santri<br/>yang tidak naik kelas. Yakin?"}
+    Peringatan -- "batal" --> Batal(["Tidak ada perubahan"])
+    Peringatan -- "yakin" --> Password{"Password Moderator<br/>yang sedang login"}
+    Password -- "salah" --> Batal
+    Password -- "benar" --> Eksekusi["Satu proses:<br/>tutup tahun lama, catat riwayat kelas baru,<br/>Kelas 6 jadi Alumni + akun nonaktif,<br/>tahun baru jadi aktif"]
+    Eksekusi --> Tahan["Daftar Menunggu Penempatan<br/>diselesaikan satu per satu"]
+    Tahan --> Selesai(["Tahun ajaran baru berjalan"])
+```
+
+#### Update Kamar
+
+- Rotasi kamar **1–2 kali setahun** (tidak dibatasi sekali per tahun).
+- Lewat **upload file** atau **pilih banyak santri → pindahkan ke satu kamar**.
+- Pratinjau → peringatan + password → satu proses; setiap perpindahan tercatat di **riwayat kamar**.
+- Santri hanya bisa ditempatkan di kamar yang **sesuai gender**.
+
+#### Masa Khidmat & Serah Terima Jabatan
+
+- **Masa khidmat ±1 tahun** (paling cepat 7–8 bulan), dari akhir Semester 1 ke akhir Semester 1 berikutnya.
+- Masa khidmat juga menjadi **acuan "tahun" organisasi** untuk statistik dan tampilan Kalender 2 Semester.
+- Jabatan pengurus diambil dari **santri aktif Kelas 5**.
+
+**Alur Serah Terima** — tiga pelaku: **Moderator** (tombol + tunjuk Sekretaris) → **Sekretaris baru** (isi bagian) → **Moderator** (tetapkan role).
+
+1. **Moderator** menekan **Serah Terima Jabatan** dan menunjuk **1–2 Sekretaris baru**.
+2. **Peringatan** selalu muncul (jumlah pengurus lama, waktu Serah Terima terakhir), lalu **password Moderator yang sedang login**.
+3. Dalam satu proses: masa khidmat lama & semua jabatan **diarsipkan** (bukan dihapus), akun pengurus lama **dinonaktifkan** (santrinya tetap aktif), masa khidmat baru dibuat, Sekretaris baru langsung aktif.
+4. **Sekretaris baru** mengisi bagian/jabatan pengurus lain — lewat **upload file** (NIS + jabatan) **atau pilih banyak sekaligus**. Hanya santri aktif Kelas 5; baris yang tidak valid **ditolak** dan proses tidak lanjut sampai diperbaiki.
+5. Akun pengurus dibuat otomatis (`NIS@daarululuumlido.com`, password sementara NIS + tanggal lahir).
+6. **Moderator** menetapkan role & akses khusus tiap pengurus.
+
+Selama menunggu langkah 6, **Absensi tetap berjalan** karena Sekretaris otomatis memiliki akses Absensi.
+
+```mermaid
+flowchart TD
+    Start(["MODERATOR tekan<br/>Serah Terima Jabatan"]) --> Tunjuk["Moderator pilih 1-2<br/>Sekretaris baru (santri aktif Kelas 5)"]
+    Tunjuk --> Peringatan{"PERINGATAN:<br/>pengurus lama dinonaktifkan,<br/>serah terima terakhir X bulan lalu.<br/>Yakin?"}
+    Peringatan -- "batal" --> Batal(["Tidak ada perubahan"])
+    Peringatan -- "yakin" --> Password{"Password Moderator<br/>yang sedang login"}
+    Password -- "salah" --> Batal
+    Password -- "benar" --> Proses["Satu proses:<br/>1. Arsipkan masa khidmat lama + semua jabatan<br/>2. Nonaktifkan akun pengurus lama<br/>(santri tetap aktif Kelas 6)<br/>3. Buat masa khidmat baru<br/>4. Aktifkan Sekretaris baru"]
+    Proses --> Login1["Sekretaris baru login<br/>password sementara = NIS + tgl lahir<br/>wajib ganti saat login pertama"]
+    Login1 --> Absensi["Absensi tetap berjalan<br/>(Sekretaris otomatis akses Absensi)"]
+    Login1 --> Bagian["SEKRETARIS isi bagian pengurus lain:<br/>upload file ATAU pilih banyak sekaligus<br/>(hanya santri aktif Kelas 5)"]
+    Bagian --> Akun["Akun pengurus dibuat<br/>NIS@daarululuumlido.com"]
+    Akun --> Badge["Dashboard Moderator:<br/>N pengurus menunggu role"]
+    Badge --> Role["MODERATOR tetapkan role<br/>+ akses khusus"]
+    Role --> Aktif(["Semua pengurus baru bekerja"])
+```
+
+#### Pergantian Antar-Waktu (PAW)
+
+Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mis. mundur, skorsing).
+
+1. Nonaktifkan jabatan satu orang (**alasan wajib**).
+2. Angkat satu santri aktif Kelas 5/6 ke jabatan tersebut.
+3. Tetapkan role.
+4. Peringatan + password, tercatat di Riwayat Perubahan.
+
+### Cari Santri & Cari Guru
+
+- **Live search**: hasil tersaring otomatis saat mengetik. Cari Santri punya filter kamar.
+- Komponen **pencarian santri (typeahead)** dipakai di semua form yang memilih santri.
+- Hasil mengikuti **cakupan putra/putri** pengguna.
+
+---
+
+## Pemantauan
+
+### Dashboard & Statistik
+
+- Ringkasan: jumlah santri putra / putri / total, sakit 30 hari, pulang hari ini, alpha hari ini, agenda mendatang.
+- **Statistik tahunan** memakai rentang **masa khidmat**.
+
+### Riwayat Perubahan
+
+- **Sekretaris**: melihat riwayat **masa jabatannya sendiri**.
+- **Moderator**: melihat **seluruh** riwayat, dengan **filter opsional per masa jabatan**.
+- Mencatat semua aksi penting, termasuk pindah rombel, Serah Terima, Update Kelas Tahunan, perubahan role.
+
+---
+
+## Komunikasi
+
+### Notifikasi
 
 **Di dalam aplikasi:** badge di sidebar (pelanggaran menunggu sidang, santri menunggu pemeriksaan, izin overdue, pengurus menunggu role).
 
@@ -656,7 +657,7 @@ flowchart TD
 | Kelompok | Contoh kejadian | Penerima |
 |---|---|---|
 | **Sistem & keamanan** | Backup gagal/terlewat, login gagal berulang, domain/hosting hampir jatuh tempo | Moderator, tim IT (login gagal juga ke pemilik akun) |
-| **Proses tahunan & akun** | Serah Terima / Kenaikan Kelas dijalankan, pengurus menunggu role, akun tertahan, akun dibuat, password/role diubah | Moderator, Sekretaris, pemilik akun |
+| **Proses tahunan & akun** | Serah Terima / Update Kelas Tahunan dijalankan, pengurus menunggu role, akun tertahan, akun dibuat, password/role diubah | Moderator, Sekretaris, pemilik akun |
 | **Kesantrian** | Pelanggaran menunggu sidang, izin overdue | Kedisiplinan, Piket berakses Perizinan |
 
 **Rekap harian untuk wali** — satu email per hari pukul **20.00 WIB**, hanya jika ada kejadian:
@@ -670,7 +671,7 @@ flowchart TD
 
 **Aturan isi:** email hanya berisi kabar singkat **tanpa data sensitif** (diagnosa, isi vonis, NIK); rinciannya dibaca setelah login. Semua email melewati **antrean** dan tercatat. Di server testing berlaku **Mode Uji** (semua email dialihkan ke kotak surat tim IT).
 
-### 23. Portal Wali Santri
+### Portal Wali Santri
 
 - **Wali mendaftar akun sendiri** (nama, email, no. HP, persetujuan penggunaan data), lalu memverifikasi email. Ayah dan ibu bisa punya akun masing-masing.
 - **Menautkan santri otomatis** bila **NIS + tanggal lahir anak + no. HP wali** cocok dengan data.
@@ -697,9 +698,9 @@ flowchart TD
 
 ---
 
-## I. Keberlanjutan
+## Keberlanjutan
 
-### 24. Backup Database
+### Backup Database
 
 *(akses: Moderator)*
 
@@ -707,7 +708,7 @@ flowchart TD
 - Backup database disimpan **terenkripsi** di **repositori GitHub privat terpisah** (bukan repo ini). Untuk sementara diunggah manual.
 - Kunci enkripsi dipegang **lebih dari 2 orang** dari pihak pondok/tim IT.
 
-### 25. Export Excel
+### Export Excel
 
 - File `.xlsx` asli dibuat native (`ZipArchive`, tanpa Composer).
 - Tersedia di Prestasi, Korespondensi, dan rekap Absensi Kamar.
@@ -719,7 +720,7 @@ flowchart TD
 | Topik | Pertanyaan |
 |---|---|
 | Profil kesehatan (alergi, penyakit kronis) | Diedit pemegang akses Kesehatan, atau tetap Moderator lewat Data Master? |
-| Penempatan Kamar Massal & PAW | Siapa pemiliknya selain Moderator? |
+| Update Kamar & PAW | Siapa pemiliknya selain Moderator? |
 | Inventaris | Untuk barang pondok atau barang titipan santri? |
 | Sekretaris per lingkungan | Wajib minimal 1 Sekretaris putra & 1 putri saat Serah Terima? |
 | Asatidz | Lingkungan guru diatur Moderator (Putra/Putri/Semua)? Data apa saja yang boleh dilihat? Format akun guru? |
@@ -731,7 +732,7 @@ flowchart TD
 | Alur Kedisiplinan | Lingkungan: pengurus menuntut → guru hakim memutus; pelanggaran pengurus dicatat guru pengasuhan; pembatalan ≤ 1 jam. Bagaimana menyesuaikan role Kedisiplinan yang saat ini dipegang pengurus? |
 | Dokter | Diagnosa & resep diinput dokter sendiri atau oleh pengurus jaga? Bagaimana perlindungan data medis santri? |
 | Serah Terima & kelompok kegiatan | Penempatan pengurus di kelompok (tahsin, muhadhoroh, pramuka) ikut berganti saat Serah Terima? |
-| Kegiatan baru | Kelas & pengajar, tahsin, syakia, muhadhoroh, pramuka, belajar malam, menu makan: masuk sistem sekaligus atau bertahap? |
+| Kegiatan baru | Kelas & pengajar, tahsin, syakia, muhadhoroh, belajar malam, menu makan: masuk sistem sekaligus atau bertahap? |
 | Info ke wali santri | Kenyataan: per kejadian (sakit, vonis berat, terlambat kembali). Desain sebelumnya: rekap harian 20.00 (K-45/K-51). Mana yang dipakai di sistem? |
 
 ---
@@ -745,8 +746,8 @@ flowchart TD
 | 6 role + 3 akses khusus, role di akun user | Role lama (`piket`, `asisten_poskestren`, `dokter`, `sekretaris_mahkamah`, `hakim`, `sekretaris`) terikat jabatan aktif |
 | Kesehatan & Kedisiplinan Santri (masing-masing satu modul) | Poskestren (Asisten + Dokter) & Mahkamah (Sekretaris + Hakim) terpisah |
 | Serah Terima 3 langkah (Moderator → Sekretaris → Moderator) | Serah Terima hanya mengganti periode |
-| Tahun Ajaran, Kenaikan Kelas, riwayat kelas, PAW, Penempatan Kamar Massal | Belum ada |
-| Kegiatan & Ekskul (kelola grup) | Tabel ada, layar kelola belum ada |
+| Tahun Ajaran, Update Kelas Tahunan, riwayat kelas, PAW, Update Kamar | Belum ada |
+| Kegiatan & Ekstrakurikuler (kelola grup) | Tabel ada, layar kelola belum ada |
 | Notifikasi email & rekap harian wali | Belum ada (hanya badge polling) |
 | Portal Wali dengan akun mandiri | Akun wali dibuat admin per keluarga |
 | Cakupan data putra/putri, role Asatidz | Belum ada |
