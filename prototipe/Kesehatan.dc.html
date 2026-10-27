@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>HISADA · Kesehatan</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F4;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#18201C}
+*{box-sizing:border-box}
+a{color:#1F6B4F}a:hover{color:#14533C}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; background: #F4F6F4">
+  <div style="flex: 1 1 248px; max-width: 100%">
+    <dc-import name="Sidebar" active="kesehatan" hint-size="248px,900px"></dc-import>
+  </div>
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px">
+    <header style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; color: #55605A">Administrasi › Kesantrian</span>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 700">Kesehatan</h1>
+      </div>
+      <span style="font-size: 12px; color: #7A4E0C; background: #FBF0DC; border-radius: 999px; padding: 5px 12px; font-weight: 600">Data medis · akses terbatas</span>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+      <section style="flex: 1 1 340px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 8px 0; display: flex; flex-direction: column">
+        <h2 style="margin: 0; font-size: 17px; font-weight: 700; padding: 12px 20px">Kunjungan hari ini</h2>
+        <sc-for list="{{ visits }}" as="v" hint-placeholder-count="5">
+          <button type="button" onClick="{{ v.pick }}" style="{{ v.style }}">
+            <span style="display: flex; flex-direction: column; gap: 2px; text-align: left"><span style="font-weight: 600">{{ v.nama }}</span><span style="font-size: 13px; color: #55605A">{{ v.kamar }} · {{ v.keluhan }}</span></span>
+            <span style="{{ v.badge }}">{{ v.jenis }}</span>
+          </button>
+        </sc-for>
+      </section>
+
+      <section style="flex: 1.3 1 380px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px">
+          <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Pemeriksaan · {{ sel.nama }}</h2><span style="font-size: 13px; color: #55605A">{{ sel.kamar }} · keluhan: {{ sel.keluhan }}</span></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Jenis kunjungan
+          <div style="display: flex; flex-wrap: wrap; gap: 6px">
+            <button type="button" onClick="{{ setJalan }}" aria-pressed="{{ isJalan }}" style="{{ jalanStyle }}">Rawat Jalan</button>
+            <button type="button" onClick="{{ setRawat }}" aria-pressed="{{ isRawat }}" style="{{ rawatStyle }}">Perawatan</button>
+          </div>
+          <span style="font-weight: 400; color: #55605A">{{ jenisNote }}</span>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Diagnosa
+          <input type="text" placeholder="Diisi dokter / pengurus jaga" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Resep
+          <textarea rows="3" placeholder="Obat dan aturan pakai" style="border: 1px solid #C9D2CC; border-radius: 10px; padding: 10px 12px; font: inherit; font-weight: 400; resize: vertical"></textarea>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Tindak lanjut
+          <select style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Kembali ke kegiatan</option><option>Istirahat di kamar</option><option>Rujuk ke klinik / RS</option></select>
+        </label>
+        <div style="background: #EEF3EF; border: 1px solid #D5E2DA; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.5; color: #3B4540">Wali hanya menerima kabar "sedang sakit / dirawat", tanpa diagnosa.</div>
+        <button type="button" style="height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; font: inherit; font-weight: 600; cursor: pointer">Simpan pemeriksaan</button>
+      </section>
+    </div>
+
+    <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; justify-content: space-between; align-items: center"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Analisis musim sakit</h2><span style="font-size: 12px; color: #55605A">kunjungan 6 bulan terakhir</span></div>
+      <div style="display: flex; align-items: flex-end; gap: 14px; height: 120px" role="img" aria-label="Kunjungan per bulan, Mei sampai Oktober">
+        <sc-for list="{{ months }}" as="m" hint-placeholder-count="6">
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end">
+            <span style="font-size: 12px; font-weight: 600">{{ m.n }}</span>
+            <div style="{{ m.bar }}"></div>
+            <span style="font-size: 12px; color: #55605A">{{ m.label }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sel: 0, rawat: { 0: false, 1: true, 2: false, 3: true, 4: false } };
+  }
+  renderVals() {
+    const V = [
+      { nama: 'Santri Contoh 21', kamar: 'Ibnu Sina-03', keluhan: 'demam' },
+      { nama: 'Santri Contoh 22', kamar: 'Ibnu Rusyd-01', keluhan: 'pusing, mual' },
+      { nama: 'Santri Contoh 23', kamar: 'Kholid Bin Walid-05', keluhan: 'gatal kulit' },
+      { nama: 'Santri Contoh 24', kamar: 'Ibnu Sina-01', keluhan: 'batuk pilek' },
+      { nama: 'Santri Contoh 25', kamar: 'Bilal bin Rabah-02', keluhan: 'luka ringan' }
+    ];
+    const r = this.state.rawat;
+    const s = this.state.sel;
+    const badge = (on) => 'border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; white-space: nowrap; ' + (on ? 'background: #FBF0DC; color: #7A4E0C' : 'background: #EEF1EF; color: #3B4540');
+    const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
+    const data = [18, 22, 15, 27, 34, 29];
+    const max = 34;
+    return {
+      visits: V.map((v, i) => ({
+        ...v, jenis: r[i] ? 'Perawatan' : 'Rawat Jalan', badge: badge(r[i]),
+        style: 'display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 20px; border: 0; border-top: 1px solid #EEF1EF; font: inherit; color: #18201C; cursor: pointer; ' + (i === s ? 'background: #EEF5F1' : 'background: #FFFFFF'),
+        pick: () => this.setState({ sel: i })
+      })),
+      sel: V[s], isRawat: !!r[s], isJalan: !r[s],
+      rawatStyle: pill(!!r[s]), jalanStyle: pill(!r[s]),
+      setRawat: () => this.setState({ rawat: { ...r, [s]: true } }),
+      setJalan: () => this.setState({ rawat: { ...r, [s]: false } }),
+      jenisNote: r[s] ? 'Absensi hari ini otomatis menjadi Sakit.' : 'Tidak mengubah absensi.',
+      months: ['Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt'].map((label, i) => ({
+        label, n: String(data[i]),
+        bar: 'width: 100%; max-width: 56px; border-radius: 6px 6px 0 0; background: ' + (i === 4 ? '#1F6B4F' : '#A9CDB9') + '; height: ' + Math.round(data[i] / max * 80) + 'px'
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>HISADA · Masuk</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F4;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#18201C}
+*{box-sizing:border-box}
+a{color:#1F6B4F}a:hover{color:#14533C}
+</style>
+</helmet>
+<div style="min-height: 900px; display: flex; flex-wrap: wrap; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C">
+  <div style="flex: 1 1 420px; background: #1F6B4F; color: #FFFFFF; padding: 64px 56px; display: flex; flex-direction: column; justify-content: space-between; gap: 48px">
+    <div style="display: flex; align-items: center; gap: 12px">
+      <div style="width: 44px; height: 44px; border-radius: 12px; background: #FFFFFF; color: #1F6B4F; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px">H</div>
+      <div style="font-weight: 700; font-size: 20px; letter-spacing: 0.02em">HISADA</div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 16px; max-width: 440px">
+      <h1 style="margin: 0; font-size: 40px; line-height: 1.15; font-weight: 700">Sistem Administrasi Himpunan Santri</h1>
+      <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #DCEDE4">Pesantren Modern Daarul 'Uluum Lido. Absensi, perizinan, kesehatan, dan kedisiplinan santri dalam satu tempat.</p>
+    </div>
+    <p style="margin: 0; font-size: 13px; color: #CFE5D9">Prototipe desain · data contoh, bukan data santri asli</p>
+  </div>
+  <div style="flex: 999 1 480px; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 48px 24px">
+    <form style="width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 20px" onSubmit="{{ submit }}">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <h2 style="margin: 0; font-size: 28px; font-weight: 700">Masuk</h2>
+        <p style="margin: 0; font-size: 14px; color: #55605A">Pengurus memakai email NIS@daarululuumlido.com.</p>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600">Email
+        <input type="email" placeholder="990101@daarululuumlido.com" style="height: 46px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 14px; font: inherit; font-weight: 400; background: #FFFFFF">
+      </label>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600">Password
+        <input type="password" placeholder="••••••••" style="height: 46px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 14px; font: inherit; font-weight: 400; background: #FFFFFF">
+      </label>
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px">
+        <label style="display: flex; align-items: center; gap: 8px; color: #3B4540"><input type="checkbox"> Ingat saya</label>
+        <a href="#lupa">Lupa password?</a>
+      </div>
+      <a href="Dashboard.dc.html" style="height: 48px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px; text-decoration: none">Masuk</a>
+      <div style="background: #EEF3EF; border: 1px solid #D5E2DA; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.55; color: #3B4540">Akun baru: password sementara = NIS + tanggal lahir (ddmmyyyy). Wajib diganti saat login pertama.</div>
+      <a href="#wali" style="font-size: 14px; text-align: center">Wali santri? Masuk ke Portal Wali</a>
+    </form>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { submit: (e) => { if (e && e.preventDefault) e.preventDefault(); } };
+  }
+}
+</script>
+</body>
+</html>

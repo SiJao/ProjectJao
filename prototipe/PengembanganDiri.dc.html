@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>HISADA · Pengembangan Diri</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F4;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#18201C}
+*{box-sizing:border-box}
+a{color:#1F6B4F}a:hover{color:#14533C}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; background: #F4F6F4">
+  <div style="flex: 1 1 248px; max-width: 100%">
+    <dc-import name="Sidebar" active="pd" hint-size="248px,900px"></dc-import>
+  </div>
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px">
+    <header style="display: flex; flex-direction: column; gap: 4px">
+      <span style="font-size: 13px; color: #55605A">Administrasi › Kesantrian</span>
+      <h1 style="margin: 0; font-size: 28px; font-weight: 700">Pengembangan Diri</h1>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px" role="tablist" aria-label="Bagian">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+        <button type="button" role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{ isKeg }}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+        <section style="flex: 1 1 320px; min-width: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px">
+          <sc-for list="{{ groups }}" as="g" hint-placeholder-count="5">
+            <button type="button" onClick="{{ g.pick }}" aria-pressed="{{ g.on }}" style="{{ g.style }}">
+              <span style="font-weight: 700; font-size: 15px">{{ g.label }}</span>
+              <span style="font-size: 13px; color: #55605A">{{ g.cabang }}</span>
+              <span style="font-size: 13px">{{ g.anggota }} anggota</span>
+            </button>
+          </sc-for>
+        </section>
+        <section style="flex: 1.3 1 360px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px">
+            <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 17px; font-weight: 700">{{ cur.label }} · {{ cur.first }}</h2><span style="font-size: 13px; color: #55605A">Pembimbing: [Nama guru] · Pengurus: Santri Contoh 70</span></div>
+            <button type="button" style="height: 40px; border-radius: 10px; border: 1px solid #1F6B4F; background: #FFFFFF; color: #1F6B4F; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap">Tambah anggota</button>
+          </div>
+          <div style="border: 1px solid #E6EBE8; border-radius: 10px; overflow: hidden">
+            <sc-for list="{{ members }}" as="m" hint-placeholder-count="5">
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 48px; padding: 8px 14px; border-bottom: 1px solid #EEF1EF; font-size: 14px">
+                <span style="font-weight: 600">{{ m.nama }}</span>
+                <span style="font-size: 13px; color: #55605A">{{ m.kelas }} · hadir {{ m.hadir }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <p style="margin: 0; font-size: 13px; color: #55605A; line-height: 1.5">Keaktifan diambil dari Absensi Kegiatan. Santri yang pindah grup membawa catatannya.</p>
+        </section>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isPres }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+        <section style="flex: 1.4 1 420px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto">
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 560px">
+            <thead><tr style="text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em">
+              <th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Santri</th><th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Lomba</th><th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Tingkat</th><th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Hasil</th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ prestasi }}" as="p" hint-placeholder-count="4">
+                <tr><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF; font-weight: 600">{{ p.nama }}</td><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF">{{ p.lomba }}</td><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF">{{ p.tingkat }}</td><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF">{{ p.hasil }}</td></tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </section>
+        <section style="flex: 1 1 300px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 700">Catat prestasi</h2>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Santri<input type="search" placeholder="Ketik nama atau NIS" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400"></label>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Nama lomba<input type="text" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400"></label>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Tingkat<select style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Pondok</option><option>Kabupaten</option><option>Provinsi</option><option>Nasional</option></select></label>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Hasil<input type="text" placeholder="Juara 1, Harapan, Peserta" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400"></label>
+          <button type="button" style="height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; font: inherit; font-weight: 600; cursor: pointer">Simpan</button>
+        </section>
+      </div>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'keg', g: 0 };
+  }
+  renderVals() {
+    const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
+    const G = [
+      { label: 'Pramuka', cabang: 'DLT 1, DLT 2, …', anggota: 96, first: 'DLT 1' },
+      { label: 'Muhadhoroh', cabang: 'Senin malam · Jumat siang', anggota: 120, first: 'Grup 1' },
+      { label: "Halaqah Qur'an", cabang: 'per kelompok', anggota: 140, first: 'Kelompok 1' },
+      { label: 'Olahraga', cabang: 'Basket, Volley, Archery', anggota: 64, first: 'Basket' },
+      { label: 'Kesenian', cabang: 'Hadroh, Kaligrafi, Drawing', anggota: 52, first: 'Hadroh' }
+    ];
+    const s = this.state.g;
+    return {
+      tabs: [['keg', 'Kegiatan & Ekstrakurikuler'], ['pres', 'Prestasi Santri']].map(([k, label]) => ({ label, on: this.state.tab === k, style: pill(this.state.tab === k), pick: () => this.setState({ tab: k }) })),
+      isKeg: this.state.tab === 'keg', isPres: this.state.tab === 'pres',
+      groups: G.map((g, i) => ({
+        ...g, anggota: String(g.anggota), on: i === s,
+        style: 'display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 104px; padding: 14px; border-radius: 12px; font: inherit; color: #18201C; text-align: left; cursor: pointer; ' + (i === s ? 'background: #E3EFE8; border: 1px solid #1F6B4F' : 'background: #FFFFFF; border: 1px solid #DDE3DF'),
+        pick: () => this.setState({ g: i })
+      })),
+      cur: G[s],
+      members: [
+        { nama: 'Santri Contoh 71', kelas: '2 A MTs', hadir: '92%' },
+        { nama: 'Santri Contoh 72', kelas: '2 C SMP', hadir: '88%' },
+        { nama: 'Santri Contoh 73', kelas: '3 B MTs', hadir: '100%' },
+        { nama: 'Santri Contoh 74', kelas: '4 A', hadir: '75%' },
+        { nama: 'Santri Contoh 75', kelas: '4 D', hadir: '96%' }
+      ],
+      prestasi: [
+        { nama: 'Santri Contoh 81', lomba: 'Musabaqah Tilawatil Quran', tingkat: 'Kabupaten', hasil: 'Juara 2' },
+        { nama: 'Santri Contoh 82', lomba: 'Pidato Bahasa Arab', tingkat: 'Provinsi', hasil: 'Juara 1' },
+        { nama: 'Santri Contoh 83', lomba: 'Panahan', tingkat: 'Pondok', hasil: 'Juara 3' },
+        { nama: 'Santri Contoh 84', lomba: 'Kaligrafi', tingkat: 'Nasional', hasil: 'Harapan 1' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

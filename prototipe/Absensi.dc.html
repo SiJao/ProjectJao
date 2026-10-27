@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>HISADA · Absensi</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F4;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#18201C}
+*{box-sizing:border-box}
+a{color:#1F6B4F}a:hover{color:#14533C}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; background: #F4F6F4">
+  <div style="flex: 1 1 248px; max-width: 100%">
+    <dc-import name="Sidebar" active="absensi" hint-size="248px,900px"></dc-import>
+  </div>
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px">
+    <header style="display: flex; flex-direction: column; gap: 4px">
+      <span style="font-size: 13px; color: #55605A">Administrasi › Kesantrian</span>
+      <h1 style="margin: 0; font-size: 28px; font-weight: 700">{{ title }}</h1>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px" role="group" aria-label="Jenis absensi">
+      <button type="button" onClick="{{ modeHarian }}" style="{{ harianStyle }}">Harian (per kamar)</button>
+      <button type="button" onClick="{{ modeKegiatan }}" style="{{ kegiatanStyle }}">Kegiatan (per grup)</button>
+    </div>
+
+    <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 18px 20px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end">
+      <sc-if value="{{ isHarian }}" hint-placeholder-val="{{ true }}">
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Asrama
+        <select style="height: 44px; min-width: 200px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Ibnu Rusyd</option><option>Ibnu Sina</option><option>Kholid Bin Walid</option></select>
+      </label>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Kamar
+        <div style="display: flex; flex-wrap: wrap; gap: 6px">
+          <sc-for list="{{ kamars }}" as="k" hint-placeholder-count="4">
+            <button type="button" onClick="{{ k.pick }}" style="{{ k.style }}">{{ k.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+      <sc-if value="{{ isKegiatan }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Kegiatan
+        <div style="display: flex; flex-wrap: wrap; gap: 6px">
+          <sc-for list="{{ kegiatan }}" as="g" hint-placeholder-count="5">
+            <button type="button" onClick="{{ g.pick }}" style="{{ g.style }}">{{ g.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Grup
+        <select style="height: 44px; min-width: 160px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Grup 1</option><option>Grup 2</option><option>Grup 3</option></select>
+      </label>
+      </sc-if>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Tanggal
+        <input type="date" value="2026-10-26" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
+      </label>
+      <button type="button" onClick="{{ allHadir }}" style="height: 44px; margin-left: auto; border: 1px solid #1F6B4F; color: #1F6B4F; background: #FFFFFF; border-radius: 10px; padding: 0 16px; font: inherit; font-weight: 600; cursor: pointer">Tandai semua hadir</button>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px">
+      <span style="background: #E3F1E9; color: #1E5E3F; border-radius: 999px; padding: 6px 12px; font-weight: 600">Hadir {{ count.H }}</span>
+      <span style="background: #E4ECF8; color: #23497E; border-radius: 999px; padding: 6px 12px; font-weight: 600">Izin {{ count.I }}</span>
+      <span style="background: #FBF0DC; color: #7A4E0C; border-radius: 999px; padding: 6px 12px; font-weight: 600">Sakit {{ count.S }}</span>
+      <span style="background: #F9E3E1; color: #8E2A22; border-radius: 999px; padding: 6px 12px; font-weight: 600">Alpha {{ count.A }}</span>
+    </div>
+
+    <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto">
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 620px">
+        <thead>
+          <tr style="text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em">
+            <th style="padding: 12px 16px; border-bottom: 1px solid #DDE3DF">NIS</th>
+            <th style="padding: 12px 16px; border-bottom: 1px solid #DDE3DF">Nama</th>
+            <th style="padding: 12px 16px; border-bottom: 1px solid #DDE3DF">Kelas</th>
+            <th style="padding: 12px 16px; border-bottom: 1px solid #DDE3DF">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="8">
+            <tr>
+              <td style="padding: 10px 16px; border-bottom: 1px solid #EEF1EF; color: #55605A">{{ r.nis }}</td>
+              <td style="padding: 10px 16px; border-bottom: 1px solid #EEF1EF; font-weight: 600">{{ r.nama }}</td>
+              <td style="padding: 10px 16px; border-bottom: 1px solid #EEF1EF">{{ r.kelas }}</td>
+              <td style="padding: 8px 16px; border-bottom: 1px solid #EEF1EF">
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center">
+                  <sc-for list="{{ r.opts }}" as="o" hint-placeholder-count="4">
+                    <button type="button" onClick="{{ o.pick }}" disabled="{{ r.locked }}" aria-pressed="{{ o.on }}" aria-label="{{ o.full }}" style="{{ o.style }}">{{ o.code }}</button>
+                  </sc-for>
+                  <sc-if value="{{ r.locked }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size: 12px; color: #55605A">otomatis dari {{ r.source }}</span>
+                  </sc-if>
+                </div>
+              </td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </section>
+    <div style="display: flex; justify-content: flex-end; gap: 10px">
+      <button type="button" style="height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; padding: 0 22px; font: inherit; font-weight: 600; cursor: pointer">Simpan absensi</button>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      mode: 'harian', kamar: '01', keg: 'Pramuka',
+      st: { 1: 'H', 2: 'H', 3: 'I', 4: 'H', 5: 'S', 6: 'H', 7: 'A', 8: 'H' }
+    };
+  }
+  renderVals() {
+    const tab = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
+    const chip = (on) => 'height: 44px; min-width: 52px; border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer; ' + (on ? 'background: #E3EFE8; color: #14533C; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
+    const colors = { H: ['#E3F1E9', '#1E5E3F'], I: ['#E4ECF8', '#23497E'], S: ['#FBF0DC', '#7A4E0C'], A: ['#F9E3E1', '#8E2A22'] };
+    const full = { H: 'Hadir', I: 'Izin', S: 'Sakit', A: 'Alpha' };
+    const people = [
+      [1, '990101', 'Santri Contoh 01', '1 A MTs'], [2, '990102', 'Santri Contoh 02', '1 A MTs'],
+      [3, '990203', 'Santri Contoh 03', '2 B MTs', 'Perizinan'], [4, '990204', 'Santri Contoh 04', '2 C SMP'],
+      [5, '990305', 'Santri Contoh 05', '3 A MTs', 'Kesehatan'], [6, '990306', 'Santri Contoh 06', '3 D SMP'],
+      [7, '990407', 'Santri Contoh 07', '4 B'], [8, '990408', 'Santri Contoh 08', '4 B']
+    ];
+    const st = this.state.st;
+    const count = { H: 0, I: 0, S: 0, A: 0 };
+    Object.values(st).forEach((v) => { count[v]++; });
+    const rows = people.map(([id, nis, nama, kelas, source]) => ({
+      nis, nama, kelas, source: source || '', locked: !!source,
+      opts: ['H', 'I', 'S', 'A'].map((c) => {
+        const on = st[id] === c;
+        return {
+          code: c, full: full[c] + ' untuk ' + nama, on,
+          style: 'width: 44px; height: 36px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; ' + (on ? 'background: ' + colors[c][0] + '; color: ' + colors[c][1] + '; border: 1px solid ' + colors[c][1] : 'background: #FFFFFF; color: #5F6A64; border: 1px solid #DDE3DF'),
+          pick: () => this.setState({ st: { ...st, [id]: c } })
+        };
+      })
+    }));
+    return {
+      harianStyle: tab(this.state.mode === 'harian'),
+      kegiatanStyle: tab(this.state.mode === 'kegiatan'),
+      modeHarian: () => this.setState({ mode: 'harian' }),
+      modeKegiatan: () => this.setState({ mode: 'kegiatan' }),
+      kamars: ['01', '02', '03', '04'].map((k) => ({ label: k, style: chip(this.state.kamar === k), pick: () => this.setState({ kamar: k }) })),
+      allHadir: () => this.setState({ st: { ...st, 1: 'H', 2: 'H', 4: 'H', 6: 'H', 7: 'H', 8: 'H' } }),
+      count, rows,
+      isHarian: this.state.mode === 'harian', isKegiatan: this.state.mode === 'kegiatan',
+      title: this.state.mode === 'harian' ? 'Absensi Harian' : 'Absensi Kegiatan',
+      kegiatan: ['Pramuka', 'Muhadhoroh', 'Halaqah Qur\x27an', 'Olahraga', 'Kesenian'].map((g) => ({ label: g, style: chip(this.state.keg === g).replace('min-width: 52px', 'padding: 0 14px'), pick: () => this.setState({ keg: g }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

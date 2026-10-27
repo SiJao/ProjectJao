@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>HISADA · Update Data &amp; Import</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F4;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#18201C}
+*{box-sizing:border-box}
+a{color:#1F6B4F}a:hover{color:#14533C}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; background: #F4F6F4">
+  <div style="flex: 1 1 248px; max-width: 100%">
+    <dc-import name="Sidebar" active="updatedata" hint-size="248px,900px"></dc-import>
+  </div>
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px">
+    <header style="display: flex; flex-direction: column; gap: 4px">
+      <span style="font-size: 13px; color: #55605A">Fungsi › Pengolahan Data</span>
+      <h1 style="margin: 0; font-size: 28px; font-weight: 700">Update Data &amp; Import</h1>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px" role="tablist" aria-label="Jenis update">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+        <button type="button" role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{ isPilih }}" hint-placeholder-val="{{ true }}">
+      <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: flex-end">
+          <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Pilih banyak → ubah satu kategori</h2><span style="font-size: 13px; color: #55605A">Contoh: pindahkan santri dari kamar berbeda ke satu kamar.</span></div>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end">
+            <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Ubah
+              <select style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Kamar</option><option>Kelas</option><option>Status</option></select>
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Menjadi
+              <select style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Ibnu Sina-04</option><option>Ibnu Rusyd-03</option></select>
+            </label>
+          </div>
+        </div>
+        <div style="border: 1px solid #E6EBE8; border-radius: 10px; overflow: hidden">
+          <sc-for list="{{ people }}" as="p" hint-placeholder-count="6">
+            <label style="display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 14px; border-bottom: 1px solid #EEF1EF; font-size: 14px; cursor: pointer">
+              <input type="checkbox" checked="{{ p.on }}" onChange="{{ p.toggle }}" style="width: 18px; height: 18px">
+              <span style="flex: 1; font-weight: 600">{{ p.nama }}</span>
+              <span style="color: #55605A; font-size: 13px">{{ p.kamar }}</span>
+            </label>
+          </sc-for>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+          <span style="font-size: 14px"><strong>{{ picked }}</strong> santri dipilih → Ibnu Sina-04</span>
+          <button type="button" style="height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; padding: 0 20px; font: inherit; font-weight: 600; cursor: pointer">Pratinjau perubahan</button>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isUpload }}" hint-placeholder-val="{{ false }}">
+      <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+        <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px">
+          <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+            <li style="{{ s.style }}">{{ s.label }}</li>
+          </sc-for>
+        </ol>
+        <sc-if value="{{ step1 }}" hint-placeholder-val="{{ true }}">
+          <div style="border: 2px dashed #B9C4BD; border-radius: 14px; padding: 36px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center">
+            <strong style="font-size: 16px">Unggah file CSV</strong>
+            <span style="font-size: 13px; color: #55605A">Kolom wajib sesuai jenis update, mis. <code>nis, kamar</code> atau <code>nis, kelas</code></span>
+            <button type="button" onClick="{{ next }}" style="height: 44px; border-radius: 10px; border: 1px solid #1F6B4F; background: #FFFFFF; color: #1F6B4F; padding: 0 18px; font: inherit; font-weight: 600; cursor: pointer">Pilih file (contoh)</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ step2 }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px">
+              <span style="background: #E3F1E9; color: #1E5E3F; border-radius: 999px; padding: 6px 12px; font-weight: 600">48 baris valid</span>
+              <span style="background: #F9E3E1; color: #8E2A22; border-radius: 999px; padding: 6px 12px; font-weight: 600">2 baris ditolak</span>
+            </div>
+            <div style="border: 1px solid #F0C9C4; background: #FDF4F3; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.6">Baris 12: NIS tidak ditemukan · Baris 31: kamar tidak sesuai jenis kelamin. Perbaiki file lalu unggah ulang.</div>
+            <div style="display: flex; gap: 10px"><button type="button" onClick="{{ back }}" style="height: 44px; border-radius: 10px; border: 1px solid #C9D2CC; background: #FFFFFF; padding: 0 16px; font: inherit; font-weight: 600; cursor: pointer">Unggah ulang</button><button type="button" onClick="{{ next }}" style="height: 44px; border-radius: 10px; border: 0; background: #1F6B4F; color: #FFFFFF; padding: 0 16px; font: inherit; font-weight: 600; cursor: pointer">Lanjut (contoh)</button></div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ step3 }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 12px; max-width: 420px">
+            <div style="background: #FBF0DC; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.55; color: #5C3B09">Peringatan: 50 santri akan dipindahkan. Setiap perubahan tercatat di riwayat dan Riwayat Perubahan.</div>
+            <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Password Anda
+              <input type="password" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit">
+            </label>
+            <button type="button" onClick="{{ reset }}" style="height: 46px; border-radius: 10px; border: 0; background: #1F6B4F; color: #FFFFFF; font: inherit; font-weight: 600; cursor: pointer">Jalankan dalam satu proses</button>
+          </div>
+        </sc-if>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isKelas }}" hint-placeholder-val="{{ false }}">
+      <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Update Kelas Tahunan · 2026/2027 → 2027/2028</h2><span style="font-size: 13px; color: #55605A">Hanya Moderator · satu kali per tahun ajaran · file <code>nis, kelas</code></span></div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px">
+          <sc-for list="{{ kelasSum }}" as="k" hint-placeholder-count="4">
+            <div style="border: 1px solid #E6EBE8; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 13px; color: #55605A">{{ k.label }}</span><span style="font-size: 26px; font-weight: 700">{{ k.n }}</span></div>
+          </sc-for>
+        </div>
+        <p style="margin: 0; font-size: 13px; color: #55605A; line-height: 1.55">Kelas 6 menjadi Alumni (akun nonaktif). Centang Kelas 6 yang tidak lulus. Santri yang tidak tercantum di file ditahan (menunggu penempatan).</p>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isST }}" hint-placeholder-val="{{ false }}">
+      <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+        <h2 style="margin: 0; font-size: 17px; font-weight: 700">Jabatan pengurus</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 14px">
+          <div style="flex: 1 1 280px; border: 1px solid #E6EBE8; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+            <strong>Serah Terima Jabatan (semua)</strong>
+            <span style="font-size: 13px; color: #55605A; line-height: 1.55">Moderator menunjuk 1–2 Sekretaris baru → arsip masa khidmat lama → Sekretaris mengisi bagian (file NIS + jabatan) → Moderator menetapkan role.</span>
+            <span style="font-size: 13px">Serah terima terakhir: 8 bulan lalu</span>
+          </div>
+          <div style="flex: 1 1 280px; border: 1px solid #E6EBE8; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+            <strong>PAW (satu orang)</strong>
+            <span style="font-size: 13px; color: #55605A; line-height: 1.55">Nonaktifkan jabatan satu pengurus (alasan wajib) → angkat santri aktif kelas 5/6 → tetapkan role → peringatan + password.</span>
+            <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Alasan
+              <select style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Mundur</option><option>Skorsing</option><option>Sakit lama</option><option>Dikeluarkan</option></select>
+            </label>
+          </div>
+        </div>
+      </section>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'pilih', step: 1, sel: { 0: true, 2: true, 3: true } };
+  }
+  renderVals() {
+    const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
+    const P = [['Santri Contoh 51', 'Ibnu Rusyd-01'], ['Santri Contoh 52', 'Ibnu Rusyd-02'], ['Santri Contoh 53', 'Ibnu Sina-01'], ['Santri Contoh 54', 'Kholid Bin Walid-03'], ['Santri Contoh 55', 'Ibnu Sina-02'], ['Santri Contoh 56', 'Bilal bin Rabah-01']];
+    const sel = this.state.sel;
+    const st = this.state.step;
+    const stepStyle = (n) => 'border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; ' + (st === n ? 'background: #1F6B4F; color: #FFFFFF' : (st > n ? 'background: #E3EFE8; color: #14533C' : 'background: #EEF1EF; color: #55605A'));
+    return {
+      tabs: [['pilih', 'Pilih banyak'], ['upload', 'Upload file'], ['kelas', 'Update Kelas Tahunan'], ['st', 'Serah Terima & PAW']].map(([k, label]) => ({ label, on: this.state.tab === k, style: pill(this.state.tab === k), pick: () => this.setState({ tab: k }) })),
+      isPilih: this.state.tab === 'pilih', isUpload: this.state.tab === 'upload', isKelas: this.state.tab === 'kelas', isST: this.state.tab === 'st',
+      people: P.map(([nama, kamar], i) => ({ nama, kamar, on: !!sel[i], toggle: () => this.setState({ sel: { ...sel, [i]: !sel[i] } }) })),
+      picked: String(Object.values(sel).filter(Boolean).length),
+      steps: [[1, '1 · Unggah'], [2, '2 · Pratinjau'], [3, '3 · Konfirmasi']].map(([n, label]) => ({ label, style: stepStyle(n) })),
+      step1: st === 1, step2: st === 2, step3: st === 3,
+      next: () => this.setState({ step: Math.min(3, st + 1) }), back: () => this.setState({ step: 1 }), reset: () => this.setState({ step: 1 }),
+      kelasSum: [{ label: 'Naik / tinggal kelas', n: '812' }, { label: 'Menjadi Alumni', n: '168' }, { label: 'Ditahan', n: '5' }, { label: 'Ditolak', n: '0' }]
+    };
+  }
+}
+</script>
+</body>
+</html>

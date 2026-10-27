@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>HISADA · Tata Warkat</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F4;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#18201C}
+*{box-sizing:border-box}
+a{color:#1F6B4F}a:hover{color:#14533C}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; background: #F4F6F4">
+  <div style="flex: 1 1 248px; max-width: 100%">
+    <dc-import name="Sidebar" active="tw" hint-size="248px,900px"></dc-import>
+  </div>
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px">
+    <header style="display: flex; flex-direction: column; gap: 4px">
+      <span style="font-size: 13px; color: #55605A">Administrasi</span>
+      <h1 style="margin: 0; font-size: 28px; font-weight: 700">Tata Warkat</h1>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px" role="tablist" aria-label="Bagian">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+        <button type="button" role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{ isKal }}" hint-placeholder-val="{{ true }}">
+      <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 700">Kalender Akademik · Semester 1 2026/2027</h2>
+          <button type="button" style="height: 40px; border-radius: 10px; border: 1px solid #1F6B4F; background: #FFFFFF; color: #1F6B4F; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Tambah agenda</button>
+        </div>
+        <sc-for list="{{ agenda }}" as="a" hint-placeholder-count="6">
+          <div style="display: flex; gap: 16px; align-items: center; padding: 10px 0; border-top: 1px solid #EEF1EF">
+            <span style="min-width: 110px; font-size: 13px; font-weight: 600; color: #14533C">{{ a.tgl }}</span>
+            <span style="flex: 1; font-size: 14px">{{ a.ket }}</span>
+            <span style="font-size: 12px; color: #55605A; border: 1px solid #DDE3DF; border-radius: 999px; padding: 2px 9px">{{ a.jenis }}</span>
+          </div>
+        </sc-for>
+        <p style="margin: 0; font-size: 13px; color: #55605A">Semua role melihat · Sekretaris dan Moderator mengubah.</p>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isSurat }}" hint-placeholder-val="{{ false }}">
+      <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto">
+        <div style="padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between">
+          <div style="display: flex; gap: 6px" role="group" aria-label="Arah surat">
+            <sc-for list="{{ arah }}" as="r" hint-placeholder-count="2">
+              <button type="button" onClick="{{ r.pick }}" aria-pressed="{{ r.on }}" style="{{ r.style }}">{{ r.label }}</button>
+            </sc-for>
+          </div>
+          <button type="button" style="height: 40px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Catat surat</button>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px">
+          <thead><tr style="text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em">
+            <th style="padding: 10px 18px; border-bottom: 1px solid #DDE3DF">Nomor</th><th style="padding: 10px 18px; border-bottom: 1px solid #DDE3DF">Tanggal</th><th style="padding: 10px 18px; border-bottom: 1px solid #DDE3DF">Perihal</th><th style="padding: 10px 18px; border-bottom: 1px solid #DDE3DF">{{ kolom4 }}</th><th style="padding: 10px 18px; border-bottom: 1px solid #DDE3DF">Lampiran</th>
+          </tr></thead>
+          <tbody>
+            <sc-for list="{{ surat }}" as="s" hint-placeholder-count="4">
+              <tr><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF; font-weight: 600">{{ s.no }}</td><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF; color: #55605A">{{ s.tgl }}</td><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF">{{ s.hal }}</td><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF">{{ s.k4 }}</td><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF"><a href="#lampiran">Google Docs</a></td></tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isInv }}" hint-placeholder-val="{{ false }}">
+      <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px">
+          <thead><tr style="text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em">
+            <th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Kode</th><th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Barang</th><th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Unit</th><th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Bagus</th><th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Rusak ringan</th><th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Rusak berat</th><th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Hilang</th>
+          </tr></thead>
+          <tbody>
+            <sc-for list="{{ inv }}" as="i" hint-placeholder-count="4">
+              <tr><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF; color: #55605A">{{ i.kode }}</td><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF; font-weight: 600">{{ i.nama }}</td><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF">{{ i.unit }}</td><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF">{{ i.b }}</td><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF">{{ i.rr }}</td><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF">{{ i.rb }}</td><td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF">{{ i.h }}</td></tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </section>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'kal', arah: 'keluar' };
+  }
+  renderVals() {
+    const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
+    const keluar = this.state.arah === 'keluar';
+    return {
+      tabs: [['kal', 'Kalender Akademik'], ['surat', 'Korespondensi'], ['inv', 'Inventaris Barang']].map(([k, label]) => ({ label, on: this.state.tab === k, style: pill(this.state.tab === k), pick: () => this.setState({ tab: k }) })),
+      isKal: this.state.tab === 'kal', isSurat: this.state.tab === 'surat', isInv: this.state.tab === 'inv',
+      agenda: [
+        { tgl: '[Tanggal]', ket: 'Kedatangan santri baru', jenis: 'Pondok' },
+        { tgl: '[Tanggal]', ket: 'Masa pengenalan pesantren', jenis: 'Pondok' },
+        { tgl: '[Tanggal]', ket: 'Khutbatul Arsy', jenis: 'Pondok' },
+        { tgl: '[Tanggal]', ket: 'Ujian tengah semester', jenis: 'Akademik' },
+        { tgl: '[Tanggal]', ket: 'Serah Terima Jabatan HISADA', jenis: 'HISADA' },
+        { tgl: '[Tanggal]', ket: 'Libur akhir semester', jenis: 'Libur' }
+      ],
+      arah: [['keluar', 'Surat keluar'], ['masuk', 'Surat masuk']].map(([k, label]) => ({ label, on: this.state.arah === k, style: pill(this.state.arah === k), pick: () => this.setState({ arah: k }) })),
+      kolom4: keluar ? 'Tujuan' : 'Disposisi',
+      surat: keluar
+        ? [{ no: '[No. surat]', tgl: '20/10', hal: 'Undangan rapat pengurus', k4: 'Pengurus HISADA' }, { no: '[No. surat]', tgl: '14/10', hal: 'Permohonan peminjaman aula', k4: 'Bagian Sarpras' }]
+        : [{ no: '[No. surat]', tgl: '22/10', hal: 'Pemberitahuan kegiatan', k4: 'Diteruskan ke Ketua' }, { no: '[No. surat]', tgl: '18/10', hal: 'Edaran jadwal ujian', k4: 'Selesai' }],
+      inv: [
+        { kode: 'SND-01', nama: 'Sound system', unit: '2', b: '1', rr: '1', rb: '0', h: '0' },
+        { kode: 'MJ-02', nama: 'Meja lipat', unit: '24', b: '20', rr: '3', rb: '1', h: '0' },
+        { kode: 'PRJ-01', nama: 'Proyektor', unit: '1', b: '1', rr: '0', rb: '0', h: '0' },
+        { kode: 'TND-03', nama: 'Tenda', unit: '6', b: '4', rr: '1', rb: '0', h: '1' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

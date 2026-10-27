@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>HISADA · Data Master</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F4;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#18201C}
+*{box-sizing:border-box}
+a{color:#1F6B4F}a:hover{color:#14533C}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; background: #F4F6F4">
+  <div style="flex: 1 1 248px; max-width: 100%">
+    <dc-import name="Sidebar" active="datamaster" hint-size="248px,900px"></dc-import>
+  </div>
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px">
+    <header style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; color: #55605A">Administrasi</span>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 700">Data Master</h1>
+      </div>
+      <a href="UpdateData.dc.html" style="height: 42px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; padding: 0 16px; display: flex; align-items: center; font-weight: 600; font-size: 14px; text-decoration: none">Update Data &amp; Import</a>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px" role="tablist" aria-label="Kategori data">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+        <button type="button" role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
+      <label style="flex: 1 1 280px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600"><span style="position: absolute; left: -9999px">Cari</span>
+        <input type="search" placeholder="{{ placeholder }}" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 14px; font: inherit; font-weight: 400; background: #FFFFFF">
+      </label>
+      <span style="font-size: 13px; color: #55605A">{{ summary }}</span>
+    </div>
+
+    <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto">
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 680px">
+        <thead>
+          <tr style="text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em">
+            <sc-for list="{{ cols }}" as="c" hint-placeholder-count="5">
+              <th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">{{ c }}</th>
+            </sc-for>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+            <tr>
+              <sc-for list="{{ r.cells }}" as="cell" hint-placeholder-count="5">
+                <td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF">{{ cell }}</td>
+              </sc-for>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </section>
+    <p style="margin: 0; font-size: 13px; color: #55605A; line-height: 1.5">{{ footnote }}</p>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'santri' };
+  }
+  renderVals() {
+    const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
+    const T = {
+      santri: {
+        label: 'Santri', placeholder: 'Cari nama atau NIS', summary: 'Data contoh · 1.072 aktif',
+        cols: ['NIS', 'Nama', 'L/P', 'Kelas', 'Kamar', 'Status'],
+        rows: [
+          ['990101', 'Santri Contoh 01', 'L', '1 A MTs', 'Ibnu Rusyd-01', 'Aktif'],
+          ['990102', 'Santri Contoh 02', 'L', '1 A MTs', 'Ibnu Rusyd-01', 'Aktif'],
+          ['990203', 'Santri Contoh 03', 'L', '2 B MTs', 'Ibnu Rusyd-02', 'Aktif'],
+          ['990306', 'Santri Contoh 06', 'L', '3 D SMP', 'Ibnu Sina-03', 'Skorsing'],
+          ['990407', 'Santri Contoh 07', 'L', '4 B', 'Kholid Bin Walid-05', 'Aktif'],
+          ['990509', 'Santri Contoh 09', 'L', '5 C', 'Bilal bin Rabah-02', 'Mutasi keluar']
+        ],
+        footnote: 'Keluarga: nama ayah/ibu + WA (untuk Portal Wali). NIK, No KK, penghasilan, dan NISN tidak disimpan.'
+      },
+      kelas: {
+        label: 'Kelas', placeholder: 'Cari kelas', summary: '53 rombel · tahun ajaran 2026/2027',
+        cols: ['Kelas', 'Tingkat', 'Jenjang', 'Wali kelas', 'Asisten'],
+        rows: [
+          ['1 A MTs', '1', 'MTs', '[Nama guru]', '[Nama guru]'],
+          ['1 D SMP', '1', 'SMP', '[Nama guru]', '—'],
+          ['1 Intensif A', '1', 'MTs', '[Nama guru]', '—'],
+          ['4 B', '4', 'MA', '[Nama guru]', '[Nama guru]'],
+          ['6 A MIA', '6', 'MA', '[Nama guru]', '—'],
+          ['6 F IIS', '6', 'MA', '[Nama guru]', '—']
+        ],
+        footnote: 'Kelas 1–3: MTs / SMP · kelas 4–6: MA · kelas Intensif = rombel biasa · MIA/IIS hanya label.'
+      },
+      asrama: {
+        label: 'Asrama & Kamar', placeholder: 'Cari asrama atau kamar', summary: '10 asrama · 61 kamar',
+        cols: ['Asrama', 'Kamar', 'Penghuni', 'Wali asuh', 'Asisten'],
+        rows: [
+          ['Ibnu Rusyd', 'Ibnu Rusyd-01', '18', '[Nama guru]', '[Nama guru]'],
+          ['Ibnu Rusyd', 'Ibnu Rusyd-02', '17', '[Nama guru]', '—'],
+          ['Ibnu Sina', 'Ibnu Sina-03', '20', '[Nama guru]', '[Nama guru]'],
+          ['Kholid Bin Walid', 'Kholid Bin Walid-05', '16', '[Nama guru]', '—'],
+          ['Thoriq bin Ziyad', 'Thoriq bin Ziyad-02', '19', '[Nama guru]', '[Nama guru]']
+        ],
+        footnote: 'Rayon = asrama. Wali asuh dan asistennya melekat ke kamar. Kamar hanya untuk santri dengan jenis kelamin yang sesuai.'
+      },
+      guru: {
+        label: 'Guru', placeholder: 'Cari nama atau NIP', summary: 'Akun guru dibuat Moderator',
+        cols: ['NIP', 'Nama', 'L/P', 'Email', 'Akses'],
+        rows: [
+          ['9001', '[Nama guru]', 'L', 'nama@daarululuumlido.com', 'Wali asuh'],
+          ['9002', '[Nama guru]', 'L', 'nama@daarululuumlido.com', 'Wali kelas · hakim'],
+          ['9003', '[Nama guru]', 'L', 'nama@daarululuumlido.com', 'Wali kelas'],
+          ['9004', '[Nama guru]', 'L', 'nama@daarululuumlido.com', 'Asisten wali asuh']
+        ],
+        footnote: 'Peran guru di luar role diatur lewat Manajemen Akses (hanya Moderator).'
+      },
+      ta: {
+        label: 'Tahun Ajaran', placeholder: 'Cari tahun ajaran', summary: 'Hanya satu yang aktif',
+        cols: ['Tahun ajaran', 'Status', 'Mulai', 'Selesai'],
+        rows: [
+          ['2027/2028', 'Persiapan', '—', '—'],
+          ['2026/2027', 'Aktif', 'Juli 2026', '—'],
+          ['2025/2026', 'Arsip', 'Juli 2025', 'Juli 2026']
+        ],
+        footnote: 'Tanggal mulai terisi saat Update Kelas Tahunan dijalankan.'
+      }
+    };
+    const cur = T[this.state.tab];
+    return {
+      tabs: Object.keys(T).map((k) => ({ label: T[k].label, on: this.state.tab === k, style: pill(this.state.tab === k), pick: () => this.setState({ tab: k }) })),
+      placeholder: cur.placeholder, summary: cur.summary, cols: cur.cols,
+      rows: cur.rows.map((cells) => ({ cells })), footnote: cur.footnote
+    };
+  }
+}
+</script>
+</body>
+</html>

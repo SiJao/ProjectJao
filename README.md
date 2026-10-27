@@ -97,6 +97,7 @@ Fungsi Sistem HISADA
 - [Mindmap (Ide Besar)](#mindmap-ide-besar)
 - [Posisi Tahap SDLC](#posisi-tahap-sdlc)
 - [Lingkungan Pondok](#lingkungan-pondok)
+- [Prototipe Tampilan](#prototipe-tampilan)
 - [Flowchart Sistem](#flowchart-sistem)
 - [Role, Manajemen Akses & Cakupan Data](#role-manajemen-akses--cakupan-data)
 - [Siklus Tahunan](#siklus-tahunan)
@@ -235,6 +236,15 @@ Mengacu pada *Jadwal Kegiatan Harian Santri* dalam Risalah HISADA 2025/2026, den
 | 22.00–04.00 | Wajib tidur | |
 
 Kegiatan mingguan, semesteran, dan tahunan cukup dicatat di [Kalender Akademik](#kalender-akademik).
+
+---
+
+## Prototipe Tampilan
+
+Prototipe tampilan yang bisa diklik untuk **13 layar** (Login, Dashboard, seluruh menu Administrasi dan Fungsi), memakai **data contoh** (nama fiktif, NIS/NIP palsu berawalan 99). Belum terhubung ke database. Sumber dan daftar layar: [prototipe/](prototipe/README.md).
+
+- Sidebar mengikuti mindmap: **Beranda · Administrasi · Fungsi**.
+- Sudut pandang saat ini: **Sekretaris**.
 
 ---
 

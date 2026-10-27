@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>HISADA · Kedisiplinan</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F4;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#18201C}
+*{box-sizing:border-box}
+a{color:#1F6B4F}a:hover{color:#14533C}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; background: #F4F6F4">
+  <div style="flex: 1 1 248px; max-width: 100%">
+    <dc-import name="Sidebar" active="kedisiplinan" hint-size="248px,900px"></dc-import>
+  </div>
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px">
+    <header style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; color: #55605A">Administrasi › Kesantrian</span>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 700">Kedisiplinan</h1>
+      </div>
+      <a href="#daftar-malam" style="height: 42px; border-radius: 10px; border: 1px solid #1F6B4F; color: #1F6B4F; padding: 0 14px; display: flex; align-items: center; font-weight: 600; font-size: 14px; text-decoration: none">Daftar pelanggar hari ini</a>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px" role="tablist" aria-label="Tahap">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+        <button type="button" role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{ isInput }}" hint-placeholder-val="{{ false }}">
+      <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px; max-width: 640px">
+        <h2 style="margin: 0; font-size: 17px; font-weight: 700">Input pelanggaran (tuntutan)</h2>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Santri
+          <input type="search" placeholder="Ketik nama atau NIS" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
+        </label>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px">
+          <label style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Kategori
+            <select style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Keamanan</option><option>Bahasa</option><option>Ibadah</option><option>Kebersihan</option></select>
+          </label>
+          <label style="flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Tanggal
+            <input type="date" value="2026-10-26" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
+          </label>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Keterangan
+          <textarea rows="3" style="border: 1px solid #C9D2CC; border-radius: 10px; padding: 10px 12px; font: inherit; font-weight: 400; resize: vertical"></textarea>
+        </label>
+        <p style="margin: 0; font-size: 13px; color: #55605A">Input bisa dibatalkan penginput dalam 1 jam. Setelah divonis, pemutihan hanya oleh hakim.</p>
+        <button type="button" style="height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; font: inherit; font-weight: 600; cursor: pointer">Kirim ke antrean sidang</button>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isSidang }}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+        <section style="flex: 1 1 360px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 8px 0">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 700; padding: 12px 20px">Antrean sidang</h2>
+          <sc-for list="{{ cases }}" as="c" hint-placeholder-count="4">
+            <button type="button" onClick="{{ c.pick }}" style="{{ c.style }}">
+              <span style="display: flex; flex-direction: column; gap: 2px; text-align: left"><span style="font-weight: 600">{{ c.nama }}</span><span style="font-size: 13px; color: #55605A">{{ c.kategori }} · {{ c.ket }}</span></span>
+              <span style="font-size: 12px; color: #55605A; white-space: nowrap">{{ c.status }}</span>
+            </button>
+          </sc-for>
+        </section>
+        <section style="flex: 1 1 340px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Putusan hakim</h2><span style="font-size: 13px; color: #55605A">{{ cur.nama }} · {{ cur.kategori }}</span></div>
+          <p style="margin: 0; font-size: 14px; line-height: 1.55">{{ cur.ket }}. Dicatat oleh {{ cur.oleh }}.</p>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px" role="group" aria-label="Vonis">
+            <sc-for list="{{ vonis }}" as="v" hint-placeholder-count="4">
+              <button type="button" onClick="{{ v.pick }}" aria-pressed="{{ v.on }}" style="{{ v.style }}">{{ v.label }}</button>
+            </sc-for>
+          </div>
+          <span style="font-size: 13px; color: #55605A">{{ vonisNote }}</span>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Hukuman / alasan
+            <textarea rows="2" style="border: 1px solid #C9D2CC; border-radius: 10px; padding: 10px 12px; font: inherit; font-weight: 400; resize: vertical"></textarea>
+          </label>
+          <button type="button" style="height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; font: inherit; font-weight: 600; cursor: pointer">Simpan putusan</button>
+        </section>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isRiwayat }}" hint-placeholder-val="{{ false }}">
+      <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 620px">
+          <thead><tr style="text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em">
+            <th style="padding: 12px 20px; border-bottom: 1px solid #DDE3DF">Tanggal</th><th style="padding: 12px 20px; border-bottom: 1px solid #DDE3DF">Santri</th><th style="padding: 12px 20px; border-bottom: 1px solid #DDE3DF">Kategori</th><th style="padding: 12px 20px; border-bottom: 1px solid #DDE3DF">Vonis</th>
+          </tr></thead>
+          <tbody>
+            <sc-for list="{{ history }}" as="h" hint-placeholder-count="4">
+              <tr><td style="padding: 10px 20px; border-bottom: 1px solid #EEF1EF; color: #55605A">{{ h.tgl }}</td><td style="padding: 10px 20px; border-bottom: 1px solid #EEF1EF; font-weight: 600">{{ h.nama }}</td><td style="padding: 10px 20px; border-bottom: 1px solid #EEF1EF">{{ h.kat }}</td><td style="padding: 10px 20px; border-bottom: 1px solid #EEF1EF">{{ h.vonis }}</td></tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </section>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'sidang', sel: 0, vonis: {} };
+  }
+  renderVals() {
+    const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
+    const C = [
+      { nama: 'Santri Contoh 11', kategori: 'Keamanan', ket: 'Terlambat kembali dari izin (otomatis)', oleh: 'sistem (overdue)' },
+      { nama: 'Santri Contoh 31', kategori: 'Bahasa', ket: 'Tidak berbahasa resmi di asrama', oleh: 'Bagian Bahasa' },
+      { nama: 'Santri Contoh 32', kategori: 'Ibadah', ket: 'Terlambat shalat berjamaah', oleh: 'Bagian Ibadah' },
+      { nama: 'Santri Contoh 33', kategori: 'Kebersihan', ket: 'Kamar tidak dirapikan', oleh: 'Bagian Kebersihan' }
+    ];
+    const VL = [['ringan', 'Ringan'], ['sedang', 'Sedang'], ['berat', 'Berat'], ['putih', 'Pemutihan']];
+    const s = this.state.sel;
+    const cv = this.state.vonis[s];
+    const notes = { ringan: 'Tidak dikirim ke wali.', sedang: 'Tidak dikirim ke wali.', berat: 'Wali diberi tahu saat itu juga, tanpa isi vonis.', putih: 'Dibatalkan dengan alasan; data tetap tersimpan.' };
+    const vstyle = (on, k) => 'height: 44px; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? (k === 'berat' ? 'background: #F9E3E1; color: #8E2A22; border: 1px solid #8E2A22' : 'background: #E3EFE8; color: #14533C; border: 1px solid #1F6B4F') : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
+    const labels = { ringan: 'Ringan', sedang: 'Sedang', berat: 'Berat', putih: 'Pemutihan' };
+    return {
+      tabs: [['input', 'Input pelanggaran'], ['sidang', 'Sidang & vonis'], ['riwayat', 'Riwayat']].map(([k, label]) => ({ label, on: this.state.tab === k, style: pill(this.state.tab === k), pick: () => this.setState({ tab: k }) })),
+      isInput: this.state.tab === 'input', isSidang: this.state.tab === 'sidang', isRiwayat: this.state.tab === 'riwayat',
+      cases: C.map((c, i) => ({
+        ...c, status: this.state.vonis[i] ? 'Divonis: ' + labels[this.state.vonis[i]] : 'Menunggu',
+        style: 'display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 62px; padding: 10px 20px; border: 0; border-top: 1px solid #EEF1EF; font: inherit; color: #18201C; cursor: pointer; ' + (i === s ? 'background: #EEF5F1' : 'background: #FFFFFF'),
+        pick: () => this.setState({ sel: i })
+      })),
+      cur: C[s],
+      vonis: VL.map(([k, label]) => ({ label, on: cv === k, style: vstyle(cv === k, k), pick: () => this.setState({ vonis: { ...this.state.vonis, [s]: k } }) })),
+      vonisNote: cv ? notes[cv] : 'Pilih vonis.',
+      history: [
+        { tgl: '24/10', nama: 'Santri Contoh 41', kat: 'Keamanan', vonis: 'Sedang' },
+        { tgl: '23/10', nama: 'Santri Contoh 42', kat: 'Bahasa', vonis: 'Ringan' },
+        { tgl: '22/10', nama: 'Santri Contoh 43', kat: 'Ibadah', vonis: 'Pemutihan' },
+        { tgl: '20/10', nama: 'Santri Contoh 44', kat: 'Keamanan', vonis: 'Berat' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

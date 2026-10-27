@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>HISADA · Riwayat Perubahan</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F4;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#18201C}
+*{box-sizing:border-box}
+a{color:#1F6B4F}a:hover{color:#14533C}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; background: #F4F6F4">
+  <div style="flex: 1 1 248px; max-width: 100%">
+    <dc-import name="Sidebar" active="riwayat" hint-size="248px,900px"></dc-import>
+  </div>
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px">
+    <header style="display: flex; flex-direction: column; gap: 4px">
+      <span style="font-size: 13px; color: #55605A">Fungsi › Pemantauan</span>
+      <h1 style="margin: 0; font-size: 28px; font-weight: 700">Riwayat Perubahan</h1>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px" role="group" aria-label="Saring kategori">
+      <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5">
+        <button type="button" aria-pressed="{{ f.on }}" onClick="{{ f.pick }}" style="{{ f.style }}">{{ f.label }}</button>
+      </sc-for>
+    </div>
+
+    <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto">
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 700px">
+        <thead>
+          <tr style="text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em">
+            <th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Waktu</th>
+            <th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Oleh</th>
+            <th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Kategori</th>
+            <th style="padding: 12px 18px; border-bottom: 1px solid #DDE3DF">Perubahan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="7">
+            <tr>
+              <td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF; color: #55605A; white-space: nowrap">{{ r.waktu }}</td>
+              <td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF; font-weight: 600">{{ r.oleh }}</td>
+              <td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF"><span style="font-size: 12px; font-weight: 700; background: #EEF1EF; color: #3B4540; border-radius: 999px; padding: 3px 10px">{{ r.kat }}</span></td>
+              <td style="padding: 11px 18px; border-bottom: 1px solid #EEF1EF; line-height: 1.45">{{ r.text }}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </section>
+    <p style="margin: 0; font-size: 13px; color: #55605A">Moderator melihat semua · Sekretaris hanya selama masa jabatannya. Data tidak dapat dihapus.</p>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { f: 'Semua' };
+  }
+  renderVals() {
+    const R = [
+      { waktu: '26/10 15.32', oleh: 'Moderator', kat: 'Akses', text: 'Akses "Putusan kedisiplinan" diberikan ke [Nama guru] (NIP 9002)' },
+      { waktu: '26/10 14.10', oleh: 'Sekretaris', kat: 'Data', text: 'Santri Contoh 51–53 dipindah ke kamar Ibnu Sina-04 (Update Data)' },
+      { waktu: '26/10 13.05', oleh: 'Sistem', kat: 'Kesantrian', text: 'Izin Santri Contoh 11 overdue → absensi Alpha, pelanggaran otomatis' },
+      { waktu: '26/10 10.15', oleh: 'Petugas perizinan', kat: 'Kesantrian', text: 'Izin pulang Santri Contoh 13 diterbitkan' },
+      { waktu: '25/10 20.40', oleh: 'Moderator', kat: 'Akun', text: 'Password Santri Contoh 62 direset' },
+      { waktu: '25/10 09.00', oleh: 'Moderator', kat: 'Jabatan', text: 'PAW: jabatan Bagian Keamanan dialihkan (alasan: mundur)' },
+      { waktu: '24/10 19.55', oleh: 'Hakim', kat: 'Kesantrian', text: 'Pelanggaran Santri Contoh 43 diputihkan (alasan tercatat)' }
+    ];
+    const F = ['Semua', 'Akses', 'Akun', 'Data', 'Jabatan', 'Kesantrian'];
+    const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
+    const f = this.state.f;
+    return {
+      filters: F.map((label) => ({ label, on: f === label, style: pill(f === label), pick: () => this.setState({ f: label }) })),
+      rows: R.filter((r) => f === 'Semua' || r.kat === f)
+    };
+  }
+}
+</script>
+</body>
+</html>
