@@ -7,9 +7,9 @@ Abaikan jabatan, fokus kepada objek (sistem yang abadi tetap berjalan dan diperl
 # Sistem Hisada
 ### Himpunan Santri Daarul Uluum Lido — Sistem Informasi Manajemen Kesantrian
 
-Dibangun dengan PHP native + MySQL/MariaDB, tanpa framework, tanpa build-tool JavaScript. Semua aset front-end (Bootstrap 5, Bootstrap Icons) di-vendor lokal — tidak ada dependensi ke CDN eksternal.
+Rencana teknologi: PHP native + MySQL/MariaDB, tanpa framework, tanpa build-tool JavaScript; aset front-end di-vendor lokal (tanpa dependensi CDN).
 
-> **Status dokumen (4 Oktober 2026):** dokumen ini berisi **hasil desain sistem** (Mindmap, Analisis, Flowchart) yang sudah disepakati. **Kode PHP belum diubah** mengikuti desain ini — kode yang berjalan saat ini masih versi lama (lihat [Status Implementasi](#status-implementasi)). Hal yang belum diputuskan dikumpulkan di [Belum Diputuskan](#belum-diputuskan).
+> **Status dokumen (4 Oktober 2026):** dokumen ini berisi **hasil desain sistem** (Mindmap, Analisis, Flowchart) yang sudah disepakati. **Belum ada kode** yang mengikuti desain ini; kode PHP lama sudah dihapus dari repo pada 27 Oktober 2026 (lihat [Status Implementasi](#status-implementasi)). Tampilan bisa dicoba lewat [Prototipe Tampilan](#prototipe-tampilan). Hal yang belum diputuskan dikumpulkan di [Belum Diputuskan](#belum-diputuskan).
 
 ---
 
@@ -113,8 +113,7 @@ Fungsi Sistem HISADA
   - Keberlanjutan — [Backup Database](#backup-database) · [Export Excel](#export-excel)
 - [Belum Diputuskan](#belum-diputuskan)
 - [Status Implementasi](#status-implementasi)
-- [Instalasi](#instalasi-kode-saat-ini)
-- [Struktur Folder](#struktur-folder)
+- [Struktur Repo](#struktur-repo)
 
 ---
 
@@ -750,9 +749,9 @@ flowchart TD
 
 ## Status Implementasi
 
-**Seluruh desain di atas belum dikoding.** Kode PHP yang berjalan saat ini masih versi lama:
+**Seluruh desain di atas belum dikoding.** Kode PHP lama **sudah dihapus dari repo** (27 Oktober 2026) dan masih bisa dilihat di riwayat git, commit `6ddf02a`. Perbedaannya dengan desain baru, sebagai acuan:
 
-| Desain baru | Kode saat ini |
+| Desain baru | Kode lama (sudah dihapus) |
 |---|---|
 | 6 role + Manajemen Akses, role di akun user | Role lama (`piket`, `asisten_poskestren`, `dokter`, `sekretaris_mahkamah`, `hakim`, `sekretaris`) terikat jabatan aktif |
 | Kesehatan & Kedisiplinan Santri (masing-masing satu modul) | Poskestren (Asisten + Dokter) & Mahkamah (Sekretaris + Hakim) terpisah |
@@ -767,37 +766,12 @@ Urutan berikutnya: **Desain Database** → Coding bertahap → Testing → Deplo
 
 ---
 
-## Instalasi (kode saat ini)
-
-1. Upload seluruh isi folder ini ke `public_html`.
-2. **Hapus `reset_password.php` dari server** — jangan dibuka.
-3. **cPanel → MySQL Databases** → buat database + user → **Add User to Database** dengan **ALL PRIVILEGES**.
-4. **phpMyAdmin** → pilih database → import `database.sql` (**skema kosong**, tanpa data contoh).
-5. Isi `config/database.php` dengan kredensial asli (jangan di-commit).
-6. Buat akun Moderator pertama secara manual. Buat hash password:
-   ```bash
-   php -r 'echo password_hash("GANTI_PASSWORD_ANDA", PASSWORD_BCRYPT), PHP_EOL;'
-   ```
-   lalu jalankan di phpMyAdmin:
-   ```sql
-   INSERT INTO users (email, password, student_id, nama, is_super_admin, status)
-   VALUES ('admin@daarululuumlido.com', '<HASH_DARI_PERINTAH_DI_ATAS>', NULL, 'Moderator', 1, 'aktif');
-   ```
-
-## Struktur Folder
+## Struktur Repo
 
 ```
-├── index.php              # Halaman login
-├── dashboard.php          # Seluruh modul (routing via ?modul=...)
-├── wali.php / wali_dashboard.php / wali_logout.php   # Portal Wali Santri
-├── logout.php
-├── reset_password.php     # Utilitas lama — hapus dari server
-├── database.sql           # Skema kosong (tanpa data contoh)
-├── config/database.php    # Kredensial koneksi (isi sendiri)
-├── includes/
-│   ├── auth.php               # Session, login check, RBAC
-│   ├── error_page.php         # Halaman error kustom + exception handler
-│   ├── print_surat_izin.php
-│   └── header.php / sidebar.php / footer.php
-└── assets/                # CSS, logo, Bootstrap (di-vendor lokal)
+├── README.md        # Desain sistem (dokumen ini)
+└── prototipe/       # Prototipe tampilan (data contoh)
+    ├── *.dc.html        # Sumber kanvas Design
+    ├── build-web.js     # Pembuat versi web
+    └── web/             # Versi HTML biasa, bisa dibuka di browser / hosting
 ```
