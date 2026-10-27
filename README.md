@@ -72,7 +72,7 @@ Fungsi Sistem HISADA
 │   │   └── Wajib ganti saat login pertama
 │   └── Kelola User & Role
 │       ├── Role: Piket · Kesehatan · Kedisiplinan · Sekretaris · Asatidz · Moderator
-│       └── Akses khusus: Absensi · Kesehatan · Perizinan
+│       └── Manajemen Akses: akses di luar role, per orang (hanya Moderator)
 ├── Pengolahan Data
 │   ├── Update Data & Import
 │   │   ├── Upload file (CSV)
@@ -98,7 +98,7 @@ Fungsi Sistem HISADA
 - [Posisi Tahap SDLC](#posisi-tahap-sdlc)
 - [Lingkungan Pondok](#lingkungan-pondok)
 - [Flowchart Sistem](#flowchart-sistem)
-- [Role, Akses Khusus & Cakupan Data](#role-akses-khusus--cakupan-data)
+- [Role, Manajemen Akses & Cakupan Data](#role-manajemen-akses--cakupan-data)
 - [Siklus Tahunan](#siklus-tahunan)
 - **Modul — Administrasi**
   - Data Master — [Data Master](#data-master) · [Tahun Ajaran](#tahun-ajaran)
@@ -273,12 +273,12 @@ flowchart TD
     M5 --> DB
     M7 --> DB
     DB --> L["Riwayat Perubahan"]
-    DB --> N["Notifikasi email<br/>+ rekap harian wali"]
+    DB --> N["Notifikasi email<br/>+ kabar ke wali per kejadian"]
 ```
 
 ---
 
-## Role, Akses Khusus & Cakupan Data
+## Role, Manajemen Akses & Cakupan Data
 
 ### Role (satu role per user)
 
@@ -294,14 +294,18 @@ flowchart TD
 - **Jabatan ≠ role.** Jabatan (mis. "Ketua Bagian Keamanan") adalah label organisasi yang diisi Sekretaris. Role menentukan hak akses dan ditetapkan Moderator.
 - **Role Moderator tidak pernah diberikan ke akun santri.** Jika ditemukan, role dicabut.
 
-### Akses khusus (dicentang Moderator per orang)
+### Manajemen Akses (hanya Moderator)
 
-Hanya ada tiga akses khusus; di luar ini, satu orang = satu role.
+- Peran atau akses **di luar role** diberikan per orang lewat **Manajemen Akses**. **Hanya Moderator (admin)** yang dapat mengelolanya.
+- Berlaku untuk pengurus **dan guru**. Guru yang memegang banyak peran (hakim, guru pengasuhan, wali kelas, pengajar, dll.) diberi akses sesuai tugasnya lewat Manajemen Akses.
+- Setiap pemberian/pencabutan akses tercatat di Riwayat Perubahan.
 
-| Akses khusus | Untuk role |
+Akses yang sudah ditetapkan untuk role pengurus:
+
+| Akses | Untuk role |
 |---|---|
 | Absensi | Kesehatan, Kedisiplinan |
-| Kesehatan | Kesehatan (role saja belum cukup — wajib dicentang) |
+| Kesehatan | Kesehatan (role saja belum cukup — wajib diberi akses) |
 | Perizinan | Piket |
 
 ### Cakupan data Putra / Putri
@@ -310,7 +314,7 @@ Hanya ada tiga akses khusus; di luar ini, satu orang = satu role.
 
 ### Peta akses
 
-Keterangan: ✔ otomatis · ☑ jika dicentang Moderator · 👁 lihat saja · ✖ tidak · ⏳ belum diputuskan
+Keterangan: ✔ otomatis · ☑ jika diberi lewat Manajemen Akses · 👁 lihat saja · ✖ tidak · ⏳ belum diputuskan
 
 | Modul / Aksi | Piket | Kesehatan | Kedisiplinan | Sekretaris | Asatidz | Moderator |
 |---|---|---|---|---|---|---|
@@ -417,7 +421,7 @@ flowchart TD
     C --> F["Absensi otomatis izin / pulang<br/>+ cetak Gate Pass"]
     D --> F
     E --> F
-    F --> R["Masuk rekap harian wali 20.00"]
+    F --> R["Email ke wali<br/>(per kejadian)"]
     F --> G{"Kembali tepat waktu?"}
     G -- "ya" --> H(["Konfirmasi kembali<br/>izin selesai"])
     G -- "tidak" --> I["Status OVERDUE"]
@@ -434,7 +438,7 @@ flowchart TD
   - **Kunjungan**: Rawat Jalan (tidak mengubah absensi) atau **Perawatan** (absensi hari itu → Sakit).
   - **Pemeriksaan**: diagnosa, resep, tindak lanjut.
   - **Analisis musim sakit**: tren kunjungan 6 bulan + keluhan terbanyak.
-- Wali hanya menerima kabar **"sedang sakit / dirawat"** di rekap harian — **tanpa diagnosa**.
+- Wali hanya menerima kabar **"sedang sakit / dirawat"** per kejadian — **tanpa diagnosa**.
 
 ### Kedisiplinan
 
@@ -443,7 +447,7 @@ flowchart TD
 - **Input Pelanggaran**: santri, kategori, keterangan, tanggal → masuk antrean sidang.
 - **Sidang & Vonis**: **Ringan / Sedang / Berat**, atau **pemutihan** (dibatalkan dengan alasan, data tidak dihapus).
 - **Pencatat tidak boleh memvonis atau memutihkan kasus yang ia catat sendiri.** Pelanggaran otomatis dari overdue boleh divonis siapa pun yang ber-role Kedisiplinan.
-- Vonis **Berat** masuk rekap harian wali (tanpa isi vonis). Ringan/Sedang tidak dikirim.
+- Vonis **Berat** diberitahukan ke wali per kejadian (tanpa isi vonis). Ringan/Sedang tidak dikirim.
 
 ### Prestasi Santri
 
@@ -511,7 +515,7 @@ flowchart TD
 
 *(akses: Moderator)*
 
-- Menetapkan **satu role** per user dan mencentang **akses khusus** (Absensi, Kesehatan, Perizinan).
+- Menetapkan **satu role** per user dan mengatur **Manajemen Akses** (akses di luar role, per orang).
 - Dashboard Moderator menampilkan **"N pengurus menunggu role"** setelah Serah Terima.
 - Pilihan role Moderator **tidak tersedia** untuk akun yang terhubung ke data santri.
 - Setiap perubahan role/akses tercatat di Riwayat Perubahan dan diberitahukan ke pemilik akun lewat email.
@@ -593,7 +597,7 @@ flowchart TD
 3. Dalam satu proses: masa khidmat lama & semua jabatan **diarsipkan** (bukan dihapus), akun pengurus lama **dinonaktifkan** (santrinya tetap aktif), masa khidmat baru dibuat, Sekretaris baru langsung aktif.
 4. **Sekretaris baru** mengisi bagian/jabatan pengurus lain — lewat **upload file** (NIS + jabatan) **atau pilih banyak sekaligus**. Hanya santri aktif Kelas 5; baris yang tidak valid **ditolak** dan proses tidak lanjut sampai diperbaiki.
 5. Akun pengurus dibuat otomatis (`NIS@daarululuumlido.com`, password sementara NIS + tanggal lahir).
-6. **Moderator** menetapkan role & akses khusus tiap pengurus.
+6. **Moderator** menetapkan role & Manajemen Akses tiap pengurus.
 
 Selama menunggu langkah 6, **Absensi tetap berjalan** karena Sekretaris otomatis memiliki akses Absensi.
 
@@ -610,7 +614,7 @@ flowchart TD
     Login1 --> Bagian["SEKRETARIS isi bagian pengurus lain:<br/>upload file ATAU pilih banyak sekaligus<br/>(hanya santri aktif Kelas 5)"]
     Bagian --> Akun["Akun pengurus dibuat<br/>NIS@daarululuumlido.com"]
     Akun --> Badge["Dashboard Moderator:<br/>N pengurus menunggu role"]
-    Badge --> Role["MODERATOR tetapkan role<br/>+ akses khusus"]
+    Badge --> Role["MODERATOR tetapkan role<br/>+ Manajemen Akses"]
     Role --> Aktif(["Semua pengurus baru bekerja"])
 ```
 
@@ -660,9 +664,8 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
 | **Proses tahunan & akun** | Serah Terima / Update Kelas Tahunan dijalankan, pengurus menunggu role, akun tertahan, akun dibuat, password/role diubah | Moderator, Sekretaris, pemilik akun |
 | **Kesantrian** | Pelanggaran menunggu sidang, izin overdue | Kedisiplinan, Piket berakses Perizinan |
 
-**Rekap harian untuk wali** — satu email per hari pukul **20.00 WIB**, hanya jika ada kejadian:
-- izin, izin pulang diterbitkan, izin overdue, sakit, pelanggaran **berat**.
-- **Izin overdue dikirim segera** (tidak menunggu rekap).
+**Kabar ke wali — per kejadian** (tidak ada rekap harian). Email dikirim **segera** saat kejadian:
+- izin, izin pulang diterbitkan, izin overdue (terlambat kembali), sakit/dirawat, vonis **berat**.
 
 **Email manual:**
 - **Pengumuman ke kelompok** (semua wali, wali per kelas/kamar, semua pengurus, dll.) — dengan pratinjau & konfirmasi.
@@ -682,7 +685,7 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
   4. No. HP diseragamkan sebelum dicocokkan (`08…` = `628…` = `+628…`).
   5. Nomor WA ayah/ibu dari data 2026-2027 dipakai sebagai bahan pencocokan.
 - **Jika tidak cocok:** Moderator menautkan manual setelah memeriksa, **atau** no. HP diperbarui lewat Sekretaris/Moderator lalu wali mencoba lagi.
-- Wali melihat data anak (read-only) dan menerima **rekap harian**.
+- Wali melihat data anak (read-only) dan menerima **kabar per kejadian**.
 
 ```mermaid
 flowchart TD
@@ -693,7 +696,7 @@ flowchart TD
     D -- "tidak cocok" --> F{"Sudah gagal 5x hari ini?"}
     F -- "ya" --> G["Penautan dikunci 24 jam"]
     F -- "belum" --> H["Cadangan:<br/>Moderator tautkan manual, atau<br/>no. HP diperbarui lalu coba lagi"]
-    E --> I(["Lihat data anak<br/>+ rekap harian 20.00"])
+    E --> I(["Lihat data anak<br/>+ kabar per kejadian"])
 ```
 
 ---
@@ -728,12 +731,10 @@ flowchart TD
 | Export Excel | Role mana yang boleh mengekspor data? |
 | Backup | Berapa banyak backup yang disimpan? |
 | Server produksi | Server pesantren sendiri atau hosting yang lebih layak (hosting saat ini hanya untuk testing) |
-| Peran guru di sistem | Banyak kegiatan dicatat langsung oleh guru (absensi KBM, tahsin, ekskul, belajar malam, penilaian, putusan hakim), sedangkan role Asatidz saat ini hanya melihat. Bagaimana akses guru yang memegang banyak peran sekaligus? |
 | Alur Kedisiplinan | Lingkungan: pengurus menuntut → guru hakim memutus; pelanggaran pengurus dicatat guru pengasuhan; pembatalan ≤ 1 jam. Bagaimana menyesuaikan role Kedisiplinan yang saat ini dipegang pengurus? |
 | Dokter | Diagnosa & resep diinput dokter sendiri atau oleh pengurus jaga? Bagaimana perlindungan data medis santri? |
 | Serah Terima & kelompok kegiatan | Penempatan pengurus di kelompok (tahsin, muhadhoroh, pramuka) ikut berganti saat Serah Terima? |
 | Kegiatan baru | Kelas & pengajar, tahsin, syakia, muhadhoroh, belajar malam, menu makan: masuk sistem sekaligus atau bertahap? |
-| Info ke wali santri | Kenyataan: per kejadian (sakit, vonis berat, terlambat kembali). Desain sebelumnya: rekap harian 20.00 (K-45/K-51). Mana yang dipakai di sistem? |
 
 ---
 
@@ -743,12 +744,12 @@ flowchart TD
 
 | Desain baru | Kode saat ini |
 |---|---|
-| 6 role + 3 akses khusus, role di akun user | Role lama (`piket`, `asisten_poskestren`, `dokter`, `sekretaris_mahkamah`, `hakim`, `sekretaris`) terikat jabatan aktif |
+| 6 role + Manajemen Akses, role di akun user | Role lama (`piket`, `asisten_poskestren`, `dokter`, `sekretaris_mahkamah`, `hakim`, `sekretaris`) terikat jabatan aktif |
 | Kesehatan & Kedisiplinan Santri (masing-masing satu modul) | Poskestren (Asisten + Dokter) & Mahkamah (Sekretaris + Hakim) terpisah |
 | Serah Terima 3 langkah (Moderator → Sekretaris → Moderator) | Serah Terima hanya mengganti periode |
 | Tahun Ajaran, Update Kelas Tahunan, riwayat kelas, PAW, Update Kamar | Belum ada |
 | Kegiatan & Ekstrakurikuler (kelola grup) | Tabel ada, layar kelola belum ada |
-| Notifikasi email & rekap harian wali | Belum ada (hanya badge polling) |
+| Notifikasi email & kabar wali per kejadian | Belum ada (hanya badge polling) |
 | Portal Wali dengan akun mandiri | Akun wali dibuat admin per keluarga |
 | Cakupan data putra/putri, role Asatidz | Belum ada |
 
