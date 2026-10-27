@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HISADA · Manajemen Akses</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F4;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#18201C}
+*{box-sizing:border-box}
+a{color:#1F6B4F}a:hover{color:#14533C}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="vue.global.prod.js"></script>
+<script src="dc-shim.js"></script>
+<script>
+var DEFS = {};
+DEFS["ManajemenAkses"] = { props: [], template: "<div style=\"display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; background: #F4F6F4\">\n  <div style=\"flex: 1 1 248px; max-width: 100%\">\n    <sidebar-c active=\"akses\"></sidebar-c>\n  </div>\n  <main style=\"flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px\">\n    <header style=\"display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px\">\n      <div style=\"display: flex; flex-direction: column; gap: 4px\">\n        <span style=\"font-size: 13px; color: #55605A\">Fungsi › Akses</span>\n        <h1 style=\"margin: 0; font-size: 28px; font-weight: 700\">Manajemen Akses</h1>\n      </div>\n      <span style=\"font-size: 12px; color: #14533C; background: #E3EFE8; border-radius: 999px; padding: 5px 12px; font-weight: 600\">Hanya Moderator</span>\n    </header>\n\n    <div style=\"display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start\">\n      <section style=\"flex: 1 1 320px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 8px 0\">\n        <div style=\"padding: 12px 20px; display: flex; flex-direction: column; gap: 10px\">\n          <h2 style=\"margin: 0; font-size: 17px; font-weight: 700\">Pengguna</h2>\n          <input type=\"search\" aria-label=\"Cari pengguna\" placeholder=\"Cari nama, NIS, atau NIP\" style=\"height: 42px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit\">\n        </div>\n        <template v-for=\"(u, $index) in users\">\n          <button type=\"button\" @click=\"u.pick\" :style=\"u.style\">\n            <span style=\"display: flex; flex-direction: column; gap: 2px; text-align: left\"><span style=\"font-weight: 600\">{{ u.nama }}</span><span style=\"font-size: 13px; color: #55605A\">{{ u.id }}</span></span>\n            <span style=\"font-size: 12px; font-weight: 700; color: #3B4540; background: #EEF1EF; border-radius: 999px; padding: 3px 10px; white-space: nowrap\">{{ u.role }}</span>\n          </button>\n        </template>\n      </section>\n\n      <section style=\"flex: 1.4 1 380px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px\">\n        <div style=\"display: flex; flex-direction: column; gap: 2px\"><h2 style=\"margin: 0; font-size: 17px; font-weight: 700\">{{ cur.nama }}</h2><span style=\"font-size: 13px; color: #55605A\">{{ cur.id }}</span></div>\n        <label style=\"display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600\">Role (satu per pengguna)\n          <select style=\"height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF\">\n            <option>{{ cur.role }}</option><option>Piket</option><option>Kesehatan</option><option>Kedisiplinan</option><option>Sekretaris</option><option>Asatidz</option>\n          </select>\n        </label>\n        <div style=\"display: flex; flex-direction: column; gap: 8px\">\n          <span style=\"font-size: 13px; font-weight: 600\">Akses di luar role</span>\n          <template v-for=\"(p, $index) in perms\">\n            <label style=\"display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 8px 12px; border: 1px solid #E6EBE8; border-radius: 10px; font-size: 14px; cursor: pointer\">\n              <input type=\"checkbox\" :checked=\"p.on\" @change=\"p.toggle\" style=\"width: 18px; height: 18px\">\n              <span style=\"display: flex; flex-direction: column; gap: 2px\"><span style=\"font-weight: 600\">{{ p.label }}</span><span style=\"font-size: 12px; color: #55605A\">{{ p.desc }}</span></span>\n            </label>\n          </template>\n        </div>\n        <p style=\"margin: 0; font-size: 13px; color: #55605A; line-height: 1.5\">Setiap pemberian atau pencabutan akses tercatat di Riwayat Perubahan dan diberitahukan ke pemilik akun lewat email.</p>\n        <button type=\"button\" style=\"height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; font: inherit; font-weight: 600; cursor: pointer\">Simpan akses</button>\n      </section>\n    </div>\n  </main>\n</div>", Cls: (function(){ class DCLogic { constructor(props){ this.props = props || {}; this.state = {}; } setState(){} forceUpdate(){} }
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sel: 0, perms: { 0: { hakim: true, absensi: true }, 1: { perizinan: true }, 2: { absensi: true, kesehatan: true }, 3: {}, 4: { absensi: true } } };
+  }
+  renderVals() {
+    const U = [
+      { nama: '[Nama guru] · guru', id: 'NIP 9002', role: 'Asatidz' },
+      { nama: 'Santri Contoh 61 · pengurus', id: 'NIS 990661', role: 'Piket' },
+      { nama: 'Santri Contoh 62 · pengurus', id: 'NIS 990662', role: 'Kesehatan' },
+      { nama: 'Santri Contoh 63 · pengurus', id: 'NIS 990663', role: 'Sekretaris' },
+      { nama: '[Nama guru] · wali kelas', id: 'NIP 9003', role: 'Asatidz' }
+    ];
+    const PL = [
+      ['absensi', 'Absensi', 'Mengisi absensi harian / kegiatan'],
+      ['perizinan', 'Perizinan', 'Menerbitkan izin dan Gate Pass'],
+      ['kesehatan', 'Kesehatan', 'Membuka data kunjungan dan pemeriksaan'],
+      ['hakim', 'Putusan kedisiplinan', 'Memvonis dan memutihkan pelanggaran'],
+      ['pengasuhan', 'Input pelanggaran pengurus', 'Untuk guru pengasuhan'],
+      ['penilaian', 'Penilaian kegiatan', 'Tahsin, muhadhoroh, ekstrakurikuler']
+    ];
+    const s = this.state.sel;
+    const mine = this.state.perms[s] || {};
+    return {
+      users: U.map((u, i) => ({
+        ...u,
+        style: 'display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 20px; border: 0; border-top: 1px solid #EEF1EF; font: inherit; color: #18201C; cursor: pointer; ' + (i === s ? 'background: #EEF5F1' : 'background: #FFFFFF'),
+        pick: () => this.setState({ sel: i })
+      })),
+      cur: U[s],
+      perms: PL.map(([k, label, desc]) => ({
+        label, desc, on: !!mine[k],
+        toggle: () => this.setState({ perms: { ...this.state.perms, [s]: { ...mine, [k]: !mine[k] } } })
+      }))
+    };
+  }
+}
+
+return Component; })() };
+DEFS["Sidebar"] = { props: ["active"], template: "<nav aria-label=\"Menu utama\" style=\"width: 100%; min-height: 900px; background: #FFFFFF; border-right: 1px solid #DDE3DF; padding: 20px 14px; display: flex; flex-direction: column; gap: 18px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; box-sizing: border-box\">\n  <a href=\"Dashboard.html\" style=\"display: flex; align-items: center; gap: 10px; padding: 4px 8px; text-decoration: none; color: #18201C\">\n    <span style=\"width: 36px; height: 36px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700\">H</span>\n    <span style=\"display: flex; flex-direction: column\"><span style=\"font-weight: 700; font-size: 16px\">HISADA</span><span style=\"font-size: 12px; color: #55605A\">Putra · 2026/2027</span></span>\n  </a>\n  <template v-for=\"(g, $index) in groups\">\n    <div style=\"display: flex; flex-direction: column; gap: 2px\">\n      <div style=\"font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5F6A64; padding: 0 10px 6px\">{{ g.label }}</div>\n      <template v-for=\"(it, $index) in g.items\">\n        <template v-if=\"it.live\">\n          <a :href=\"it.href\" :style=\"it.style\">{{ it.label }}</a>\n        </template>\n        <template v-if=\"it.soon\">\n          <span style=\"display: flex; justify-content: space-between; align-items: center; padding: 9px 10px; border-radius: 8px; font-size: 14px; color: #6B756F\">{{ it.label }}<span style=\"font-size: 11px; border: 1px solid #DDE3DF; border-radius: 999px; padding: 1px 7px\">nanti</span></span>\n        </template>\n      </template>\n    </div>\n  </template>\n  <div style=\"margin-top: auto; border-top: 1px solid #DDE3DF; padding-top: 14px; display: flex; align-items: center; gap: 10px; padding-left: 8px\">\n    <span style=\"width: 34px; height: 34px; border-radius: 999px; background: #E3EFE8; color: #14533C; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px\">SK</span>\n    <span style=\"display: flex; flex-direction: column; font-size: 13px\"><span style=\"font-weight: 600\">Sekretaris (contoh)</span><a href=\"index.html\" style=\"color: #1F6B4F\">Keluar</a></span>\n  </div>\n</nav>", Cls: (function(){ class DCLogic { constructor(props){ this.props = props || {}; this.state = {}; } setState(){} forceUpdate(){} }
+
+class Component extends DCLogic {
+  renderVals() {
+    const active = this.props.active ?? 'dashboard';
+    const base = 'display: block; padding: 9px 10px; border-radius: 8px; font-size: 14px; text-decoration: none; ';
+    const on = base + 'background: #E3EFE8; color: #14533C; font-weight: 600';
+    const off = base + 'color: #2E3833';
+    const mk = (key, label, href) => ({ label, href, live: !!href, soon: !href, style: key === active ? on : off });
+    return {
+      groups: [
+        { label: 'Beranda', items: [mk('dashboard', 'Dashboard', 'Dashboard.html')] },
+        { label: 'Administrasi', items: [
+          mk('datamaster', 'Data Master', 'DataMaster.html'),
+          mk('absensi', 'Absensi', 'Absensi.html'),
+          mk('perizinan', 'Perizinan', 'Perizinan.html'),
+          mk('kesehatan', 'Kesehatan', 'Kesehatan.html'),
+          mk('kedisiplinan', 'Kedisiplinan', 'Kedisiplinan.html'),
+          mk('pd', 'Pengembangan Diri', 'PengembanganDiri.html'),
+          mk('rapor', 'Rapor Kesantrian', 'Rapor.html'),
+          mk('tw', 'Tata Warkat', 'TataWarkat.html')
+        ] },
+        { label: 'Fungsi', items: [
+          mk('updatedata', 'Update Data & Import', 'UpdateData.html'),
+          mk('akses', 'Manajemen Akses', 'ManajemenAkses.html'),
+          mk('riwayat', 'Riwayat Perubahan', 'Riwayat.html')
+        ] }
+      ]
+    };
+  }
+}
+
+return Component; })() };
+DCMount("ManajemenAkses", DEFS);
+</script>
+</body>
+</html>

@@ -31,3 +31,11 @@ File `*.dc.html` adalah format kanvas Design (butuh runtime kanvas, tidak bisa d
 - **Kedisiplinan** memakai alur nyata (hakim memutus, batal ≤ 1 jam) — di README masih *Belum Diputuskan*.
 - **Perizinan** masih desain lama (Izin Dinas, tanda tangan Dormitory Guardian); **Absensi** masih status "Sakit" — tabrakan dengan kenyataan, belum diputuskan.
 - Gaya: hijau tua `#1F6B4F`, font Plus Jakarta Sans, sidebar Beranda / Administrasi / Fungsi.
+
+## Versi web (untuk dicoba di hosting)
+
+Folder [`web/`](web/) berisi versi **HTML biasa** dari prototipe ini, sehingga bisa dibuka tanpa kanvas:
+
+- Buka `web/index.html` langsung di browser, **atau** unggah seluruh isi folder `web/` ke hosting (mis. subfolder `/prototipe/`) lalu buka `index.html`.
+- Tidak butuh PHP, database, atau internet selain font Google (tanpa internet, huruf memakai font bawaan). Vue 3 (lisensi MIT) disertakan lokal di `web/vue.global.prod.js`.
+- Dibuat ulang dari file `.dc.html` dengan `node build-web.js . web` (lalu salin `dc-shim.js` dan `vue.global.prod.js` ke `web/`).

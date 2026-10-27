@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HISADA · Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F4;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#18201C}
+*{box-sizing:border-box}
+a{color:#1F6B4F}a:hover{color:#14533C}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="vue.global.prod.js"></script>
+<script src="dc-shim.js"></script>
+<script>
+var DEFS = {};
+DEFS["Dashboard"] = { props: [], template: "<div style=\"display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; background: #F4F6F4\">\n  <div style=\"flex: 1 1 248px; max-width: 100%\">\n    <sidebar-c active=\"dashboard\"></sidebar-c>\n  </div>\n  <main style=\"flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 24px\">\n    <header style=\"display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px\">\n      <div style=\"display: flex; flex-direction: column; gap: 4px\">\n        <span style=\"font-size: 13px; color: #55605A\">Senin, 26 Oktober 2026 · Lingkungan Putra</span>\n        <h1 style=\"margin: 0; font-size: 28px; font-weight: 700\">Assalamu'alaikum, Sekretaris</h1>\n      </div>\n      <span style=\"font-size: 12px; color: #55605A; border: 1px dashed #B9C4BD; border-radius: 999px; padding: 4px 10px\">Data contoh</span>\n    </header>\n\n    <section aria-label=\"Ringkasan hari ini\" style=\"display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px\">\n      <template v-for=\"(s, $index) in stats\">\n        <a :href=\"s.href\" style=\"background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: #18201C\">\n          <span style=\"font-size: 13px; color: #55605A\">{{ s.label }}</span>\n          <span :style=\"`font-size: 30px; font-weight: 700; color: ${s.color}`\">{{ s.value }}</span>\n          <span style=\"font-size: 12px; color: #55605A\">{{ s.note }}</span>\n        </a>\n      </template>\n    </section>\n\n    <div style=\"display: flex; flex-wrap: wrap; gap: 20px\">\n      <section style=\"flex: 2 1 420px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px\">\n        <div style=\"display: flex; justify-content: space-between; align-items: center\">\n          <h2 style=\"margin: 0; font-size: 17px; font-weight: 700\">Perlu tindakan</h2>\n          <span style=\"font-size: 12px; color: #55605A\">badge sidebar</span>\n        </div>\n        <template v-for=\"(t, $index) in todos\">\n          <a :href=\"t.href\" style=\"display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #E6EBE8; border-radius: 10px; text-decoration: none; color: #18201C\">\n            <span style=\"display: flex; flex-direction: column; gap: 2px\"><span style=\"font-weight: 600; font-size: 14px\">{{ t.title }}</span><span style=\"font-size: 13px; color: #55605A\">{{ t.desc }}</span></span>\n            <span :style=\"`min-width: 32px; height: 28px; border-radius: 999px; background: ${t.bg}; color: ${t.fg}; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; padding: 0 10px`\">{{ t.count }}</span>\n          </a>\n        </template>\n      </section>\n      <section style=\"flex: 1 1 300px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 12px\">\n        <h2 style=\"margin: 0; font-size: 17px; font-weight: 700\">Kabar ke wali hari ini</h2>\n        <p style=\"margin: 0; font-size: 13px; color: #55605A; line-height: 1.5\">Dikirim per kejadian, tanpa data sensitif.</p>\n        <template v-for=\"(w, $index) in wali\">\n          <div style=\"display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.45; padding: 8px 0; border-top: 1px solid #EEF1EF\">\n            <span style=\"color: #55605A; min-width: 42px\">{{ w.time }}</span>\n            <span><strong style=\"font-weight: 600\">{{ w.kind }}</strong> · {{ w.text }}</span>\n          </div>\n        </template>\n      </section>\n    </div>\n  </main>\n</div>", Cls: (function(){ class DCLogic { constructor(props){ this.props = props || {}; this.state = {}; } setState(){} forceUpdate(){} }
+
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      stats: [
+        { label: 'Hadir hari ini', value: '487', note: 'dari 505 santri aktif', color: '#1E5E3F', href: 'Absensi.html' },
+        { label: 'Izin berjalan', value: '9', note: '2 pulang · 7 keluar', color: '#23497E', href: 'Perizinan.html' },
+        { label: 'Overdue', value: '1', note: 'lewat jam kembali', color: '#8E2A22', href: 'Perizinan.html' },
+        { label: 'Dirawat', value: '6', note: 'pusat kesehatan', color: '#7A4E0C', href: 'Kesehatan.html' },
+        { label: 'Menunggu sidang', value: '4', note: 'antrean hakim', color: '#18201C', href: 'Kedisiplinan.html' }
+      ],
+      todos: [
+        { title: 'Absensi malam belum lengkap', desc: '3 kamar di Asrama Ibnu Sina belum diisi', count: '3', bg: '#FBF0DC', fg: '#7A4E0C', href: 'Absensi.html' },
+        { title: 'Izin overdue', desc: 'Santri contoh A, Keluar Sementara, lewat 40 menit', count: '1', bg: '#F9E3E1', fg: '#8E2A22', href: 'Perizinan.html' },
+        { title: 'Pelanggaran menunggu sidang', desc: 'Diputus oleh hakim', count: '4', bg: '#E4ECF8', fg: '#23497E', href: 'Kedisiplinan.html' },
+        { title: 'Pengurus menunggu role', desc: 'Setelah Serah Terima', count: '2', bg: '#E3EFE8', fg: '#14533C', href: 'ManajemenAkses.html' }
+      ],
+      wali: [
+        { time: '07.42', kind: 'Dirawat', text: 'Santri contoh B, sedang dirawat' },
+        { time: '10.15', kind: 'Izin pulang', text: 'Santri contoh C, didampingi wali' },
+        { time: '13.05', kind: 'Overdue', text: 'Santri contoh A, belum kembali' },
+        { time: '15.30', kind: 'Vonis berat', text: 'Santri contoh D (tanpa isi vonis)' }
+      ]
+    };
+  }
+}
+
+return Component; })() };
+DEFS["Sidebar"] = { props: ["active"], template: "<nav aria-label=\"Menu utama\" style=\"width: 100%; min-height: 900px; background: #FFFFFF; border-right: 1px solid #DDE3DF; padding: 20px 14px; display: flex; flex-direction: column; gap: 18px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; box-sizing: border-box\">\n  <a href=\"Dashboard.html\" style=\"display: flex; align-items: center; gap: 10px; padding: 4px 8px; text-decoration: none; color: #18201C\">\n    <span style=\"width: 36px; height: 36px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700\">H</span>\n    <span style=\"display: flex; flex-direction: column\"><span style=\"font-weight: 700; font-size: 16px\">HISADA</span><span style=\"font-size: 12px; color: #55605A\">Putra · 2026/2027</span></span>\n  </a>\n  <template v-for=\"(g, $index) in groups\">\n    <div style=\"display: flex; flex-direction: column; gap: 2px\">\n      <div style=\"font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5F6A64; padding: 0 10px 6px\">{{ g.label }}</div>\n      <template v-for=\"(it, $index) in g.items\">\n        <template v-if=\"it.live\">\n          <a :href=\"it.href\" :style=\"it.style\">{{ it.label }}</a>\n        </template>\n        <template v-if=\"it.soon\">\n          <span style=\"display: flex; justify-content: space-between; align-items: center; padding: 9px 10px; border-radius: 8px; font-size: 14px; color: #6B756F\">{{ it.label }}<span style=\"font-size: 11px; border: 1px solid #DDE3DF; border-radius: 999px; padding: 1px 7px\">nanti</span></span>\n        </template>\n      </template>\n    </div>\n  </template>\n  <div style=\"margin-top: auto; border-top: 1px solid #DDE3DF; padding-top: 14px; display: flex; align-items: center; gap: 10px; padding-left: 8px\">\n    <span style=\"width: 34px; height: 34px; border-radius: 999px; background: #E3EFE8; color: #14533C; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px\">SK</span>\n    <span style=\"display: flex; flex-direction: column; font-size: 13px\"><span style=\"font-weight: 600\">Sekretaris (contoh)</span><a href=\"index.html\" style=\"color: #1F6B4F\">Keluar</a></span>\n  </div>\n</nav>", Cls: (function(){ class DCLogic { constructor(props){ this.props = props || {}; this.state = {}; } setState(){} forceUpdate(){} }
+
+class Component extends DCLogic {
+  renderVals() {
+    const active = this.props.active ?? 'dashboard';
+    const base = 'display: block; padding: 9px 10px; border-radius: 8px; font-size: 14px; text-decoration: none; ';
+    const on = base + 'background: #E3EFE8; color: #14533C; font-weight: 600';
+    const off = base + 'color: #2E3833';
+    const mk = (key, label, href) => ({ label, href, live: !!href, soon: !href, style: key === active ? on : off });
+    return {
+      groups: [
+        { label: 'Beranda', items: [mk('dashboard', 'Dashboard', 'Dashboard.html')] },
+        { label: 'Administrasi', items: [
+          mk('datamaster', 'Data Master', 'DataMaster.html'),
+          mk('absensi', 'Absensi', 'Absensi.html'),
+          mk('perizinan', 'Perizinan', 'Perizinan.html'),
+          mk('kesehatan', 'Kesehatan', 'Kesehatan.html'),
+          mk('kedisiplinan', 'Kedisiplinan', 'Kedisiplinan.html'),
+          mk('pd', 'Pengembangan Diri', 'PengembanganDiri.html'),
+          mk('rapor', 'Rapor Kesantrian', 'Rapor.html'),
+          mk('tw', 'Tata Warkat', 'TataWarkat.html')
+        ] },
+        { label: 'Fungsi', items: [
+          mk('updatedata', 'Update Data & Import', 'UpdateData.html'),
+          mk('akses', 'Manajemen Akses', 'ManajemenAkses.html'),
+          mk('riwayat', 'Riwayat Perubahan', 'Riwayat.html')
+        ] }
+      ]
+    };
+  }
+}
+
+return Component; })() };
+DCMount("Dashboard", DEFS);
+</script>
+</body>
+</html>
