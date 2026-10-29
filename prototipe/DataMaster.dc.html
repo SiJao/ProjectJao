@@ -34,6 +34,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
       </sc-for>
     </div>
 
+    <sc-if value="{{ isTable }}" hint-placeholder-val="{{ true }}">
     <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
       <label style="flex: 1 1 280px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600"><span style="position: absolute; left: -9999px">Cari</span>
         <input type="search" placeholder="{{ placeholder }}" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 14px; font: inherit; font-weight: 400; background: #FFFFFF">
@@ -62,6 +63,74 @@ a{color:#1F6B4F}a:hover{color:#14533C}
       </table>
     </section>
     <p style="margin: 0; font-size: 13px; color: #55605A; line-height: 1.5">{{ footnote }}</p>
+    </sc-if>
+
+    <sc-if value="{{ isPilihan }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+        <nav aria-label="Kelompok pilihan" style="flex: 1 1 240px; max-width: 100%; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 12px">
+          <sc-for list="{{ moduls }}" as="m" hint-placeholder-count="5">
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5F6A64; padding: 4px 10px">{{ m.label }}</span>
+              <sc-for list="{{ m.groups }}" as="g" hint-placeholder-count="3">
+                <button type="button" onClick="{{ g.pick }}" aria-pressed="{{ g.on }}" style="{{ g.style }}"><span>{{ g.label }}</span><span style="font-size: 12px; color: #55605A">{{ g.count }}</span></button>
+              </sc-for>
+            </div>
+          </sc-for>
+        </nav>
+
+        <section style="flex: 999 1 460px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px">
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 13px; color: #55605A">{{ grp.modul }}</span>
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700">{{ grp.label }}</h2>
+            </div>
+            <span style="font-size: 13px; color: #55605A">{{ grp.aktif }} aktif · {{ grp.nonaktif }} nonaktif</span>
+          </div>
+
+          <form onSubmit="{{ add }}" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; background: #F4F6F4; border-radius: 12px; padding: 12px">
+            <label style="flex: 2 1 200px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Pilihan baru
+              <input type="text" value="{{ draft }}" onInput="{{ typeDraft }}" placeholder="Nama pilihan" style="height: 42px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
+            </label>
+            <label style="flex: 1 1 130px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Lingkungan
+              <select onChange="{{ pickLing }}" style="height: 42px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option value="Semua">Semua</option><option value="Putra">Putra</option><option value="Putri">Putri</option></select>
+            </label>
+            <button type="submit" style="height: 42px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; padding: 0 18px; font: inherit; font-weight: 600; cursor: pointer">Tambah</button>
+          </form>
+
+          <div style="overflow-x: auto">
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 520px">
+              <thead>
+                <tr style="text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em">
+                  <th style="padding: 10px 12px; border-bottom: 1px solid #DDE3DF">Urutan</th>
+                  <th style="padding: 10px 12px; border-bottom: 1px solid #DDE3DF">Pilihan</th>
+                  <th style="padding: 10px 12px; border-bottom: 1px solid #DDE3DF">Lingkungan</th>
+                  <sc-if value="{{ grp.perilaku }}" hint-placeholder-val="{{ false }}">
+                    <th style="padding: 10px 12px; border-bottom: 1px solid #DDE3DF">{{ grp.perilaku }}</th>
+                  </sc-if>
+                  <th style="padding: 10px 12px; border-bottom: 1px solid #DDE3DF">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ items }}" as="it" hint-placeholder-count="4">
+                  <tr style="{{ it.rowStyle }}">
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #EEF1EF; color: #55605A">{{ it.urutan }}</td>
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #EEF1EF; font-weight: 600">{{ it.nama }}</td>
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #EEF1EF">{{ it.ling }}</td>
+                    <sc-if value="{{ grp.perilaku }}" hint-placeholder-val="{{ false }}">
+                      <td style="padding: 10px 12px; border-bottom: 1px solid #EEF1EF; font-size: 13px">{{ it.atur }}</td>
+                    </sc-if>
+                    <td style="padding: 6px 12px; border-bottom: 1px solid #EEF1EF">
+                      <button type="button" onClick="{{ it.toggle }}" aria-pressed="{{ it.aktif }}" style="{{ it.btnStyle }}">{{ it.status }}</button>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+          <p style="margin: 0; font-size: 13px; color: #55605A; line-height: 1.5">{{ grp.note }}</p>
+        </section>
+      </div>
+    </sc-if>
   </main>
 </div>
 </x-dc>
@@ -69,7 +138,9 @@ a{color:#1F6B4F}a:hover{color:#14533C}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { tab: 'santri' };
+    this.state = {
+      tab: 'santri', grp: 'sesi', draft: '', ling: 'Semua', off: { 'lomba:Kecamatan': true }, added: {}
+    };
   }
   renderVals() {
     const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
@@ -133,25 +204,63 @@ class Component extends DCLogic {
         ],
         footnote: 'Tanggal mulai terisi saat Update Kelas Tahunan dijalankan.'
       },
-      pilihan: {
-        label: 'Daftar Pilihan', placeholder: 'Cari kelompok atau pilihan', summary: 'Diedit Moderator / pemegang akses · tidak dihapus, hanya dinonaktifkan',
-        cols: ['Kelompok', 'Pilihan', 'Lingkungan', 'Urutan', 'Status'],
-        rows: [
-          ['Sesi absensi', 'Subuh', 'Semua', '1', 'Aktif'],
-          ['Sesi absensi', 'Malam', 'Semua', '3', 'Aktif'],
-          ['Jenis izin', 'Izin Dinas', 'Semua', '2', 'Aktif'],
-          ['Status kehadiran', 'Sakit', 'Semua', '3', 'Aktif'],
-          ['Diagnosa', 'ISPA (batuk pilek)', 'Semua', '2', 'Aktif'],
-          ['Obat', 'Paracetamol', 'Semua', '1', 'Aktif'],
-          ['Kategori pelanggaran', 'Bahasa', 'Semua', '2', 'Aktif'],
-          ['Ekstrakurikuler', 'Marching Band', 'Putri', '9', 'Aktif'],
-          ['Tingkat lomba', 'Kecamatan', 'Semua', '2', 'Nonaktif']
-        ],
-        footnote: 'Pilihan lebih dari 2 tampil sebagai dropdown. Jenis izin, status kehadiran, jenis kunjungan, dan tingkat vonis juga punya pengaturan perilaku (mis. kirim kabar ke wali).'
-      }
+      pilihan: { label: 'Daftar Pilihan', placeholder: '', summary: '', cols: [], rows: [], footnote: '' }
     };
     const cur = T[this.state.tab];
+    const G = [
+      ['Absensi', 'sesi', 'Sesi absensi', null, [['Subuh'], ['Siang'], ['Malam']], 'Membedakan absensi harian yang dilakukan beberapa kali sehari.'],
+      ['Absensi', 'hadir', 'Status kehadiran', 'Dihitung hadir', [['Hadir', 'Semua', 'Ya'], ['Izin', 'Semua', 'Tidak'], ['Sakit', 'Semua', 'Tidak'], ['Alpha', 'Semua', 'Tidak'], ['Pulang', 'Semua', 'Tidak']], 'Kode dan warna status ikut diatur di sini.'],
+      ['Absensi', 'kegiatan', 'Jenis kegiatan', null, [['Pramuka'], ['Muhadhoroh'], ["Halaqah Qur'an"], ['Olahraga'], ['Kesenian']], 'Dasar grup kegiatan dan Absensi Kegiatan.'],
+      ['Perizinan', 'izin', 'Jenis izin', 'Waktu · wali', [['Keluar Sementara', 'Semua', 'Jam'], ['Izin Dinas', 'Semua', 'Tanggal + jam'], ['Pulang', 'Semua', 'Tanggal · wajib wali']], 'Basis waktu menentukan isian form dan format Gate Pass.'],
+      ['Kesehatan', 'kunjungan', 'Jenis kunjungan', 'Ubah absensi', [['Rawat Jalan', 'Semua', '—'], ['Perawatan', 'Semua', 'Sakit · kabar ke wali']], 'Perawatan mengubah absensi hari itu.'],
+      ['Kesehatan', 'tindak', 'Tindak lanjut', null, [['Kembali ke kegiatan'], ['Istirahat di kamar'], ['Rujuk ke klinik / RS']], ''],
+      ['Kesehatan', 'diagnosa', 'Diagnosa', null, [['Demam'], ['ISPA (batuk pilek)'], ['Gastritis'], ['Dermatitis'], ['Luka ringan']], 'Form selalu menyediakan "Lainnya" dengan teks bebas.'],
+      ['Kesehatan', 'obat', 'Obat', null, [['Paracetamol'], ['Antasida'], ['Obat batuk'], ['Salep kulit']], 'Form selalu menyediakan "Lainnya" dengan teks bebas.'],
+      ['Kedisiplinan', 'kategori', 'Kategori pelanggaran', null, [['Keamanan'], ['Bahasa'], ['Ibadah'], ['Kebersihan']], ''],
+      ['Kedisiplinan', 'vonis', 'Tingkat vonis', 'Kabar ke wali', [['Ringan', 'Semua', 'Tidak'], ['Sedang', 'Semua', 'Tidak'], ['Berat', 'Semua', 'Ya (tanpa isi vonis)'], ['Pemutihan', 'Semua', 'Tidak · membatalkan kasus']], ''],
+      ['Pengembangan Diri', 'ekskul', 'Ekstrakurikuler', null, [['Basket', 'Putra'], ['Volley', 'Semua'], ['Hadroh', 'Semua'], ['Marching Band', 'Putri'], ['Kaligrafi', 'Semua']], 'Ekstrakurikuler putra dan putri boleh berbeda.'],
+      ['Pengembangan Diri', 'lomba', 'Tingkat lomba', null, [['Pondok'], ['Kecamatan'], ['Kabupaten'], ['Provinsi'], ['Nasional']], ''],
+      ['Pengembangan Diri', 'hasil', 'Hasil lomba', null, [['Juara 1'], ['Juara 2'], ['Juara 3'], ['Harapan 1'], ['Peserta']], '']
+    ];
+    const st = this.state;
+    const listOf = (key, base) => base.concat((st.added[key] || []));
+    const g = G.find((x) => x[1] === st.grp) || G[0];
+    const items = listOf(g[1], g[4]).map((r, i) => {
+      const id = g[1] + ':' + r[0];
+      const aktif = !st.off[id];
+      return {
+        urutan: String(i + 1), nama: r[0], ling: r[1] || 'Semua', atur: r[2] || '—', aktif,
+        status: aktif ? 'Aktif' : 'Nonaktif',
+        rowStyle: aktif ? '' : 'color: #6B756F',
+        btnStyle: 'height: 32px; min-width: 88px; border-radius: 999px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; ' + (aktif ? 'background: #E3F1E9; color: #1E5E3F; border: 1px solid #1E5E3F' : 'background: #EEF1EF; color: #55605A; border: 1px solid #B9C4BD'),
+        toggle: () => this.setState({ off: { ...st.off, [id]: aktif } })
+      };
+    });
+    const moduls = [];
+    G.forEach((x) => {
+      let m = moduls.find((y) => y.label === x[0]);
+      if (!m) { m = { label: x[0], groups: [] }; moduls.push(m); }
+      const on = x[1] === g[1];
+      m.groups.push({
+        label: x[2], on, count: String(listOf(x[1], x[4]).length),
+        style: 'display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 8px 10px; border-radius: 8px; border: 0; font: inherit; font-size: 14px; text-align: left; cursor: pointer; ' + (on ? 'background: #E3EFE8; color: #14533C; font-weight: 600' : 'background: #FFFFFF; color: #2E3833'),
+        pick: () => this.setState({ grp: x[1], draft: '' })
+      });
+    });
+    const aktifN = items.filter((x) => x.aktif).length;
     return {
+      isTable: st.tab !== 'pilihan', isPilihan: st.tab === 'pilihan',
+      moduls, items,
+      grp: { modul: g[0], label: g[2], perilaku: g[3] || '', note: (g[5] ? g[5] + ' ' : '') + 'Pilihan yang sudah dipakai tidak dihapus — cukup dinonaktifkan.', aktif: String(aktifN), nonaktif: String(items.length - aktifN) },
+      draft: st.draft,
+      typeDraft: (e) => this.setState({ draft: e.target.value }),
+      pickLing: (e) => this.setState({ ling: e.target.value }),
+      add: (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        const name = (st.draft || '').trim();
+        if (!name) return;
+        this.setState({ draft: '', added: { ...st.added, [g[1]]: (st.added[g[1]] || []).concat([[name, st.ling, g[3] ? '(atur)' : '']]) } });
+      },
       tabs: Object.keys(T).map((k) => ({ label: T[k].label, on: this.state.tab === k, style: pill(this.state.tab === k), pick: () => this.setState({ tab: k }) })),
       placeholder: cur.placeholder, summary: cur.summary, cols: cur.cols,
       rows: cur.rows.map((cells) => ({ cells })), footnote: cur.footnote

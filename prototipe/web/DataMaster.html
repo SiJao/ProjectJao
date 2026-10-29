@@ -17,12 +17,14 @@ a{color:#1F6B4F}a:hover{color:#14533C}
 <script src="dc-shim.js"></script>
 <script>
 var DEFS = {};
-DEFS["DataMaster"] = { props: [], template: "<div style=\"display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; background: #F4F6F4\">\n  <div style=\"flex: 1 1 248px; max-width: 100%\">\n    <sidebar-c active=\"datamaster\"></sidebar-c>\n  </div>\n  <main style=\"flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px\">\n    <header style=\"display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px\">\n      <div style=\"display: flex; flex-direction: column; gap: 4px\">\n        <span style=\"font-size: 13px; color: #55605A\">Administrasi</span>\n        <h1 style=\"margin: 0; font-size: 28px; font-weight: 700\">Data Master</h1>\n      </div>\n      <a href=\"UpdateData.html\" style=\"height: 42px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; padding: 0 16px; display: flex; align-items: center; font-weight: 600; font-size: 14px; text-decoration: none\">Update Data &amp; Import</a>\n    </header>\n\n    <div style=\"display: flex; flex-wrap: wrap; gap: 8px\" role=\"tablist\" aria-label=\"Kategori data\">\n      <template v-for=\"(t, $index) in tabs\">\n        <button type=\"button\" role=\"tab\" :aria-selected=\"t.on\" @click=\"t.pick\" :style=\"t.style\">{{ t.label }}</button>\n      </template>\n    </div>\n\n    <div style=\"display: flex; flex-wrap: wrap; gap: 12px; align-items: center\">\n      <label style=\"flex: 1 1 280px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600\"><span style=\"position: absolute; left: -9999px\">Cari</span>\n        <input type=\"search\" :placeholder=\"placeholder\" style=\"height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 14px; font: inherit; font-weight: 400; background: #FFFFFF\">\n      </label>\n      <span style=\"font-size: 13px; color: #55605A\">{{ summary }}</span>\n    </div>\n\n    <section style=\"background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto\">\n      <table style=\"width: 100%; border-collapse: collapse; font-size: 14px; min-width: 680px\">\n        <thead>\n          <tr style=\"text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em\">\n            <template v-for=\"(c, $index) in cols\">\n              <th style=\"padding: 12px 18px; border-bottom: 1px solid #DDE3DF\">{{ c }}</th>\n            </template>\n          </tr>\n        </thead>\n        <tbody>\n          <template v-for=\"(r, $index) in rows\">\n            <tr>\n              <template v-for=\"(cell, $index) in r.cells\">\n                <td style=\"padding: 11px 18px; border-bottom: 1px solid #EEF1EF\">{{ cell }}</td>\n              </template>\n            </tr>\n          </template>\n        </tbody>\n      </table>\n    </section>\n    <p style=\"margin: 0; font-size: 13px; color: #55605A; line-height: 1.5\">{{ footnote }}</p>\n  </main>\n</div>", Cls: (function(){ class DCLogic { constructor(props){ this.props = props || {}; this.state = {}; } setState(){} forceUpdate(){} }
+DEFS["DataMaster"] = { props: [], template: "<div style=\"display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; background: #F4F6F4\">\n  <div style=\"flex: 1 1 248px; max-width: 100%\">\n    <sidebar-c active=\"datamaster\"></sidebar-c>\n  </div>\n  <main style=\"flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px\">\n    <header style=\"display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px\">\n      <div style=\"display: flex; flex-direction: column; gap: 4px\">\n        <span style=\"font-size: 13px; color: #55605A\">Administrasi</span>\n        <h1 style=\"margin: 0; font-size: 28px; font-weight: 700\">Data Master</h1>\n      </div>\n      <a href=\"UpdateData.html\" style=\"height: 42px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; padding: 0 16px; display: flex; align-items: center; font-weight: 600; font-size: 14px; text-decoration: none\">Update Data &amp; Import</a>\n    </header>\n\n    <div style=\"display: flex; flex-wrap: wrap; gap: 8px\" role=\"tablist\" aria-label=\"Kategori data\">\n      <template v-for=\"(t, $index) in tabs\">\n        <button type=\"button\" role=\"tab\" :aria-selected=\"t.on\" @click=\"t.pick\" :style=\"t.style\">{{ t.label }}</button>\n      </template>\n    </div>\n\n    <template v-if=\"isTable\">\n    <div style=\"display: flex; flex-wrap: wrap; gap: 12px; align-items: center\">\n      <label style=\"flex: 1 1 280px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600\"><span style=\"position: absolute; left: -9999px\">Cari</span>\n        <input type=\"search\" :placeholder=\"placeholder\" style=\"height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 14px; font: inherit; font-weight: 400; background: #FFFFFF\">\n      </label>\n      <span style=\"font-size: 13px; color: #55605A\">{{ summary }}</span>\n    </div>\n\n    <section style=\"background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto\">\n      <table style=\"width: 100%; border-collapse: collapse; font-size: 14px; min-width: 680px\">\n        <thead>\n          <tr style=\"text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em\">\n            <template v-for=\"(c, $index) in cols\">\n              <th style=\"padding: 12px 18px; border-bottom: 1px solid #DDE3DF\">{{ c }}</th>\n            </template>\n          </tr>\n        </thead>\n        <tbody>\n          <template v-for=\"(r, $index) in rows\">\n            <tr>\n              <template v-for=\"(cell, $index) in r.cells\">\n                <td style=\"padding: 11px 18px; border-bottom: 1px solid #EEF1EF\">{{ cell }}</td>\n              </template>\n            </tr>\n          </template>\n        </tbody>\n      </table>\n    </section>\n    <p style=\"margin: 0; font-size: 13px; color: #55605A; line-height: 1.5\">{{ footnote }}</p>\n    </template>\n\n    <template v-if=\"isPilihan\">\n      <div style=\"display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start\">\n        <nav aria-label=\"Kelompok pilihan\" style=\"flex: 1 1 240px; max-width: 100%; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 12px\">\n          <template v-for=\"(m, $index) in moduls\">\n            <div style=\"display: flex; flex-direction: column; gap: 2px\">\n              <span style=\"font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5F6A64; padding: 4px 10px\">{{ m.label }}</span>\n              <template v-for=\"(g, $index) in m.groups\">\n                <button type=\"button\" @click=\"g.pick\" :aria-pressed=\"g.on\" :style=\"g.style\"><span>{{ g.label }}</span><span style=\"font-size: 12px; color: #55605A\">{{ g.count }}</span></button>\n              </template>\n            </div>\n          </template>\n        </nav>\n\n        <section style=\"flex: 999 1 460px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px\">\n          <div style=\"display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px\">\n            <div style=\"display: flex; flex-direction: column; gap: 2px\">\n              <span style=\"font-size: 13px; color: #55605A\">{{ grp.modul }}</span>\n              <h2 style=\"margin: 0; font-size: 20px; font-weight: 700\">{{ grp.label }}</h2>\n            </div>\n            <span style=\"font-size: 13px; color: #55605A\">{{ grp.aktif }} aktif · {{ grp.nonaktif }} nonaktif</span>\n          </div>\n\n          <form @submit=\"add\" style=\"display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; background: #F4F6F4; border-radius: 12px; padding: 12px\">\n            <label style=\"flex: 2 1 200px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600\">Pilihan baru\n              <input type=\"text\" :value=\"draft\" @input=\"typeDraft\" placeholder=\"Nama pilihan\" style=\"height: 42px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF\">\n            </label>\n            <label style=\"flex: 1 1 130px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600\">Lingkungan\n              <select @change=\"pickLing\" style=\"height: 42px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF\"><option value=\"Semua\">Semua</option><option value=\"Putra\">Putra</option><option value=\"Putri\">Putri</option></select>\n            </label>\n            <button type=\"submit\" style=\"height: 42px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; padding: 0 18px; font: inherit; font-weight: 600; cursor: pointer\">Tambah</button>\n          </form>\n\n          <div style=\"overflow-x: auto\">\n            <table style=\"width: 100%; border-collapse: collapse; font-size: 14px; min-width: 520px\">\n              <thead>\n                <tr style=\"text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em\">\n                  <th style=\"padding: 10px 12px; border-bottom: 1px solid #DDE3DF\">Urutan</th>\n                  <th style=\"padding: 10px 12px; border-bottom: 1px solid #DDE3DF\">Pilihan</th>\n                  <th style=\"padding: 10px 12px; border-bottom: 1px solid #DDE3DF\">Lingkungan</th>\n                  <template v-if=\"grp.perilaku\">\n                    <th style=\"padding: 10px 12px; border-bottom: 1px solid #DDE3DF\">{{ grp.perilaku }}</th>\n                  </template>\n                  <th style=\"padding: 10px 12px; border-bottom: 1px solid #DDE3DF\">Status</th>\n                </tr>\n              </thead>\n              <tbody>\n                <template v-for=\"(it, $index) in items\">\n                  <tr :style=\"it.rowStyle\">\n                    <td style=\"padding: 10px 12px; border-bottom: 1px solid #EEF1EF; color: #55605A\">{{ it.urutan }}</td>\n                    <td style=\"padding: 10px 12px; border-bottom: 1px solid #EEF1EF; font-weight: 600\">{{ it.nama }}</td>\n                    <td style=\"padding: 10px 12px; border-bottom: 1px solid #EEF1EF\">{{ it.ling }}</td>\n                    <template v-if=\"grp.perilaku\">\n                      <td style=\"padding: 10px 12px; border-bottom: 1px solid #EEF1EF; font-size: 13px\">{{ it.atur }}</td>\n                    </template>\n                    <td style=\"padding: 6px 12px; border-bottom: 1px solid #EEF1EF\">\n                      <button type=\"button\" @click=\"it.toggle\" :aria-pressed=\"it.aktif\" :style=\"it.btnStyle\">{{ it.status }}</button>\n                    </td>\n                  </tr>\n                </template>\n              </tbody>\n            </table>\n          </div>\n          <p style=\"margin: 0; font-size: 13px; color: #55605A; line-height: 1.5\">{{ grp.note }}</p>\n        </section>\n      </div>\n    </template>\n  </main>\n</div>", Cls: (function(){ class DCLogic { constructor(props){ this.props = props || {}; this.state = {}; } setState(){} forceUpdate(){} }
 
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { tab: 'santri' };
+    this.state = {
+      tab: 'santri', grp: 'sesi', draft: '', ling: 'Semua', off: { 'lomba:Kecamatan': true }, added: {}
+    };
   }
   renderVals() {
     const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
@@ -86,25 +88,63 @@ class Component extends DCLogic {
         ],
         footnote: 'Tanggal mulai terisi saat Update Kelas Tahunan dijalankan.'
       },
-      pilihan: {
-        label: 'Daftar Pilihan', placeholder: 'Cari kelompok atau pilihan', summary: 'Diedit Moderator / pemegang akses · tidak dihapus, hanya dinonaktifkan',
-        cols: ['Kelompok', 'Pilihan', 'Lingkungan', 'Urutan', 'Status'],
-        rows: [
-          ['Sesi absensi', 'Subuh', 'Semua', '1', 'Aktif'],
-          ['Sesi absensi', 'Malam', 'Semua', '3', 'Aktif'],
-          ['Jenis izin', 'Izin Dinas', 'Semua', '2', 'Aktif'],
-          ['Status kehadiran', 'Sakit', 'Semua', '3', 'Aktif'],
-          ['Diagnosa', 'ISPA (batuk pilek)', 'Semua', '2', 'Aktif'],
-          ['Obat', 'Paracetamol', 'Semua', '1', 'Aktif'],
-          ['Kategori pelanggaran', 'Bahasa', 'Semua', '2', 'Aktif'],
-          ['Ekstrakurikuler', 'Marching Band', 'Putri', '9', 'Aktif'],
-          ['Tingkat lomba', 'Kecamatan', 'Semua', '2', 'Nonaktif']
-        ],
-        footnote: 'Pilihan lebih dari 2 tampil sebagai dropdown. Jenis izin, status kehadiran, jenis kunjungan, dan tingkat vonis juga punya pengaturan perilaku (mis. kirim kabar ke wali).'
-      }
+      pilihan: { label: 'Daftar Pilihan', placeholder: '', summary: '', cols: [], rows: [], footnote: '' }
     };
     const cur = T[this.state.tab];
+    const G = [
+      ['Absensi', 'sesi', 'Sesi absensi', null, [['Subuh'], ['Siang'], ['Malam']], 'Membedakan absensi harian yang dilakukan beberapa kali sehari.'],
+      ['Absensi', 'hadir', 'Status kehadiran', 'Dihitung hadir', [['Hadir', 'Semua', 'Ya'], ['Izin', 'Semua', 'Tidak'], ['Sakit', 'Semua', 'Tidak'], ['Alpha', 'Semua', 'Tidak'], ['Pulang', 'Semua', 'Tidak']], 'Kode dan warna status ikut diatur di sini.'],
+      ['Absensi', 'kegiatan', 'Jenis kegiatan', null, [['Pramuka'], ['Muhadhoroh'], ["Halaqah Qur'an"], ['Olahraga'], ['Kesenian']], 'Dasar grup kegiatan dan Absensi Kegiatan.'],
+      ['Perizinan', 'izin', 'Jenis izin', 'Waktu · wali', [['Keluar Sementara', 'Semua', 'Jam'], ['Izin Dinas', 'Semua', 'Tanggal + jam'], ['Pulang', 'Semua', 'Tanggal · wajib wali']], 'Basis waktu menentukan isian form dan format Gate Pass.'],
+      ['Kesehatan', 'kunjungan', 'Jenis kunjungan', 'Ubah absensi', [['Rawat Jalan', 'Semua', '—'], ['Perawatan', 'Semua', 'Sakit · kabar ke wali']], 'Perawatan mengubah absensi hari itu.'],
+      ['Kesehatan', 'tindak', 'Tindak lanjut', null, [['Kembali ke kegiatan'], ['Istirahat di kamar'], ['Rujuk ke klinik / RS']], ''],
+      ['Kesehatan', 'diagnosa', 'Diagnosa', null, [['Demam'], ['ISPA (batuk pilek)'], ['Gastritis'], ['Dermatitis'], ['Luka ringan']], 'Form selalu menyediakan "Lainnya" dengan teks bebas.'],
+      ['Kesehatan', 'obat', 'Obat', null, [['Paracetamol'], ['Antasida'], ['Obat batuk'], ['Salep kulit']], 'Form selalu menyediakan "Lainnya" dengan teks bebas.'],
+      ['Kedisiplinan', 'kategori', 'Kategori pelanggaran', null, [['Keamanan'], ['Bahasa'], ['Ibadah'], ['Kebersihan']], ''],
+      ['Kedisiplinan', 'vonis', 'Tingkat vonis', 'Kabar ke wali', [['Ringan', 'Semua', 'Tidak'], ['Sedang', 'Semua', 'Tidak'], ['Berat', 'Semua', 'Ya (tanpa isi vonis)'], ['Pemutihan', 'Semua', 'Tidak · membatalkan kasus']], ''],
+      ['Pengembangan Diri', 'ekskul', 'Ekstrakurikuler', null, [['Basket', 'Putra'], ['Volley', 'Semua'], ['Hadroh', 'Semua'], ['Marching Band', 'Putri'], ['Kaligrafi', 'Semua']], 'Ekstrakurikuler putra dan putri boleh berbeda.'],
+      ['Pengembangan Diri', 'lomba', 'Tingkat lomba', null, [['Pondok'], ['Kecamatan'], ['Kabupaten'], ['Provinsi'], ['Nasional']], ''],
+      ['Pengembangan Diri', 'hasil', 'Hasil lomba', null, [['Juara 1'], ['Juara 2'], ['Juara 3'], ['Harapan 1'], ['Peserta']], '']
+    ];
+    const st = this.state;
+    const listOf = (key, base) => base.concat((st.added[key] || []));
+    const g = G.find((x) => x[1] === st.grp) || G[0];
+    const items = listOf(g[1], g[4]).map((r, i) => {
+      const id = g[1] + ':' + r[0];
+      const aktif = !st.off[id];
+      return {
+        urutan: String(i + 1), nama: r[0], ling: r[1] || 'Semua', atur: r[2] || '—', aktif,
+        status: aktif ? 'Aktif' : 'Nonaktif',
+        rowStyle: aktif ? '' : 'color: #6B756F',
+        btnStyle: 'height: 32px; min-width: 88px; border-radius: 999px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; ' + (aktif ? 'background: #E3F1E9; color: #1E5E3F; border: 1px solid #1E5E3F' : 'background: #EEF1EF; color: #55605A; border: 1px solid #B9C4BD'),
+        toggle: () => this.setState({ off: { ...st.off, [id]: aktif } })
+      };
+    });
+    const moduls = [];
+    G.forEach((x) => {
+      let m = moduls.find((y) => y.label === x[0]);
+      if (!m) { m = { label: x[0], groups: [] }; moduls.push(m); }
+      const on = x[1] === g[1];
+      m.groups.push({
+        label: x[2], on, count: String(listOf(x[1], x[4]).length),
+        style: 'display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 8px 10px; border-radius: 8px; border: 0; font: inherit; font-size: 14px; text-align: left; cursor: pointer; ' + (on ? 'background: #E3EFE8; color: #14533C; font-weight: 600' : 'background: #FFFFFF; color: #2E3833'),
+        pick: () => this.setState({ grp: x[1], draft: '' })
+      });
+    });
+    const aktifN = items.filter((x) => x.aktif).length;
     return {
+      isTable: st.tab !== 'pilihan', isPilihan: st.tab === 'pilihan',
+      moduls, items,
+      grp: { modul: g[0], label: g[2], perilaku: g[3] || '', note: (g[5] ? g[5] + ' ' : '') + 'Pilihan yang sudah dipakai tidak dihapus — cukup dinonaktifkan.', aktif: String(aktifN), nonaktif: String(items.length - aktifN) },
+      draft: st.draft,
+      typeDraft: (e) => this.setState({ draft: e.target.value }),
+      pickLing: (e) => this.setState({ ling: e.target.value }),
+      add: (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        const name = (st.draft || '').trim();
+        if (!name) return;
+        this.setState({ draft: '', added: { ...st.added, [g[1]]: (st.added[g[1]] || []).concat([[name, st.ling, g[3] ? '(atur)' : '']]) } });
+      },
       tabs: Object.keys(T).map((k) => ({ label: T[k].label, on: this.state.tab === k, style: pill(this.state.tab === k), pick: () => this.setState({ tab: k }) })),
       placeholder: cur.placeholder, summary: cur.summary, cols: cur.cols,
       rows: cur.rows.map((cells) => ({ cells })), footnote: cur.footnote
