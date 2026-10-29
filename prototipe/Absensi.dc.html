@@ -32,31 +32,26 @@ a{color:#1F6B4F}a:hover{color:#14533C}
 
     <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 18px 20px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end">
       <sc-if value="{{ isHarian }}" hint-placeholder-val="{{ true }}">
-      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Asrama
-        <select style="height: 44px; min-width: 200px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Ibnu Rusyd</option><option>Ibnu Sina</option><option>Kholid Bin Walid</option></select>
-      </label>
-      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Kamar
-        <div style="display: flex; flex-wrap: wrap; gap: 6px">
-          <sc-for list="{{ kamars }}" as="k" hint-placeholder-count="4">
-            <button type="button" onClick="{{ k.pick }}" style="{{ k.style }}">{{ k.label }}</button>
-          </sc-for>
-        </div>
-      </div>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Asrama
+          <select style="height: 44px; min-width: 180px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Ibnu Rusyd</option><option>Ibnu Sina</option><option>Kholid Bin Walid</option></select>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Kamar
+          <select style="height: 44px; min-width: 160px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Ibnu Rusyd-01</option><option>Ibnu Rusyd-02</option><option>Ibnu Rusyd-03</option><option>Ibnu Rusyd-04</option></select>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Sesi
+          <select style="height: 44px; min-width: 150px; border: 1px solid #1F6B4F; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 600; background: #FFFFFF"><option>Subuh</option><option>Siang</option><option>Malam</option></select>
+        </label>
       </sc-if>
       <sc-if value="{{ isKegiatan }}" hint-placeholder-val="{{ false }}">
-      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Kegiatan
-        <div style="display: flex; flex-wrap: wrap; gap: 6px">
-          <sc-for list="{{ kegiatan }}" as="g" hint-placeholder-count="5">
-            <button type="button" onClick="{{ g.pick }}" style="{{ g.style }}">{{ g.label }}</button>
-          </sc-for>
-        </div>
-      </div>
-      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Grup
-        <select style="height: 44px; min-width: 160px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Grup 1</option><option>Grup 2</option><option>Grup 3</option></select>
-      </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Kegiatan
+          <select style="height: 44px; min-width: 180px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Pramuka</option><option>Muhadhoroh</option><option>Halaqah Qur'an</option><option>Olahraga</option><option>Kesenian</option></select>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Grup
+          <select style="height: 44px; min-width: 150px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Grup 1</option><option>Grup 2</option><option>Grup 3</option></select>
+        </label>
       </sc-if>
       <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Tanggal
-        <input type="date" value="2026-10-26" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
+        <input type="date" value="2026-10-29" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
       </label>
       <button type="button" onClick="{{ allHadir }}" style="height: 44px; margin-left: auto; border: 1px solid #1F6B4F; color: #1F6B4F; background: #FFFFFF; border-radius: 10px; padding: 0 16px; font: inherit; font-weight: 600; cursor: pointer">Tandai semua hadir</button>
     </section>
@@ -85,10 +80,12 @@ a{color:#1F6B4F}a:hover{color:#14533C}
               <td style="padding: 10px 16px; border-bottom: 1px solid #EEF1EF; font-weight: 600">{{ r.nama }}</td>
               <td style="padding: 10px 16px; border-bottom: 1px solid #EEF1EF">{{ r.kelas }}</td>
               <td style="padding: 8px 16px; border-bottom: 1px solid #EEF1EF">
-                <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center">
-                  <sc-for list="{{ r.opts }}" as="o" hint-placeholder-count="4">
-                    <button type="button" onClick="{{ o.pick }}" disabled="{{ r.locked }}" aria-pressed="{{ o.on }}" aria-label="{{ o.full }}" style="{{ o.style }}">{{ o.code }}</button>
-                  </sc-for>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+                  <select aria-label="{{ r.label }}" onChange="{{ r.change }}" disabled="{{ r.locked }}" style="{{ r.selStyle }}">
+                    <sc-for list="{{ r.opts }}" as="o" hint-placeholder-count="4">
+                      <option value="{{ o.code }}" selected="{{ o.on }}">{{ o.full }}</option>
+                    </sc-for>
+                  </select>
                   <sc-if value="{{ r.locked }}" hint-placeholder-val="{{ false }}">
                     <span style="font-size: 12px; color: #55605A">otomatis dari {{ r.source }}</span>
                   </sc-if>
@@ -99,7 +96,8 @@ a{color:#1F6B4F}a:hover{color:#14533C}
         </tbody>
       </table>
     </section>
-    <div style="display: flex; justify-content: flex-end; gap: 10px">
+    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px">
+      <span style="font-size: 13px; color: #55605A">Daftar sesi dan status kehadiran diatur di Data Master › Daftar Pilihan.</span>
       <button type="button" style="height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; padding: 0 22px; font: inherit; font-weight: 600; cursor: pointer">Simpan absensi</button>
     </div>
   </main>
@@ -110,13 +108,12 @@ class Component extends DCLogic {
   constructor(props) {
     super(props);
     this.state = {
-      mode: 'harian', kamar: '01', keg: 'Pramuka',
+      mode: 'harian',
       st: { 1: 'H', 2: 'H', 3: 'I', 4: 'H', 5: 'S', 6: 'H', 7: 'A', 8: 'H' }
     };
   }
   renderVals() {
     const tab = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
-    const chip = (on) => 'height: 44px; min-width: 52px; border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer; ' + (on ? 'background: #E3EFE8; color: #14533C; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
     const colors = { H: ['#E3F1E9', '#1E5E3F'], I: ['#E4ECF8', '#23497E'], S: ['#FBF0DC', '#7A4E0C'], A: ['#F9E3E1', '#8E2A22'] };
     const full = { H: 'Hadir', I: 'Izin', S: 'Sakit', A: 'Alpha' };
     const people = [
@@ -128,28 +125,24 @@ class Component extends DCLogic {
     const st = this.state.st;
     const count = { H: 0, I: 0, S: 0, A: 0 };
     Object.values(st).forEach((v) => { count[v]++; });
-    const rows = people.map(([id, nis, nama, kelas, source]) => ({
-      nis, nama, kelas, source: source || '', locked: !!source,
-      opts: ['H', 'I', 'S', 'A'].map((c) => {
-        const on = st[id] === c;
-        return {
-          code: c, full: full[c] + ' untuk ' + nama, on,
-          style: 'width: 44px; height: 36px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; ' + (on ? 'background: ' + colors[c][0] + '; color: ' + colors[c][1] + '; border: 1px solid ' + colors[c][1] : 'background: #FFFFFF; color: #5F6A64; border: 1px solid #DDE3DF'),
-          pick: () => this.setState({ st: { ...st, [id]: c } })
-        };
-      })
-    }));
+    const rows = people.map(([id, nis, nama, kelas, source]) => {
+      const cur = st[id];
+      return {
+        nis, nama, kelas, source: source || '', locked: !!source, label: 'Status kehadiran ' + nama,
+        selStyle: 'height: 38px; min-width: 120px; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 13px; font-weight: 700; border: 1px solid ' + colors[cur][1] + '; background: ' + colors[cur][0] + '; color: ' + colors[cur][1],
+        opts: ['H', 'I', 'S', 'A'].map((c) => ({ code: c, full: full[c], on: cur === c })),
+        change: (e) => { const v = e.target.value; if (full[v]) this.setState({ st: { ...st, [id]: v } }); }
+      };
+    });
+    const harian = this.state.mode === 'harian';
     return {
-      harianStyle: tab(this.state.mode === 'harian'),
-      kegiatanStyle: tab(this.state.mode === 'kegiatan'),
+      title: harian ? 'Absensi Harian' : 'Absensi Kegiatan',
+      isHarian: harian, isKegiatan: !harian,
+      harianStyle: tab(harian), kegiatanStyle: tab(!harian),
       modeHarian: () => this.setState({ mode: 'harian' }),
       modeKegiatan: () => this.setState({ mode: 'kegiatan' }),
-      kamars: ['01', '02', '03', '04'].map((k) => ({ label: k, style: chip(this.state.kamar === k), pick: () => this.setState({ kamar: k }) })),
       allHadir: () => this.setState({ st: { ...st, 1: 'H', 2: 'H', 4: 'H', 6: 'H', 7: 'H', 8: 'H' } }),
-      count, rows,
-      isHarian: this.state.mode === 'harian', isKegiatan: this.state.mode === 'kegiatan',
-      title: this.state.mode === 'harian' ? 'Absensi Harian' : 'Absensi Kegiatan',
-      kegiatan: ['Pramuka', 'Muhadhoroh', 'Halaqah Qur\x27an', 'Olahraga', 'Kesenian'].map((g) => ({ label: g, style: chip(this.state.keg === g).replace('min-width: 52px', 'padding: 0 14px'), pick: () => this.setState({ keg: g }) }))
+      count, rows
     };
   }
 }

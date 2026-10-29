@@ -51,7 +51,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
         <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Keterangan
           <textarea rows="3" style="border: 1px solid #C9D2CC; border-radius: 10px; padding: 10px 12px; font: inherit; font-weight: 400; resize: vertical"></textarea>
         </label>
-        <p style="margin: 0; font-size: 13px; color: #55605A">Input bisa dibatalkan penginput dalam 1 jam. Setelah divonis, pemutihan hanya oleh hakim.</p>
+        <p style="margin: 0; font-size: 13px; color: #55605A">Input bisa dibatalkan penginput dalam 1 jam. Setelah divonis, pemutihan hanya oleh hakim. Penginput dan hakim ditentukan Moderator lewat Manajemen Akses.</p>
         <button type="button" style="height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; font: inherit; font-weight: 600; cursor: pointer">Kirim ke antrean sidang</button>
       </section>
     </sc-if>
@@ -70,11 +70,14 @@ a{color:#1F6B4F}a:hover{color:#14533C}
         <section style="flex: 1 1 340px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
           <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Putusan hakim</h2><span style="font-size: 13px; color: #55605A">{{ cur.nama }} · {{ cur.kategori }}</span></div>
           <p style="margin: 0; font-size: 14px; line-height: 1.55">{{ cur.ket }}. Dicatat oleh {{ cur.oleh }}.</p>
-          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px" role="group" aria-label="Vonis">
-            <sc-for list="{{ vonis }}" as="v" hint-placeholder-count="4">
-              <button type="button" onClick="{{ v.pick }}" aria-pressed="{{ v.on }}" style="{{ v.style }}">{{ v.label }}</button>
-            </sc-for>
-          </div>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Vonis
+            <select onChange="{{ pickVonis }}" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
+              <option value="" selected="{{ noVonis }}">Pilih vonis…</option>
+              <sc-for list="{{ vonis }}" as="v" hint-placeholder-count="4">
+                <option value="{{ v.key }}" selected="{{ v.on }}">{{ v.label }}</option>
+              </sc-for>
+            </select>
+          </label>
           <span style="font-size: 13px; color: #55605A">{{ vonisNote }}</span>
           <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Hukuman / alasan
             <textarea rows="2" style="border: 1px solid #C9D2CC; border-radius: 10px; padding: 10px 12px; font: inherit; font-weight: 400; resize: vertical"></textarea>
@@ -130,7 +133,8 @@ class Component extends DCLogic {
         pick: () => this.setState({ sel: i })
       })),
       cur: C[s],
-      vonis: VL.map(([k, label]) => ({ label, on: cv === k, style: vstyle(cv === k, k), pick: () => this.setState({ vonis: { ...this.state.vonis, [s]: k } }) })),
+      noVonis: !cv, pickVonis: (e) => this.setState({ vonis: { ...this.state.vonis, [s]: e.target.value || undefined } }),
+      vonis: VL.map(([k, label]) => ({ key: k, label, on: cv === k, style: vstyle(cv === k, k), pick: () => this.setState({ vonis: { ...this.state.vonis, [s]: k } }) })),
       vonisNote: cv ? notes[cv] : 'Pilih vonis.',
       history: [
         { tgl: '24/10', nama: 'Santri Contoh 41', kat: 'Keamanan', vonis: 'Sedang' },

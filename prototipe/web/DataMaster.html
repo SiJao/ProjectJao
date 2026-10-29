@@ -51,7 +51,7 @@ class Component extends DCLogic {
           ['6 A MIA', '6', 'MA', '[Nama guru]', '—'],
           ['6 F IIS', '6', 'MA', '[Nama guru]', '—']
         ],
-        footnote: 'Kelas 1–3: MTs / SMP · kelas 4–6: MA · kelas Intensif = rombel biasa · MIA/IIS hanya label.'
+        footnote: 'Rombel statis — yang berubah tiap tahun hanya santri dan wali kelasnya. Kelas 1–3: MTs / SMP · kelas 4–6: MA · Intensif = rombel biasa · MIA/IIS hanya label.'
       },
       asrama: {
         label: 'Asrama & Kamar', placeholder: 'Cari asrama atau kamar', summary: '10 asrama · 61 kamar',
@@ -85,6 +85,22 @@ class Component extends DCLogic {
           ['2025/2026', 'Arsip', 'Juli 2025', 'Juli 2026']
         ],
         footnote: 'Tanggal mulai terisi saat Update Kelas Tahunan dijalankan.'
+      },
+      pilihan: {
+        label: 'Daftar Pilihan', placeholder: 'Cari kelompok atau pilihan', summary: 'Diedit Moderator / pemegang akses · tidak dihapus, hanya dinonaktifkan',
+        cols: ['Kelompok', 'Pilihan', 'Lingkungan', 'Urutan', 'Status'],
+        rows: [
+          ['Sesi absensi', 'Subuh', 'Semua', '1', 'Aktif'],
+          ['Sesi absensi', 'Malam', 'Semua', '3', 'Aktif'],
+          ['Jenis izin', 'Izin Dinas', 'Semua', '2', 'Aktif'],
+          ['Status kehadiran', 'Sakit', 'Semua', '3', 'Aktif'],
+          ['Diagnosa', 'ISPA (batuk pilek)', 'Semua', '2', 'Aktif'],
+          ['Obat', 'Paracetamol', 'Semua', '1', 'Aktif'],
+          ['Kategori pelanggaran', 'Bahasa', 'Semua', '2', 'Aktif'],
+          ['Ekstrakurikuler', 'Marching Band', 'Putri', '9', 'Aktif'],
+          ['Tingkat lomba', 'Kecamatan', 'Semua', '2', 'Nonaktif']
+        ],
+        footnote: 'Pilihan lebih dari 2 tampil sebagai dropdown. Jenis izin, status kehadiran, jenis kunjungan, dan tingkat vonis juga punya pengaturan perilaku (mis. kirim kabar ke wali).'
       }
     };
     const cur = T[this.state.tab];

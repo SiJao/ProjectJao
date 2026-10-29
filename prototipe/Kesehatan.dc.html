@@ -51,11 +51,23 @@ a{color:#1F6B4F}a:hover{color:#14533C}
           <span style="font-weight: 400; color: #55605A">{{ jenisNote }}</span>
         </div>
         <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Diagnosa
-          <input type="text" placeholder="Diisi dokter / pengurus jaga" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
+          <select onChange="{{ onDiag }}" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option value="Demam">Demam</option><option value="ISPA">ISPA (batuk pilek)</option><option value="Gastritis">Gastritis</option><option value="Dermatitis">Dermatitis</option><option value="Luka ringan">Luka ringan</option><option value="Lainnya">Lainnya…</option></select>
         </label>
-        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Resep
-          <textarea rows="3" placeholder="Obat dan aturan pakai" style="border: 1px solid #C9D2CC; border-radius: 10px; padding: 10px 12px; font: inherit; font-weight: 400; resize: vertical"></textarea>
-        </label>
+        <sc-if value="{{ diagLain }}" hint-placeholder-val="{{ false }}">
+          <input type="text" aria-label="Diagnosa lainnya" placeholder="Tulis diagnosa lain" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit">
+        </sc-if>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end">
+          <label style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Resep · obat
+            <select onChange="{{ onObat }}" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option value="Paracetamol">Paracetamol</option><option value="Antasida">Antasida</option><option value="Obat batuk">Obat batuk</option><option value="Salep kulit">Salep kulit</option><option value="Lainnya">Lainnya…</option></select>
+          </label>
+          <label style="flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Aturan pakai
+            <input type="text" placeholder="3 × 1 sesudah makan" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
+          </label>
+        </div>
+        <sc-if value="{{ obatLain }}" hint-placeholder-val="{{ false }}">
+          <input type="text" aria-label="Obat lainnya" placeholder="Tulis nama obat lain" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit">
+        </sc-if>
+        <button type="button" style="align-self: flex-start; height: 38px; border-radius: 8px; border: 1px dashed #8A948E; background: #FFFFFF; color: #2E3833; padding: 0 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">+ Tambah obat</button>
         <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Tindak lanjut
           <select style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Kembali ke kegiatan</option><option>Istirahat di kamar</option><option>Rujuk ke klinik / RS</option></select>
         </label>
@@ -83,7 +95,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { sel: 0, rawat: { 0: false, 1: true, 2: false, 3: true, 4: false } };
+    this.state = { diag: 'Demam', obat: 'Paracetamol', sel: 0, rawat: { 0: false, 1: true, 2: false, 3: true, 4: false } };
   }
   renderVals() {
     const V = [
@@ -105,6 +117,8 @@ class Component extends DCLogic {
         style: 'display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 20px; border: 0; border-top: 1px solid #EEF1EF; font: inherit; color: #18201C; cursor: pointer; ' + (i === s ? 'background: #EEF5F1' : 'background: #FFFFFF'),
         pick: () => this.setState({ sel: i })
       })),
+      onDiag: (e) => this.setState({ diag: e.target.value }), diagLain: this.state.diag === 'Lainnya',
+      onObat: (e) => this.setState({ obat: e.target.value }), obatLain: this.state.obat === 'Lainnya',
       sel: V[s], isRawat: !!r[s], isJalan: !r[s],
       rawatStyle: pill(!!r[s]), jalanStyle: pill(!r[s]),
       setRawat: () => this.setState({ rawat: { ...r, [s]: true } }),

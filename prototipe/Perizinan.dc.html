@@ -32,11 +32,11 @@ a{color:#1F6B4F}a:hover{color:#14533C}
           <input type="search" value="Santri Contoh 03 · 990203" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
         </label>
         <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Jenis izin
-          <div style="display: flex; flex-wrap: wrap; gap: 6px" role="group" aria-label="Jenis izin">
+          <select aria-label="Jenis izin" onChange="{{ pickJenis }}" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
             <sc-for list="{{ jenis }}" as="j" hint-placeholder-count="3">
-              <button type="button" onClick="{{ j.pick }}" aria-pressed="{{ j.on }}" style="{{ j.style }}">{{ j.label }}</button>
+              <option value="{{ j.key }}" selected="{{ j.on }}">{{ j.label }}</option>
             </sc-for>
-          </div>
+          </select>
           <span style="font-weight: 400; color: #55605A">{{ jenisNote }}</span>
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 12px">
@@ -128,7 +128,8 @@ class Component extends DCLogic {
       { id: 4, nama: 'Santri Contoh 14', jenis: 'Izin Dinas', ret: '27/10 17.00' }
     ];
     return {
-      jenis: Object.keys(J).map((k) => ({ label: J[k].label, on: this.state.jenis === k, style: pill(this.state.jenis === k), pick: () => this.setState({ jenis: k }) })),
+      pickJenis: (e) => { if (J[e.target.value]) this.setState({ jenis: e.target.value }); },
+      jenis: Object.keys(J).map((k) => ({ key: k, label: J[k].label, on: this.state.jenis === k, style: pill(this.state.jenis === k), pick: () => this.setState({ jenis: k }) })),
       jenisNote: cur.note, jenisLabel: cur.label.toUpperCase(), dep: cur.dep, ret: cur.ret,
       izin: list.map((z) => {
         const done = !!this.state.back[z.id];
