@@ -608,19 +608,19 @@ export const MIGRATIONS = [
       `CREATE TABLE backup_log (id INTEGER PRIMARY KEY, waktu TEXT NOT NULL DEFAULT (datetime('now')), jenis TEXT NOT NULL CHECK (jenis IN ('sql','csv')), ukuran INTEGER, status TEXT NOT NULL, oleh INTEGER REFERENCES users(id))`,
 
       // ---------- Data awal ----------
-      `INSERT INTO jenis_kunjungan (nama, status_kehadiran_id, kabar_wali, urutan) VALUES
+      `INSERT OR IGNORE INTO jenis_kunjungan (nama, status_kehadiran_id, kabar_wali, urutan) VALUES
         ('Rawat Jalan', NULL, 0, 1),
         ('Perawatan', (SELECT id FROM status_kehadiran WHERE kode='S'), 1, 2)`,
-      `INSERT INTO tingkat_vonis (nama, kabar_wali, adalah_pemutihan, urutan) VALUES
+      `INSERT OR IGNORE INTO tingkat_vonis (nama, kabar_wali, adalah_pemutihan, urutan) VALUES
         ('Ringan',0,0,1),('Sedang',0,0,2),('Berat',1,0,3),('Pemutihan',0,1,4)`,
-      `INSERT INTO jabatan (nama, urutan) VALUES
+      `INSERT OR IGNORE INTO jabatan (nama, urutan) VALUES
         ('Ketua',1),('Wakil Ketua',2),('Sekretaris',3),('Bendahara',4),('Bagian Keamanan',5),('Bagian Bahasa',6),
         ('Bagian Peribadatan',7),('Bagian Kesehatan',8),('Bagian Kebersihan',9),('Bagian Pendidikan',10),('Bagian Olahraga',11),('Bagian Kesenian',12)`,
-      `INSERT INTO pilihan (kelompok, nama, urutan) VALUES
+      `INSERT OR IGNORE INTO pilihan (kelompok, nama, urutan) VALUES
         ('diagnosa','Demam',1),('diagnosa','Flu / batuk',2),('diagnosa','Sakit kepala',3),('diagnosa','Diare',4),('diagnosa','Maag',5),('diagnosa','Luka',6),('diagnosa','Gatal-gatal',7),
         ('obat','Paracetamol',1),('obat','Antasida',2),('obat','Oralit',3),('obat','Obat batuk',4),('obat','Antiseptik luka',5),
         ('ekstrakurikuler','Futsal',1),('ekstrakurikuler','Basket',2),('ekstrakurikuler','Hadroh',3),('ekstrakurikuler','Kaligrafi',4),('ekstrakurikuler','Pencak silat',5)`,
-      `INSERT INTO pengaturan (kunci, nilai, keterangan) VALUES
+      `INSERT OR IGNORE INTO pengaturan (kunci, nilai, keterangan) VALUES
         ('overdue.kategori_pelanggaran','Keamanan','Nama kategori pelanggaran otomatis untuk izin overdue'),
         ('pelanggaran.batas_batal_menit','60','Batas pencatat membatalkan input pelanggarannya'),
         ('tautan_wali.batas_gagal_per_hari','5','Gagal menautkan anak per hari sebelum dikunci'),
@@ -628,7 +628,7 @@ export const MIGRATIONS = [
         ('email.mode_uji','1','1 = semua email dialihkan ke email.alamat_uji (server testing)'),
         ('email.alamat_uji','','Kotak surat tim IT untuk Mode Uji'),
         ('email.nama_pengirim','HISADA','Nama pengirim email')`,
-      `INSERT INTO akses (kode, nama, keterangan) VALUES
+      `INSERT OR IGNORE INTO akses (kode, nama, keterangan) VALUES
         ('pemeriksaan','Pemeriksaan kesehatan','Mengisi diagnosa, resep, tindak lanjut (mis. dokter)'),
         ('update_kamar','Update Kamar','Memindah kamar santri (massal)'),
         ('paw','Pergantian Antar-Waktu','Mengganti satu pengurus di tengah masa khidmat'),

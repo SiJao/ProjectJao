@@ -350,7 +350,7 @@ Keterangan: ✔ otomatis · ☑ jika diberi lewat Manajemen Akses · 👁 lihat 
 | Data Master (termasuk no. HP wali) | ✖ | ✖ | ✖ | ✖ | ✖ | ✔ |
 | Edit daftar pilihan tertentu (mis. obat, diagnosa) | ☑ | ☑ | ☑ | ☑ | ☑ | ✔ |
 | Profil kesehatan | ✖ | ☑ | ✖ | ✖ | ✖ | ✔ |
-| Update Kamar, PAW | ⏳ | ⏳ | ⏳ | ⏳ | ✖ | ✔ |
+| Update Kamar, PAW | ☑ | ☑ | ☑ | ☑ | ✖ | ✔ |
 | Update Kelas Tahunan, Serah Terima, role & akses, backup, email ke wali tertentu, tautkan wali manual | ✖ | ✖ | ✖ | ✖ | ✖ | ✔ |
 
 ---
@@ -762,13 +762,11 @@ flowchart TD
 
 | Topik | Pertanyaan |
 |---|---|
-| Update Kamar & PAW | Siapa pemiliknya selain Moderator? |
 | Inventaris | Untuk barang pondok atau barang titipan santri? |
 | Asatidz | Data apa saja yang boleh dilihat? Format akun guru? |
-| Export Excel | Role mana yang boleh mengekspor data? |
+| Export Excel | Role mana yang boleh mengekspor data? *(sementara: Prestasi & Korespondensi oleh pemegang aksesnya; rekap Absensi Kamar oleh pemegang akses Absensi di lingkungannya)* |
 | Backup | Berapa banyak backup yang disimpan? |
 | Server produksi | Server pesantren sendiri atau hosting yang lebih layak (hosting saat ini hanya untuk testing) |
-| Dokter | Diagnosa & resep diinput dokter sendiri atau oleh pengurus jaga? |
 | Serah Terima & kelompok kegiatan | Penempatan pengurus di kelompok (tahsin, muhadhoroh, pramuka) ikut berganti saat Serah Terima? |
 | Kegiatan baru | Kelas & pengajar, tahsin, syakia, muhadhoroh, belajar malam, menu makan: masuk sistem sekaligus atau bertahap? |
 | Perizinan oleh guru (P-50) | Bolehkah guru Bagian Keamanan diberi akses Perizinan lewat Manajemen Akses? |
@@ -785,8 +783,8 @@ Dibangun bertahap di Cloudflare Workers + D1; peluncuran resmi tetap sekaligus (
 | Tahap | Isi | Status |
 |---|---|---|
 | **1** | Login (Google + password cadangan), akun & role, Manajemen Akses, Data Master + Daftar Pilihan, impor santri dari spreadsheet, Absensi harian (sesi, status otomatis dari izin/overdue/skorsing), Perizinan + Gate Pass (masa tenggang & overdue), Riwayat Perubahan | ✅ Dikoding & diuji (59 uji API) |
-| 2 | Kesehatan, Kedisiplinan (input/putusan), Update Data (Update Kelas Tahunan, Update Kamar, Serah Terima, PAW) | ⏳ |
-| 3 | Absensi Kegiatan, Pengembangan Diri, Rapor, Tata Warkat, Notifikasi email, Portal Wali, Backup, Export | ⏳ |
+| **2** | Kesehatan (pemeriksaan oleh pemegang akses *Pemeriksaan* yang diberikan Moderator), Kedisiplinan (input/putusan, pemutihan, skorsing bertanggal), Update Data (Update Kelas Tahunan, Update Kamar & PAW lewat Manajemen Akses, Serah Terima, Isi Bagian Pengurus) | ✅ Dikoding & diuji |
+| **3** | Absensi Kegiatan, Pengembangan Diri, Prestasi, Rapor, Tata Warkat, Libur Pondok & koreksi overdue, Notifikasi & antrean email, Portal Wali, Cari Santri & Guru, Backup (.sql terenkripsi) & Export (.xlsx/CSV), impor guru massal, pencarian langsung (maks. 5 saran) | ✅ Dikoding & diuji — email terkirim setelah pengirim Gmail pondok diatur (lihat halaman Komunikasi) |
 
 Kode PHP lama sudah dihapus dari repo (27 Oktober 2026); masih bisa dilihat di riwayat git, commit `6ddf02a`. Perbedaannya dengan desain baru, sebagai acuan:
 

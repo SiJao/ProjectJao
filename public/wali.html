@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal Wali Santri — HISADA</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#134A2F">
+<link rel="icon" type="image/png" href="/img/logo-hisada-64.png">
+<link rel="apple-touch-icon" href="/img/logo-hisada-256.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<style>
+  /* tambahan khusus Portal Wali (mobile-first, satu kolom) */
+  .portal{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+  .portal .bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;height:58px;padding:0 16px;background:var(--hijau-tua);color:#fff;box-shadow:0 2px 12px -6px rgba(0,0,0,.4)}
+  .portal .bar img{width:34px;height:34px}
+  .portal .bar strong{flex:1;letter-spacing:.04em}
+  .portal .bar button{min-height:36px;background:transparent;border-color:rgba(255,255,255,.4)}
+  .portal main{width:100%;max-width:760px;margin:0 auto;padding:18px 16px 48px;display:flex;flex-direction:column;gap:16px}
+  .anak-kartu{display:flex;gap:14px;align-items:center;text-decoration:none;color:inherit}
+  .foto-anak{width:64px;height:auto;aspect-ratio:3/4;border-radius:12px;object-fit:cover;object-position:50% 18%;background:var(--hijau-muda);flex:none;display:grid;place-items:center;font-weight:700;color:var(--hijau-tua)}
+  .foto-anak.besar{width:110px}
+  .daftar-kecil{display:flex;flex-direction:column}
+  .daftar-kecil>div{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--garis-tipis);flex-wrap:wrap}
+  .daftar-kecil>div:first-child{border-top:0}
+  .rekap{display:flex;flex-wrap:wrap;gap:8px}
+</style>
+</head>
+<body>
+<div id="app"><p class="muat">Memuat Portal Wali…</p></div>
+<script src="/vue.global.prod.js"></script>
+<script src="/anime.umd.min.js"></script>
+<script src="/wali.js"></script>
+</body>
+</html>

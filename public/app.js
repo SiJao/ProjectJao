@@ -228,6 +228,7 @@ const Masuk = {
           <button :disabled="f.sibuk">Masuk</button>
         </form>
         <p class="redup" style="margin:0">Akun pengurus baru: password sementara = NIS + tanggal lahir (ddmmyyyy), wajib diganti saat login pertama.</p>
+        <p class="redup" style="margin:0;text-align:center">Wali santri? Masuk lewat <a href="/wali.html">Portal Wali</a>.</p>
       </template>
       <Pesan :galat="f.galat" :ok="f.ok"/>
     </template>
@@ -934,7 +935,7 @@ const Riwayat = {
     return { d, kat, galat };
   },
   template: `<div><span class="jejak">Fungsi › Pemantauan</span><h1>Riwayat Perubahan</h1></div>
-  <div class="tab"><button v-for="k in ['','data','kesantrian','pilihan','akun','akses','pengaturan']" :class="{aktif: kat===k}" @click="kat=k">{{ k || 'Semua' }}</button></div>
+  <div class="tab"><button v-for="k in ['','data','kesantrian','jabatan','pilihan','akun','akses','pengaturan']" :class="{aktif: kat===k}" @click="kat=k">{{ k || 'Semua' }}</button></div>
   <div v-if="galat" class="pesan galat">{{ galat }}</div>
   <div class="tabel"><table><thead><tr><th>Waktu (UTC)</th><th>Oleh</th><th>Kategori</th><th>Aksi</th><th>Ringkasan</th></tr></thead>
     <tbody><tr v-for="r in d" :key="r.id"><td class="redup" style="white-space:nowrap">{{ r.waktu }}</td><td>{{ r.oleh || 'Sistem' }}</td><td><span class="lencana">{{ r.kategori }}</span></td><td>{{ r.aksi }}</td><td>{{ r.ringkasan }}</td></tr></tbody></table></div>`,

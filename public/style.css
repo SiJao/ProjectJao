@@ -135,7 +135,7 @@ tbody tr:last-child td{border-bottom:0}
 .masuk{min-height:100vh;min-height:100dvh;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr)}
 .masuk-merek{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:14px;padding:clamp(28px,5vw,64px);color:#fff;
   background:radial-gradient(70% 60% at 50% 40%,rgba(201,160,66,.28),transparent 70%),linear-gradient(160deg,var(--hijau),var(--hijau-gelap))}
-.masuk-merek img{width:clamp(130px,18vw,230px);filter:drop-shadow(0 10px 30px rgba(0,0,0,.35))}
+.masuk-merek img{width:clamp(130px,18vw,230px);height:auto;filter:drop-shadow(0 10px 30px rgba(0,0,0,.35))}
 .masuk-merek h1{color:#fff;font-size:clamp(28px,3vw,42px);letter-spacing:.12em}
 .masuk-merek p{margin:0;color:#D3E6D9;max-width:420px}
 .masuk-merek .garis-emas{width:72px;height:3px;border-radius:3px;background:var(--emas)}

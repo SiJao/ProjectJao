@@ -121,8 +121,10 @@ const AKSES_ROLE = {
 const KEMAMPUAN = ["absensi", "lihat_absensi", "perizinan", "lihat_perizinan", "kesehatan", "pemeriksaan", "profil_kesehatan",
   "input_pelanggaran", "putusan_kedisiplinan", "lihat_vonis", "kegiatan", "prestasi", "lihat_prestasi", "rapor", "lihat_rapor",
   "tata_warkat", "pengumuman", "isi_pengurus", "update_kamar", "paw", "riwayat"];
+// lihat_vonis tidak punya kode "vonis": pemegangnya adalah pemutus (hakim).
+const LIHAT_DARI = { lihat_vonis: "putusan_kedisiplinan" };
 const boleh = (u, kode) => u.role === "moderator" || u.akses.includes(kode) || (AKSES_ROLE[u.role] || []).includes(kode)
-  || (kode.startsWith("lihat_") && boleh(u, kode.slice(6)));
+  || (kode.startsWith("lihat_") && boleh(u, LIHAT_DARI[kode] || kode.slice(6)));
 const wajib = (u, kode) => { if (!boleh(u, kode)) gagal(403, "Anda tidak punya akses untuk tindakan ini."); };
 const wajibModerator = (u) => { if (u.role !== "moderator") gagal(403, "Hanya Moderator."); };
 const lingIn = (u, kolom = "lingkungan") => ({ sql: `${kolom} IN (${u.ling.map(() => "?").join(",")})`, args: u.ling });
@@ -192,8 +194,9 @@ async function kabarWali(db, santriId, { subjek, isi, tabel, id }) {
   return wali.length;
 }
 // Ralat untuk kabar yang ternyata salah input: dikirim ke penerima yang sama, menunjuk email aslinya.
-async function kabarKoreksi(db, tabel, id, isi) {
-  const lama = (await db.prepare("SELECT * FROM email_antrean WHERE tabel_terkait = ? AND id_terkait = ? AND koreksi_dari_id IS NULL AND jenis = 'wali'").bind(tabel, id).all()).results;
+// opsi.subjek: hanya meralat email yang subjeknya memuat teks ini (mis. kabar overdue, bukan kabar izin terbit).
+async function kabarKoreksi(db, tabel, id, isi, opsi = {}) {
+  const lama = (await db.prepare("SELECT * FROM email_antrean WHERE tabel_terkait = ? AND id_terkait = ? AND koreksi_dari_id IS NULL AND jenis = 'wali' AND instr(subjek, ?) > 0").bind(tabel, id, opsi.subjek || "").all()).results;
   if (!lama.length) return 0;
   await db.batch(lama.map((e) => stmtEmail(db, {
     penerima: e.penerima, subjek: "[HISADA] Ralat: " + e.subjek.replace(/^\[HISADA\] /, ""), isi: `Assalamu'alaikum,\n\nRalat atas kabar sebelumnya: ${isi}\n\nMohon maaf atas kekeliruan ini.\n\n— HISADA`,
@@ -429,6 +432,7 @@ on("GET", "/api/lencana", async ({ db, u }) => {
     `SELECT COUNT(*) n FROM kunjungan_kesehatan k WHERE k.status = 'aktif' AND ${lingIn(u, "k.lingkungan").sql} AND NOT EXISTS (SELECT 1 FROM pemeriksaan p WHERE p.kunjungan_id = k.id)`).bind(...l.args).first()).n;
   if (u.role === "moderator") {
     h["/pengguna"] = (await db.prepare("SELECT COUNT(*) n FROM users WHERE role IS NULL AND status = 'aktif'").first()).n;
+    h["/update-data"] = (await db.prepare("SELECT COUNT(*) n FROM santri WHERE menunggu_penempatan = 1 AND status = 'aktif'").first()).n;
     h["/komunikasi"] = (await db.prepare("SELECT COUNT(*) n FROM email_antrean WHERE status = 'gagal'").first()).n;
   }
   return json(h);
@@ -630,7 +634,9 @@ on("GET", "/api/guru", async ({ db, u, url }) => {
   const q = (url.searchParams.get("q") || "").trim();
   if (q) { w.push("(g.nama LIKE ? OR g.nip LIKE ?)"); a.push(`%${q}%`, `${q}%`); }
   const lf = url.searchParams.get("lingkungan");
-  if (["putra", "putri", "semua"].includes(lf)) { w.push("g.lingkungan = ?"); a.push(lf); }
+  // filter putra/putri ikut menampilkan guru 'semua' (mengajar di kedua lingkungan); 'semua' = hanya guru 'semua'
+  if (["putra", "putri"].includes(lf)) { w.push("(g.lingkungan = ? OR g.lingkungan = 'semua')"); a.push(lf); }
+  else if (lf === "semua") w.push("g.lingkungan = 'semua'");
   if (url.searchParams.get("aktif") !== "semua") w.push("g.aktif = 1");
   const lim = Math.min(+url.searchParams.get("limit") || 5, 50);
   const kolom = u.role === "moderator" ? "g.*" : "g.id, g.nip, g.nama, g.jenis_kelamin, g.lingkungan, g.aktif";
