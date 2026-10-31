@@ -801,6 +801,7 @@ Urutan berikutnya: **Desain Database** → **Spesifikasi Final per modul** → C
 
 ```
 ├── README.md        # Desain sistem (dokumen ini)
+├── wrangler.jsonc   # Cloudflare Workers: menayangkan prototipe/web (deploy otomatis dari GitHub)
 └── prototipe/       # Prototipe tampilan (data contoh)
     ├── *.dc.html        # Sumber kanvas Design
     ├── build-web.js     # Pembuat versi web

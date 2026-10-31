@@ -1,3 +1,7 @@
 # Umum
 .DS_Store
 *.log
+
+# Cloudflare Wrangler
+.wrangler/
+node_modules/

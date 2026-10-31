@@ -1,0 +1,9 @@
+// Cloudflare Workers — menayangkan prototipe tampilan HISADA (file statis, tanpa database).
+// Halaman utama = prototipe/web/index.html (Login). Deploy otomatis dari GitHub (Workers Builds).
+{
+  "name": "hisada",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./prototipe/web"
+  }
+}
