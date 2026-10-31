@@ -51,7 +51,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
         <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Keterangan
           <textarea rows="3" style="border: 1px solid #C9D2CC; border-radius: 10px; padding: 10px 12px; font: inherit; font-weight: 400; resize: vertical"></textarea>
         </label>
-        <p style="margin: 0; font-size: 13px; color: #55605A">Input bisa dibatalkan penginput dalam 1 jam. Setelah divonis, pemutihan hanya oleh hakim. Penginput dan hakim ditentukan Moderator lewat Manajemen Akses.</p>
+        <p style="margin: 0; font-size: 13px; color: #55605A; line-height: 1.5">Input bisa dibatalkan penginput dalam 1 jam. Setelah divonis, pemutihan dicatat sebagai putusan baru yang menggantikan vonis lama (vonis lama tetap tersimpan). Penginput dan pemutus ditentukan Moderator lewat Manajemen Akses.</p>
         <button type="button" style="height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; font: inherit; font-weight: 600; cursor: pointer">Kirim ke antrean sidang</button>
       </section>
     </sc-if>
@@ -68,10 +68,13 @@ a{color:#1F6B4F}a:hover{color:#14533C}
           </sc-for>
         </section>
         <section style="flex: 1 1 340px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
-          <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Putusan hakim</h2><span style="font-size: 13px; color: #55605A">{{ cur.nama }} · {{ cur.kategori }}</span></div>
+          <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Putusan</h2><span style="font-size: 13px; color: #55605A">{{ cur.nama }} · {{ cur.kategori }}</span></div>
           <p style="margin: 0; font-size: 14px; line-height: 1.55">{{ cur.ket }}. Dicatat oleh {{ cur.oleh }}.</p>
+          <sc-if value="{{ sendiri }}" hint-placeholder-val="{{ false }}">
+            <div role="status" style="background: #F9E3E1; color: #8E2A22; border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.5; font-weight: 600">Anda mencatat kasus ini. Pencatat tidak boleh memvonis atau memutihkan kasusnya sendiri — putusan oleh pemegang akses putusan lain atau Moderator.</div>
+          </sc-if>
           <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Vonis
-            <select onChange="{{ pickVonis }}" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
+            <select onChange="{{ pickVonis }}" disabled="{{ sendiri }}" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
               <option value="" selected="{{ noVonis }}">Pilih vonis…</option>
               <sc-for list="{{ vonis }}" as="v" hint-placeholder-count="4">
                 <option value="{{ v.key }}" selected="{{ v.on }}">{{ v.label }}</option>
@@ -82,7 +85,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
           <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Hukuman / alasan
             <textarea rows="2" style="border: 1px solid #C9D2CC; border-radius: 10px; padding: 10px 12px; font: inherit; font-weight: 400; resize: vertical"></textarea>
           </label>
-          <button type="button" style="height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; font: inherit; font-weight: 600; cursor: pointer">Simpan putusan</button>
+          <button type="button" disabled="{{ sendiri }}" style="{{ simpanStyle }}">Simpan putusan</button>
         </section>
       </div>
     </sc-if>
@@ -112,11 +115,12 @@ class Component extends DCLogic {
   }
   renderVals() {
     const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
+    // Pengguna contoh: Santri Contoh 64 (Kedisiplinan) dengan akses input pelanggaran + putusan kedisiplinan
     const C = [
-      { nama: 'Santri Contoh 11', kategori: 'Keamanan', ket: 'Terlambat kembali dari izin (otomatis)', oleh: 'sistem (overdue)' },
-      { nama: 'Santri Contoh 31', kategori: 'Bahasa', ket: 'Tidak berbahasa resmi di asrama', oleh: 'Bagian Bahasa' },
-      { nama: 'Santri Contoh 32', kategori: 'Ibadah', ket: 'Terlambat shalat berjamaah', oleh: 'Bagian Ibadah' },
-      { nama: 'Santri Contoh 33', kategori: 'Kebersihan', ket: 'Kamar tidak dirapikan', oleh: 'Bagian Kebersihan' }
+      { nama: 'Santri Contoh 11', kategori: 'Keamanan', ket: 'Overdue: tidak kembali dari izin Keluar Sementara (otomatis, 13.30)', oleh: 'sistem (overdue) — boleh diputus siapa pun yang memegang akses putusan' },
+      { nama: 'Santri Contoh 31', kategori: 'Bahasa', ket: 'Tidak berbahasa resmi di asrama', oleh: 'Santri Contoh 65 (Bagian Bahasa)' },
+      { nama: 'Santri Contoh 32', kategori: 'Ibadah', ket: 'Terlambat shalat berjamaah', oleh: 'Anda — Santri Contoh 64', sendiri: true },
+      { nama: 'Santri Contoh 33', kategori: 'Kebersihan', ket: 'Kamar tidak dirapikan', oleh: 'Santri Contoh 66 (Bagian Kebersihan)' }
     ];
     const VL = [['ringan', 'Ringan'], ['sedang', 'Sedang'], ['berat', 'Berat'], ['putih', 'Pemutihan']];
     const s = this.state.sel;
@@ -132,15 +136,16 @@ class Component extends DCLogic {
         style: 'display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 62px; padding: 10px 20px; border: 0; border-top: 1px solid #EEF1EF; font: inherit; color: #18201C; cursor: pointer; ' + (i === s ? 'background: #EEF5F1' : 'background: #FFFFFF'),
         pick: () => this.setState({ sel: i })
       })),
-      cur: C[s],
+      cur: C[s], sendiri: !!C[s].sendiri,
+      simpanStyle: 'height: 46px; border-radius: 10px; border: 0; font: inherit; font-weight: 600; ' + (C[s].sendiri ? 'background: #C9D2CC; color: #55605A; cursor: not-allowed' : 'background: #1F6B4F; color: #FFFFFF; cursor: pointer'),
       noVonis: !cv, pickVonis: (e) => this.setState({ vonis: { ...this.state.vonis, [s]: e.target.value || undefined } }),
       vonis: VL.map(([k, label]) => ({ key: k, label, on: cv === k, style: vstyle(cv === k, k), pick: () => this.setState({ vonis: { ...this.state.vonis, [s]: k } }) })),
       vonisNote: cv ? notes[cv] : 'Pilih vonis.',
       history: [
+        { tgl: '26/10', nama: 'Santri Contoh 44', kat: 'Keamanan', vonis: 'Berat — wali dikabari 11.20' },
         { tgl: '24/10', nama: 'Santri Contoh 41', kat: 'Keamanan', vonis: 'Sedang' },
         { tgl: '23/10', nama: 'Santri Contoh 42', kat: 'Bahasa', vonis: 'Ringan' },
-        { tgl: '22/10', nama: 'Santri Contoh 43', kat: 'Ibadah', vonis: 'Pemutihan' },
-        { tgl: '20/10', nama: 'Santri Contoh 44', kat: 'Keamanan', vonis: 'Berat' }
+        { tgl: '22/10', nama: 'Santri Contoh 43', kat: 'Ibadah', vonis: 'Pemutihan (24/10, menggantikan vonis Ringan)' }
       ]
     };
   }

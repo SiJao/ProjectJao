@@ -17,7 +17,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
 <script src="dc-shim.js"></script>
 <script>
 var DEFS = {};
-DEFS["Riwayat"] = { props: [], template: "<div style=\"display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; background: #F4F6F4\">\n  <div style=\"flex: 1 1 248px; max-width: 100%\">\n    <sidebar-c active=\"riwayat\"></sidebar-c>\n  </div>\n  <main style=\"flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px\">\n    <header style=\"display: flex; flex-direction: column; gap: 4px\">\n      <span style=\"font-size: 13px; color: #55605A\">Fungsi › Pemantauan</span>\n      <h1 style=\"margin: 0; font-size: 28px; font-weight: 700\">Riwayat Perubahan</h1>\n    </header>\n\n    <div style=\"display: flex; flex-wrap: wrap; gap: 8px\" role=\"group\" aria-label=\"Saring kategori\">\n      <template v-for=\"(f, $index) in filters\">\n        <button type=\"button\" :aria-pressed=\"f.on\" @click=\"f.pick\" :style=\"f.style\">{{ f.label }}</button>\n      </template>\n    </div>\n\n    <section style=\"background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto\">\n      <table style=\"width: 100%; border-collapse: collapse; font-size: 14px; min-width: 700px\">\n        <thead>\n          <tr style=\"text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em\">\n            <th style=\"padding: 12px 18px; border-bottom: 1px solid #DDE3DF\">Waktu</th>\n            <th style=\"padding: 12px 18px; border-bottom: 1px solid #DDE3DF\">Oleh</th>\n            <th style=\"padding: 12px 18px; border-bottom: 1px solid #DDE3DF\">Kategori</th>\n            <th style=\"padding: 12px 18px; border-bottom: 1px solid #DDE3DF\">Perubahan</th>\n          </tr>\n        </thead>\n        <tbody>\n          <template v-for=\"(r, $index) in rows\">\n            <tr>\n              <td style=\"padding: 11px 18px; border-bottom: 1px solid #EEF1EF; color: #55605A; white-space: nowrap\">{{ r.waktu }}</td>\n              <td style=\"padding: 11px 18px; border-bottom: 1px solid #EEF1EF; font-weight: 600\">{{ r.oleh }}</td>\n              <td style=\"padding: 11px 18px; border-bottom: 1px solid #EEF1EF\"><span style=\"font-size: 12px; font-weight: 700; background: #EEF1EF; color: #3B4540; border-radius: 999px; padding: 3px 10px\">{{ r.kat }}</span></td>\n              <td style=\"padding: 11px 18px; border-bottom: 1px solid #EEF1EF; line-height: 1.45\">{{ r.text }}</td>\n            </tr>\n          </template>\n        </tbody>\n      </table>\n    </section>\n    <p style=\"margin: 0; font-size: 13px; color: #55605A\">Moderator melihat semua · Sekretaris hanya selama masa jabatannya. Data tidak dapat dihapus.</p>\n  </main>\n</div>", Cls: (function(){ class DCLogic { constructor(props){ this.props = props || {}; this.state = {}; } setState(){} forceUpdate(){} }
+DEFS["Riwayat"] = { props: [], template: "<div style=\"display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; background: #F4F6F4\">\n  <div style=\"flex: 1 1 248px; max-width: 100%\">\n    <sidebar-c active=\"riwayat\"></sidebar-c>\n  </div>\n  <main style=\"flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px\">\n    <header style=\"display: flex; flex-direction: column; gap: 4px\">\n      <span style=\"font-size: 13px; color: #55605A\">Fungsi › Pemantauan</span>\n      <h1 style=\"margin: 0; font-size: 28px; font-weight: 700\">Riwayat Perubahan</h1>\n    </header>\n\n    <div style=\"display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end\">\n      <div style=\"display: flex; flex-wrap: wrap; gap: 8px\" role=\"group\" aria-label=\"Saring kategori\">\n        <template v-for=\"(f, $index) in filters\">\n          <button type=\"button\" :aria-pressed=\"f.on\" @click=\"f.pick\" :style=\"f.style\">{{ f.label }}</button>\n        </template>\n      </div>\n      <label style=\"margin-left: auto; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600\">Masa jabatan <span style=\"font-weight: 400; color: #55605A\">(filter Moderator)</span>\n        <select style=\"height: 40px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF\"><option>Semua</option><option selected>2026/2027 (aktif)</option><option>2025/2026</option></select>\n      </label>\n    </div>\n\n    <section style=\"background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto\">\n      <table style=\"width: 100%; border-collapse: collapse; font-size: 14px; min-width: 700px\">\n        <thead>\n          <tr style=\"text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em\">\n            <th style=\"padding: 12px 18px; border-bottom: 1px solid #DDE3DF\">Waktu</th>\n            <th style=\"padding: 12px 18px; border-bottom: 1px solid #DDE3DF\">Oleh</th>\n            <th style=\"padding: 12px 18px; border-bottom: 1px solid #DDE3DF\">Kategori</th>\n            <th style=\"padding: 12px 18px; border-bottom: 1px solid #DDE3DF\">Perubahan</th>\n          </tr>\n        </thead>\n        <tbody>\n          <template v-for=\"(r, $index) in rows\">\n            <tr>\n              <td style=\"padding: 11px 18px; border-bottom: 1px solid #EEF1EF; color: #55605A; white-space: nowrap\">{{ r.waktu }}</td>\n              <td style=\"padding: 11px 18px; border-bottom: 1px solid #EEF1EF; font-weight: 600\">{{ r.oleh }}</td>\n              <td style=\"padding: 11px 18px; border-bottom: 1px solid #EEF1EF\"><span style=\"font-size: 12px; font-weight: 700; background: #EEF1EF; color: #3B4540; border-radius: 999px; padding: 3px 10px\">{{ r.kat }}</span></td>\n              <td style=\"padding: 11px 18px; border-bottom: 1px solid #EEF1EF; line-height: 1.45\">{{ r.text }}</td>\n            </tr>\n          </template>\n        </tbody>\n      </table>\n    </section>\n    <p style=\"margin: 0; font-size: 13px; color: #55605A\">Moderator melihat semua · Sekretaris hanya selama masa jabatannya. Data tidak dapat dihapus.</p>\n  </main>\n</div>", Cls: (function(){ class DCLogic { constructor(props){ this.props = props || {}; this.state = {}; } setState(){} forceUpdate(){} }
 
 class Component extends DCLogic {
   constructor(props) {
@@ -26,13 +26,14 @@ class Component extends DCLogic {
   }
   renderVals() {
     const R = [
-      { waktu: '26/10 15.32', oleh: 'Moderator', kat: 'Akses', text: 'Akses "Putusan kedisiplinan" diberikan ke [Nama guru] (NIP 9002)' },
-      { waktu: '26/10 14.10', oleh: 'Sekretaris', kat: 'Data', text: 'Santri Contoh 51–53 dipindah ke kamar Ibnu Sina-04 (Update Data)' },
-      { waktu: '26/10 13.05', oleh: 'Sistem', kat: 'Kesantrian', text: 'Izin Santri Contoh 11 overdue → absensi Alpha, pelanggaran otomatis' },
-      { waktu: '26/10 10.15', oleh: 'Petugas perizinan', kat: 'Kesantrian', text: 'Izin pulang Santri Contoh 13 diterbitkan' },
-      { waktu: '25/10 20.40', oleh: 'Moderator', kat: 'Akun', text: 'Password Santri Contoh 62 direset' },
-      { waktu: '25/10 09.00', oleh: 'Moderator', kat: 'Jabatan', text: 'PAW: jabatan Bagian Keamanan dialihkan (alasan: mundur)' },
-      { waktu: '24/10 19.55', oleh: 'Hakim', kat: 'Kesantrian', text: 'Pelanggaran Santri Contoh 43 diputihkan (alasan tercatat)' }
+      { waktu: '26/10 13.40', oleh: 'Admin pondok (Moderator)', kat: 'Akses', text: 'Akses "Putusan kedisiplinan" diberikan ke [Nama guru] (NIP 9002)' },
+      { waktu: '26/10 13.30', oleh: 'Sistem', kat: 'Kesantrian', text: 'Izin Santri Contoh 11 overdue (kembali 12.30 + masa tenggang 60 menit) → absensi Alpha, pelanggaran otomatis, kabar ke wali' },
+      { waktu: '26/10 11.20', oleh: '[Nama guru] (Asatidz · akses putusan)', kat: 'Kesantrian', text: 'Vonis Berat untuk Santri Contoh 44; kabar ke wali dikirim (tanpa isi vonis)' },
+      { waktu: '26/10 10.15', oleh: 'Santri Contoh 61 (Piket · akses perizinan)', kat: 'Kesantrian', text: 'Izin pulang Santri Contoh 13 diterbitkan' },
+      { waktu: '26/10 09.10', oleh: 'Admin pondok (Moderator)', kat: 'Data', text: 'Santri Contoh 51–53 dipindah ke kamar Ibnu Sina-04 (Update Kamar)' },
+      { waktu: '25/10 20.40', oleh: 'Admin pondok (Moderator)', kat: 'Akun', text: 'Password Santri Contoh 62 direset' },
+      { waktu: '25/10 09.00', oleh: 'Admin pondok (Moderator)', kat: 'Jabatan', text: 'PAW: jabatan Bagian Keamanan dialihkan (alasan: mundur)' },
+      { waktu: '24/10 19.55', oleh: '[Nama guru] (Asatidz · akses putusan)', kat: 'Kesantrian', text: 'Pelanggaran Santri Contoh 43 diputihkan — putusan baru menggantikan vonis Ringan (alasan tercatat)' }
     ];
     const F = ['Semua', 'Akses', 'Akun', 'Data', 'Jabatan', 'Kesantrian'];
     const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
@@ -45,19 +46,63 @@ class Component extends DCLogic {
 }
 
 return Component; })() };
-DEFS["Sidebar"] = { props: ["active"], template: "<nav aria-label=\"Menu utama\" style=\"width: 100%; min-height: 900px; background: #FFFFFF; border-right: 1px solid #DDE3DF; padding: 20px 14px; display: flex; flex-direction: column; gap: 18px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; box-sizing: border-box\">\n  <a href=\"Dashboard.html\" style=\"display: flex; align-items: center; gap: 10px; padding: 4px 8px; text-decoration: none; color: #18201C\">\n    <span style=\"width: 36px; height: 36px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700\">H</span>\n    <span style=\"display: flex; flex-direction: column\"><span style=\"font-weight: 700; font-size: 16px\">HISADA</span><span style=\"font-size: 12px; color: #55605A\">Putra · 2026/2027</span></span>\n  </a>\n  <template v-for=\"(g, $index) in groups\">\n    <div style=\"display: flex; flex-direction: column; gap: 2px\">\n      <div style=\"font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5F6A64; padding: 0 10px 6px\">{{ g.label }}</div>\n      <template v-for=\"(it, $index) in g.items\">\n        <template v-if=\"it.live\">\n          <a :href=\"it.href\" :style=\"it.style\">{{ it.label }}</a>\n        </template>\n        <template v-if=\"it.soon\">\n          <span style=\"display: flex; justify-content: space-between; align-items: center; padding: 9px 10px; border-radius: 8px; font-size: 14px; color: #6B756F\">{{ it.label }}<span style=\"font-size: 11px; border: 1px solid #DDE3DF; border-radius: 999px; padding: 1px 7px\">nanti</span></span>\n        </template>\n      </template>\n    </div>\n  </template>\n  <div style=\"margin-top: auto; border-top: 1px solid #DDE3DF; padding-top: 14px; display: flex; align-items: center; gap: 10px; padding-left: 8px\">\n    <span style=\"width: 34px; height: 34px; border-radius: 999px; background: #E3EFE8; color: #14533C; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px\">SK</span>\n    <span style=\"display: flex; flex-direction: column; font-size: 13px\"><span style=\"font-weight: 600\">Sekretaris (contoh)</span><a href=\"index.html\" style=\"color: #1F6B4F\">Keluar</a></span>\n  </div>\n</nav>", Cls: (function(){ class DCLogic { constructor(props){ this.props = props || {}; this.state = {}; } setState(){} forceUpdate(){} }
+DEFS["Sidebar"] = { props: ["active"], template: "<nav aria-label=\"Menu utama\" style=\"width: 100%; min-height: 900px; background: #FFFFFF; border-right: 1px solid #DDE3DF; padding: 20px 14px; display: flex; flex-direction: column; gap: 18px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; box-sizing: border-box\">\n  <a href=\"Dashboard.html\" style=\"display: flex; align-items: center; gap: 10px; padding: 4px 8px; text-decoration: none; color: #18201C\">\n    <span style=\"width: 36px; height: 36px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700\">H</span>\n    <span style=\"display: flex; flex-direction: column\"><span style=\"font-weight: 700; font-size: 16px\">HISADA</span><span style=\"font-size: 12px; color: #55605A\">{{ lingkungan }} · 2026/2027</span></span>\n  </a>\n  <label style=\"display: flex; flex-direction: column; gap: 6px; padding: 10px; background: #F4F6F4; border: 1px solid #DDE3DF; border-radius: 10px; font-size: 12px; font-weight: 700; color: #3B4540\">Lihat sebagai role (prototipe)\n    <select aria-label=\"Lihat sebagai role\" @change=\"pickPeran\" style=\"height: 38px; border: 1px solid #C9D2CC; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 13px; font-weight: 600; background: #FFFFFF; color: #18201C\">\n      <template v-for=\"(p, $index) in perans\">\n        <option :value=\"p.key\" :selected=\"p.on\">{{ p.label }}</option>\n      </template>\n    </select>\n  </label>\n  <template v-if=\"blocked\">\n    <div role=\"status\" style=\"background: #FBF0DC; color: #5C3B09; border-radius: 10px; padding: 10px 12px; font-size: 12px; line-height: 1.5\">Role <strong>{{ peranLabel }}</strong> tidak membuka halaman ini. Isi halaman di samping adalah tampilan Moderator.</div>\n  </template>\n  <template v-for=\"(g, $index) in groups\">\n    <div style=\"display: flex; flex-direction: column; gap: 2px\">\n      <div style=\"font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5F6A64; padding: 0 10px 6px\">{{ g.label }}</div>\n      <template v-for=\"(it, $index) in g.items\">\n        <a :href=\"it.href\" :style=\"it.style\"><span>{{ it.label }}</span><template v-if=\"it.tag\"><span style=\"font-size: 10px; font-weight: 600; color: #55605A; border: 1px solid #DDE3DF; border-radius: 999px; padding: 1px 6px; white-space: nowrap\">{{ it.tag }}</span></template></a>\n      </template>\n    </div>\n  </template>\n  <div style=\"margin-top: auto; border-top: 1px solid #DDE3DF; padding-top: 14px; display: flex; align-items: center; gap: 10px; padding-left: 8px\">\n    <span style=\"width: 34px; height: 34px; border-radius: 999px; background: #E3EFE8; color: #14533C; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px\">{{ inisial }}</span>\n    <span style=\"display: flex; flex-direction: column; font-size: 13px\"><span style=\"font-weight: 600\">{{ pengguna }}</span><a href=\"index.html\" style=\"color: #1F6B4F\">Keluar</a></span>\n  </div>\n</nav>", Cls: (function(){ class DCLogic { constructor(props){ this.props = props || {}; this.state = {}; } setState(){} forceUpdate(){} }
 
 class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    let peran = 'moderator';
+    try { peran = window.localStorage.getItem('hisada.peran') || 'moderator'; } catch (e) {}
+    this.state = { peran };
+  }
   renderVals() {
     const active = this.props.active ?? 'dashboard';
-    const base = 'display: block; padding: 9px 10px; border-radius: 8px; font-size: 14px; text-decoration: none; ';
+    const base = 'display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 9px 10px; border-radius: 8px; font-size: 14px; text-decoration: none; ';
     const on = base + 'background: #E3EFE8; color: #14533C; font-weight: 600';
     const off = base + 'color: #2E3833';
-    const mk = (key, label, href) => ({ label, href, live: !!href, soon: !href, style: key === active ? on : off });
+    // Peta akses README: '' = penuh · 'akses' = jika diberi lewat Manajemen Akses · 'lihat' = lihat saja · 'sebagian' = sebagian fitur
+    const R = [
+      { key: 'moderator', label: 'Moderator', nama: 'Admin pondok (contoh)', inisial: 'MD', ling: 'Semua lingkungan' },
+      { key: 'sekretaris', label: 'Sekretaris', nama: 'Santri Contoh 63 · Sekretaris', inisial: 'SK', ling: 'Putra' },
+      { key: 'piket', label: 'Piket', nama: 'Santri Contoh 61 · Piket', inisial: 'PK', ling: 'Putra' },
+      { key: 'kesehatan', label: 'Kesehatan', nama: 'Santri Contoh 62 · Kesehatan', inisial: 'KS', ling: 'Putra' },
+      { key: 'kedisiplinan', label: 'Kedisiplinan', nama: 'Santri Contoh 64 · Kedisiplinan', inisial: 'KD', ling: 'Putra' },
+      { key: 'asatidz', label: 'Asatidz (guru)', nama: '[Nama guru] · Asatidz', inisial: 'GR', ling: 'Putra (diatur Moderator)' }
+    ];
+    const M = {
+      dashboard: { moderator: '', sekretaris: '', piket: '', kesehatan: '', kedisiplinan: '', asatidz: '' },
+      datamaster: { moderator: '' },
+      absensi: { moderator: '', sekretaris: '', piket: '', kesehatan: 'akses', kedisiplinan: 'akses', asatidz: 'lihat' },
+      perizinan: { moderator: '', piket: 'akses', asatidz: 'lihat' },
+      kesehatan: { moderator: '', kesehatan: 'akses' },
+      kedisiplinan: { moderator: '', kedisiplinan: 'akses', asatidz: 'lihat / akses' },
+      pd: { moderator: '', sekretaris: '', asatidz: 'lihat' },
+      rapor: { moderator: '', sekretaris: '', asatidz: 'lihat' },
+      tw: { moderator: '', sekretaris: '', piket: 'lihat', kesehatan: 'lihat', kedisiplinan: 'lihat', asatidz: 'lihat' },
+      updatedata: { moderator: '', sekretaris: 'bagian pengurus' },
+      akses: { moderator: '' },
+      riwayat: { moderator: '', sekretaris: 'masa jabatan' }
+    };
+    const peran = M.dashboard[this.state.peran] === undefined ? 'moderator' : this.state.peran;
+    const role = R.find((r) => r.key === peran);
+    const mk = (key, label, href) => {
+      const tag = M[key][peran];
+      return tag === undefined ? null : { label, href, tag: tag === 'akses' ? 'jika diberi akses' : tag, style: key === active ? on : off };
+    };
+    const grp = (label, items) => ({ label, items: items.filter(Boolean) });
     return {
+      perans: R.map((r) => ({ key: r.key, label: r.label, on: r.key === peran })),
+      pickPeran: (e) => {
+        const v = e.target.value;
+        try { window.localStorage.setItem('hisada.peran', v); } catch (err) {}
+        this.setState({ peran: v });
+        try { window.location.reload(); } catch (err) {}
+      },
+      peranLabel: role.label, pengguna: role.nama, inisial: role.inisial, lingkungan: role.ling,
+      blocked: M[active] && M[active][peran] === undefined,
       groups: [
-        { label: 'Beranda', items: [mk('dashboard', 'Dashboard', 'Dashboard.html')] },
-        { label: 'Administrasi', items: [
+        grp('Beranda', [mk('dashboard', 'Dashboard', 'Dashboard.html')]),
+        grp('Administrasi', [
           mk('datamaster', 'Data Master', 'DataMaster.html'),
           mk('absensi', 'Absensi', 'Absensi.html'),
           mk('perizinan', 'Perizinan', 'Perizinan.html'),
@@ -66,13 +111,13 @@ class Component extends DCLogic {
           mk('pd', 'Pengembangan Diri', 'PengembanganDiri.html'),
           mk('rapor', 'Rapor Kesantrian', 'Rapor.html'),
           mk('tw', 'Tata Warkat', 'TataWarkat.html')
-        ] },
-        { label: 'Fungsi', items: [
+        ]),
+        grp('Fungsi', [
           mk('updatedata', 'Update Data & Import', 'UpdateData.html'),
           mk('akses', 'Manajemen Akses', 'ManajemenAkses.html'),
           mk('riwayat', 'Riwayat Perubahan', 'Riwayat.html')
-        ] }
-      ]
+        ])
+      ].filter((g) => g.items.length)
     };
   }
 }

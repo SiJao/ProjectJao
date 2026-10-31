@@ -16,39 +16,88 @@ body{margin:0}
 <nav aria-label="Menu utama" style="width: 100%; min-height: 900px; background: #FFFFFF; border-right: 1px solid #DDE3DF; padding: 20px 14px; display: flex; flex-direction: column; gap: 18px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #18201C; box-sizing: border-box">
   <a href="Dashboard.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 4px 8px; text-decoration: none; color: #18201C">
     <span style="width: 36px; height: 36px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700">H</span>
-    <span style="display: flex; flex-direction: column"><span style="font-weight: 700; font-size: 16px">HISADA</span><span style="font-size: 12px; color: #55605A">Putra · 2026/2027</span></span>
+    <span style="display: flex; flex-direction: column"><span style="font-weight: 700; font-size: 16px">HISADA</span><span style="font-size: 12px; color: #55605A">{{ lingkungan }} · 2026/2027</span></span>
   </a>
+  <label style="display: flex; flex-direction: column; gap: 6px; padding: 10px; background: #F4F6F4; border: 1px solid #DDE3DF; border-radius: 10px; font-size: 12px; font-weight: 700; color: #3B4540">Lihat sebagai role (prototipe)
+    <select aria-label="Lihat sebagai role" onChange="{{ pickPeran }}" style="height: 38px; border: 1px solid #C9D2CC; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 13px; font-weight: 600; background: #FFFFFF; color: #18201C">
+      <sc-for list="{{ perans }}" as="p" hint-placeholder-count="6">
+        <option value="{{ p.key }}" selected="{{ p.on }}">{{ p.label }}</option>
+      </sc-for>
+    </select>
+  </label>
+  <sc-if value="{{ blocked }}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="background: #FBF0DC; color: #5C3B09; border-radius: 10px; padding: 10px 12px; font-size: 12px; line-height: 1.5">Role <strong>{{ peranLabel }}</strong> tidak membuka halaman ini. Isi halaman di samping adalah tampilan Moderator.</div>
+  </sc-if>
   <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
     <div style="display: flex; flex-direction: column; gap: 2px">
       <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5F6A64; padding: 0 10px 6px">{{ g.label }}</div>
       <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
-        <sc-if value="{{ it.live }}" hint-placeholder-val="{{ true }}">
-          <a href="{{ it.href }}" style="{{ it.style }}">{{ it.label }}</a>
-        </sc-if>
-        <sc-if value="{{ it.soon }}" hint-placeholder-val="{{ false }}">
-          <span style="display: flex; justify-content: space-between; align-items: center; padding: 9px 10px; border-radius: 8px; font-size: 14px; color: #6B756F">{{ it.label }}<span style="font-size: 11px; border: 1px solid #DDE3DF; border-radius: 999px; padding: 1px 7px">nanti</span></span>
-        </sc-if>
+        <a href="{{ it.href }}" style="{{ it.style }}"><span>{{ it.label }}</span><sc-if value="{{ it.tag }}" hint-placeholder-val="{{ false }}"><span style="font-size: 10px; font-weight: 600; color: #55605A; border: 1px solid #DDE3DF; border-radius: 999px; padding: 1px 6px; white-space: nowrap">{{ it.tag }}</span></sc-if></a>
       </sc-for>
     </div>
   </sc-for>
   <div style="margin-top: auto; border-top: 1px solid #DDE3DF; padding-top: 14px; display: flex; align-items: center; gap: 10px; padding-left: 8px">
-    <span style="width: 34px; height: 34px; border-radius: 999px; background: #E3EFE8; color: #14533C; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px">SK</span>
-    <span style="display: flex; flex-direction: column; font-size: 13px"><span style="font-weight: 600">Sekretaris (contoh)</span><a href="Main.dc.html" style="color: #1F6B4F">Keluar</a></span>
+    <span style="width: 34px; height: 34px; border-radius: 999px; background: #E3EFE8; color: #14533C; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px">{{ inisial }}</span>
+    <span style="display: flex; flex-direction: column; font-size: 13px"><span style="font-weight: 600">{{ pengguna }}</span><a href="Main.dc.html" style="color: #1F6B4F">Keluar</a></span>
   </div>
 </nav>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["dashboard","absensi","perizinan","kesehatan","kedisiplinan","datamaster","updatedata","akses","riwayat","pd","rapor","tw"],"default":"dashboard"},"$preview":{"width":248,"height":900}}'>
 class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    let peran = 'moderator';
+    try { peran = window.localStorage.getItem('hisada.peran') || 'moderator'; } catch (e) {}
+    this.state = { peran };
+  }
   renderVals() {
     const active = this.props.active ?? 'dashboard';
-    const base = 'display: block; padding: 9px 10px; border-radius: 8px; font-size: 14px; text-decoration: none; ';
+    const base = 'display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 9px 10px; border-radius: 8px; font-size: 14px; text-decoration: none; ';
     const on = base + 'background: #E3EFE8; color: #14533C; font-weight: 600';
     const off = base + 'color: #2E3833';
-    const mk = (key, label, href) => ({ label, href, live: !!href, soon: !href, style: key === active ? on : off });
+    // Peta akses README: '' = penuh · 'akses' = jika diberi lewat Manajemen Akses · 'lihat' = lihat saja · 'sebagian' = sebagian fitur
+    const R = [
+      { key: 'moderator', label: 'Moderator', nama: 'Admin pondok (contoh)', inisial: 'MD', ling: 'Semua lingkungan' },
+      { key: 'sekretaris', label: 'Sekretaris', nama: 'Santri Contoh 63 · Sekretaris', inisial: 'SK', ling: 'Putra' },
+      { key: 'piket', label: 'Piket', nama: 'Santri Contoh 61 · Piket', inisial: 'PK', ling: 'Putra' },
+      { key: 'kesehatan', label: 'Kesehatan', nama: 'Santri Contoh 62 · Kesehatan', inisial: 'KS', ling: 'Putra' },
+      { key: 'kedisiplinan', label: 'Kedisiplinan', nama: 'Santri Contoh 64 · Kedisiplinan', inisial: 'KD', ling: 'Putra' },
+      { key: 'asatidz', label: 'Asatidz (guru)', nama: '[Nama guru] · Asatidz', inisial: 'GR', ling: 'Putra (diatur Moderator)' }
+    ];
+    const M = {
+      dashboard: { moderator: '', sekretaris: '', piket: '', kesehatan: '', kedisiplinan: '', asatidz: '' },
+      datamaster: { moderator: '' },
+      absensi: { moderator: '', sekretaris: '', piket: '', kesehatan: 'akses', kedisiplinan: 'akses', asatidz: 'lihat' },
+      perizinan: { moderator: '', piket: 'akses', asatidz: 'lihat' },
+      kesehatan: { moderator: '', kesehatan: 'akses' },
+      kedisiplinan: { moderator: '', kedisiplinan: 'akses', asatidz: 'lihat / akses' },
+      pd: { moderator: '', sekretaris: '', asatidz: 'lihat' },
+      rapor: { moderator: '', sekretaris: '', asatidz: 'lihat' },
+      tw: { moderator: '', sekretaris: '', piket: 'lihat', kesehatan: 'lihat', kedisiplinan: 'lihat', asatidz: 'lihat' },
+      updatedata: { moderator: '', sekretaris: 'bagian pengurus' },
+      akses: { moderator: '' },
+      riwayat: { moderator: '', sekretaris: 'masa jabatan' }
+    };
+    const peran = M.dashboard[this.state.peran] === undefined ? 'moderator' : this.state.peran;
+    const role = R.find((r) => r.key === peran);
+    const mk = (key, label, href) => {
+      const tag = M[key][peran];
+      return tag === undefined ? null : { label, href, tag: tag === 'akses' ? 'jika diberi akses' : tag, style: key === active ? on : off };
+    };
+    const grp = (label, items) => ({ label, items: items.filter(Boolean) });
     return {
+      perans: R.map((r) => ({ key: r.key, label: r.label, on: r.key === peran })),
+      pickPeran: (e) => {
+        const v = e.target.value;
+        try { window.localStorage.setItem('hisada.peran', v); } catch (err) {}
+        this.setState({ peran: v });
+        try { window.location.reload(); } catch (err) {}
+      },
+      peranLabel: role.label, pengguna: role.nama, inisial: role.inisial, lingkungan: role.ling,
+      blocked: M[active] && M[active][peran] === undefined,
       groups: [
-        { label: 'Beranda', items: [mk('dashboard', 'Dashboard', 'Dashboard.dc.html')] },
-        { label: 'Administrasi', items: [
+        grp('Beranda', [mk('dashboard', 'Dashboard', 'Dashboard.dc.html')]),
+        grp('Administrasi', [
           mk('datamaster', 'Data Master', 'DataMaster.dc.html'),
           mk('absensi', 'Absensi', 'Absensi.dc.html'),
           mk('perizinan', 'Perizinan', 'Perizinan.dc.html'),
@@ -57,13 +106,13 @@ class Component extends DCLogic {
           mk('pd', 'Pengembangan Diri', 'PengembanganDiri.dc.html'),
           mk('rapor', 'Rapor Kesantrian', 'Rapor.dc.html'),
           mk('tw', 'Tata Warkat', 'TataWarkat.dc.html')
-        ] },
-        { label: 'Fungsi', items: [
+        ]),
+        grp('Fungsi', [
           mk('updatedata', 'Update Data & Import', 'UpdateData.dc.html'),
           mk('akses', 'Manajemen Akses', 'ManajemenAkses.dc.html'),
           mk('riwayat', 'Riwayat Perubahan', 'Riwayat.dc.html')
-        ] }
-      ]
+        ])
+      ].filter((g) => g.items.length)
     };
   }
 }

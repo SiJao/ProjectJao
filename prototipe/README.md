@@ -27,9 +27,12 @@ File `*.dc.html` adalah format kanvas Design (butuh runtime kanvas, tidak bisa d
 
 ## Catatan desain
 
-- Sudut pandang: **Sekretaris**. Versi per role belum dibuat.
-- **Kedisiplinan** memakai alur nyata (hakim memutus, batal ≤ 1 jam) — di README masih *Belum Diputuskan*.
-- **Perizinan** masih desain lama (Izin Dinas, tanda tangan Dormitory Guardian); **Absensi** masih status "Sakit" — tabrakan dengan kenyataan, belum diputuskan.
+- **Lihat sebagai role:** pilihan di sidebar (Moderator, Sekretaris, Piket, Kesehatan, Kedisiplinan, Asatidz). Menu mengikuti peta akses di README utama. Label kecil menandai menu yang "jika diberi akses", "lihat", atau sebagian. Pilihan tersimpan di browser (`localStorage`). Halaman yang tidak dibuka role itu tetap tampil sebagai tampilan Moderator, dengan pemberitahuan di sidebar.
+- **Data contoh satu hari:** Senin 26/10/2026 pukul 13.45. Angka dan nama santri saling cocok antarlayar (1.072 aktif = 505 putra + 567 putri).
+- **Perizinan:** status Terlambat (masa tenggang 60 menit) → Overdue, dan tab Libur Pondok.
+- **Kedisiplinan:** pencatat tidak bisa memvonis kasusnya sendiri; pemutihan = putusan baru.
+- **Update Data:** Update Kamar, Update Kelas Tahunan (pratinjau 5 daftar + password), Serah Terima & PAW (peringatan + password).
+- Izin Dinas & tanda tangan Gate Pass mengikuti README utama; isi daftar pilihan awal masih bisa berubah.
 - Gaya: hijau tua `#1F6B4F`, font Plus Jakarta Sans, sidebar Beranda / Administrasi / Fungsi.
 
 ## Versi web (untuk dicoba di hosting)

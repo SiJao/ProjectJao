@@ -45,15 +45,26 @@ a{color:#1F6B4F}a:hover{color:#14533C}
       <section style="flex: 1.4 1 380px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
         <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 17px; font-weight: 700">{{ cur.nama }}</h2><span style="font-size: 13px; color: #55605A">{{ cur.id }}</span></div>
         <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Role (satu per pengguna)
-          <select style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
-            <option>{{ cur.role }}</option><option>Piket</option><option>Kesehatan</option><option>Kedisiplinan</option><option>Sekretaris</option><option>Asatidz</option>
+          <select onChange="{{ pickRole }}" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
+            <sc-for list="{{ roles }}" as="r" hint-placeholder-count="6">
+              <option value="{{ r.label }}" selected="{{ r.on }}" disabled="{{ r.off }}">{{ r.text }}</option>
+            </sc-for>
           </select>
+          <span style="font-weight: 400; color: #55605A">{{ roleNote }}</span>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Cakupan data
+          <sc-if value="{{ cakupanPilih }}" hint-placeholder-val="{{ false }}">
+            <select style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Putra</option><option>Putri</option><option>Semua</option></select>
+          </sc-if>
+          <sc-if value="{{ cakupanTetap }}" hint-placeholder-val="{{ true }}">
+            <span style="font-weight: 400; min-height: 44px; display: flex; align-items: center; padding: 0 12px; border: 1px dashed #C9D2CC; border-radius: 10px; color: #3B4540">{{ cakupanText }}</span>
+          </sc-if>
         </label>
         <div style="display: flex; flex-direction: column; gap: 8px">
           <span style="font-size: 13px; font-weight: 600">Akses di luar role</span>
           <sc-for list="{{ perms }}" as="p" hint-placeholder-count="6">
-            <label style="display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 8px 12px; border: 1px solid #E6EBE8; border-radius: 10px; font-size: 14px; cursor: pointer">
-              <input type="checkbox" checked="{{ p.on }}" onChange="{{ p.toggle }}" style="width: 18px; height: 18px">
+            <label style="{{ p.rowStyle }}">
+              <input type="checkbox" checked="{{ p.on }}" disabled="{{ p.locked }}" onChange="{{ p.toggle }}" style="width: 18px; height: 18px">
               <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 600">{{ p.label }}</span><span style="font-size: 12px; color: #55605A">{{ p.desc }}</span></span>
             </label>
           </sc-for>
@@ -69,40 +80,59 @@ a{color:#1F6B4F}a:hover{color:#14533C}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { sel: 0, perms: { 0: { hakim: true, absensi: true }, 1: { perizinan: true }, 2: { absensi: true, kesehatan: true }, 3: {}, 4: { absensi: true } } };
+    this.state = { sel: 0, roleOf: {}, perms: { 0: { putusan: true }, 1: { perizinan: true }, 2: { kesehatan: true, absensi: true, profil_kesehatan: true, 'pilihan.obat': true }, 3: {}, 4: { input_pelanggaran: true, putusan: true }, 5: {} } };
   }
   renderVals() {
+    // santri: akun pengurus (NIS) · guru: akun non-santri (NIP)
     const U = [
-      { nama: '[Nama guru] · guru', id: 'NIP 9002', role: 'Asatidz' },
-      { nama: 'Santri Contoh 61 · pengurus', id: 'NIS 990661', role: 'Piket' },
-      { nama: 'Santri Contoh 62 · pengurus', id: 'NIS 990662', role: 'Kesehatan' },
-      { nama: 'Santri Contoh 63 · pengurus', id: 'NIS 990663', role: 'Sekretaris' },
-      { nama: '[Nama guru] · wali kelas', id: 'NIP 9003', role: 'Asatidz' }
+      { nama: '[Nama guru] · guru (hakim)', id: 'NIP 9002', role: 'Asatidz', jenis: 'guru' },
+      { nama: 'Santri Contoh 61 · pengurus', id: 'NIS 990661', role: 'Piket', jenis: 'santri' },
+      { nama: 'Santri Contoh 62 · pengurus', id: 'NIS 990662', role: 'Kesehatan', jenis: 'santri' },
+      { nama: 'Santri Contoh 63 · pengurus', id: 'NIS 990663', role: 'Sekretaris', jenis: 'santri' },
+      { nama: 'Santri Contoh 64 · pengurus', id: 'NIS 990664', role: 'Kedisiplinan', jenis: 'santri' },
+      { nama: 'Admin pondok · tim IT', id: 'NIP 9000', role: 'Moderator', jenis: 'guru' }
     ];
+    const ROLES = [['Piket', 'santri'], ['Kesehatan', 'santri'], ['Kedisiplinan', 'santri'], ['Sekretaris', 'santri'], ['Asatidz', 'guru'], ['Moderator', 'guru']];
+    // [kode, label, keterangan, otomatis untuk role, hanya untuk role]
     const PL = [
-      ['absensi', 'Absensi', 'Mengisi absensi harian / kegiatan'],
-      ['perizinan', 'Perizinan', 'Menerbitkan izin dan Gate Pass'],
-      ['kesehatan', 'Kesehatan', 'Membuka data kunjungan dan pemeriksaan'],
-      ['inputpel', 'Input pelanggaran', 'Mencatat pelanggaran santri (penginput)'],
-      ['hakim', 'Putusan kedisiplinan', 'Memvonis dan memutihkan pelanggaran'],
-      ['profilkes', 'Profil kesehatan', 'Mengedit alergi dan penyakit kronis'],
-      ['pilihanobat', 'Daftar obat & diagnosa', 'Mengedit daftar pilihan di Data Master'],
-      ['pengasuhan', 'Input pelanggaran pengurus', 'Untuk guru pengasuhan'],
-      ['penilaian', 'Penilaian kegiatan', 'Tahsin, muhadhoroh, ekstrakurikuler']
+      ['absensi', 'Absensi', 'Mengisi absensi harian / kegiatan', ['Piket', 'Sekretaris'], null],
+      ['perizinan', 'Perizinan', 'Menerbitkan izin, Gate Pass, Libur Pondok', [], ['Piket']],
+      ['kesehatan', 'Kesehatan', 'Membuka data kunjungan dan pemeriksaan', [], ['Kesehatan']],
+      ['profil_kesehatan', 'Profil kesehatan', 'Mengedit alergi dan penyakit kronis', [], null],
+      ['input_pelanggaran', 'Input pelanggaran', 'Mencatat pelanggaran santri (penginput)', [], null],
+      ['putusan', 'Putusan kedisiplinan', 'Memvonis dan memutihkan (bukan kasus yang ia catat)', [], null],
+      ['input_pelanggaran_pengurus', 'Input pelanggaran pengurus', 'Untuk guru pengasuhan', [], ['Asatidz']],
+      ['penilaian', 'Penilaian kegiatan', 'Tahsin, muhadhoroh, ekstrakurikuler', [], null],
+      ['pilihan.obat', 'Daftar pilihan · Obat', 'Mengedit daftar obat di Data Master', [], null],
+      ['pilihan.diagnosa', 'Daftar pilihan · Diagnosa', 'Mengedit daftar diagnosa di Data Master', [], null]
     ];
     const s = this.state.sel;
+    const u = U[s];
+    const role = this.state.roleOf[s] || u.role;
+    const mod = role === 'Moderator';
     const mine = this.state.perms[s] || {};
+    const row = (dim) => 'display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 8px 12px; border: 1px solid #E6EBE8; border-radius: 10px; font-size: 14px; ' + (dim ? 'background: #F4F6F4; color: #6B756F; cursor: not-allowed' : 'cursor: pointer');
     return {
-      users: U.map((u, i) => ({
-        ...u,
+      users: U.map((x, i) => ({
+        ...x, role: this.state.roleOf[i] || x.role,
         style: 'display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 20px; border: 0; border-top: 1px solid #EEF1EF; font: inherit; color: #18201C; cursor: pointer; ' + (i === s ? 'background: #EEF5F1' : 'background: #FFFFFF'),
         pick: () => this.setState({ sel: i })
       })),
-      cur: U[s],
-      perms: PL.map(([k, label, desc]) => ({
-        label, desc, on: !!mine[k],
-        toggle: () => this.setState({ perms: { ...this.state.perms, [s]: { ...mine, [k]: !mine[k] } } })
-      }))
+      cur: u,
+      roles: ROLES.map(([r, j]) => ({ label: r, on: r === role, off: j !== u.jenis, text: r + (j !== u.jenis ? (j === 'guru' ? ' — hanya akun non-santri' : ' — hanya akun santri') : '') })),
+      pickRole: (e) => this.setState({ roleOf: { ...this.state.roleOf, [s]: e.target.value } }),
+      roleNote: u.jenis === 'santri' ? 'Akun santri: Moderator dan Asatidz tidak tersedia.' : 'Akun non-santri (guru / pihak pondok).',
+      cakupanPilih: role === 'Asatidz', cakupanTetap: role !== 'Asatidz',
+      cakupanText: mod ? 'Semua lingkungan (Moderator)' : 'Putra — otomatis dari jenis kelamin santri',
+      perms: PL.map(([k, label, desc, auto, only]) => {
+        const otomatis = mod || auto.indexOf(role) >= 0;
+        const terlarang = !otomatis && only && only.indexOf(role) < 0;
+        const ket = otomatis ? (mod ? 'Moderator memegang semua akses' : 'otomatis dari role ' + role) : (terlarang ? 'hanya untuk role ' + only.join(' / ') : desc);
+        return {
+          label, desc: ket, on: otomatis || (!terlarang && !!mine[k]), locked: otomatis || terlarang, rowStyle: row(otomatis || terlarang),
+          toggle: () => { if (!otomatis && !terlarang) this.setState({ perms: { ...this.state.perms, [s]: { ...mine, [k]: !mine[k] } } }); }
+        };
+      })
     };
   }
 }

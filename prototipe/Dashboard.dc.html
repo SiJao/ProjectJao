@@ -22,8 +22,8 @@ a{color:#1F6B4F}a:hover{color:#14533C}
   <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px; display: flex; flex-direction: column; gap: 24px">
     <header style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
       <div style="display: flex; flex-direction: column; gap: 4px">
-        <span style="font-size: 13px; color: #55605A">Senin, 26 Oktober 2026 · Lingkungan Putra</span>
-        <h1 style="margin: 0; font-size: 28px; font-weight: 700">Assalamu'alaikum, Sekretaris</h1>
+        <span style="font-size: 13px; color: #55605A">Senin, 26 Oktober 2026 · pukul 13.45 · {{ lingkungan }}</span>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 700">Assalamu'alaikum, {{ peran }}</h1>
       </div>
       <span style="font-size: 12px; color: #55605A; border: 1px dashed #B9C4BD; border-radius: 999px; padding: 4px 10px">Data contoh</span>
     </header>
@@ -68,25 +68,35 @@ a{color:#1F6B4F}a:hover{color:#14533C}
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
 class Component extends DCLogic {
   renderVals() {
+    let peran = 'moderator';
+    try { peran = window.localStorage.getItem('hisada.peran') || 'moderator'; } catch (e) {}
+    const NAMA = { moderator: 'Moderator', sekretaris: 'Sekretaris', piket: 'Piket', kesehatan: 'Kesehatan', kedisiplinan: 'Kedisiplinan', asatidz: 'Ustadz' };
+    if (!NAMA[peran]) peran = 'moderator';
+    const semua = peran === 'moderator';
+    // Data contoh satu hari: Senin 26/10/2026 pukul 13.45 (sama dengan layar lain)
+    const T = [
+      { roles: ['moderator', 'sekretaris', 'piket'], title: 'Absensi harian belum lengkap', desc: '3 kamar di Asrama Ibnu Sina belum diisi', count: '3', bg: '#FBF0DC', fg: '#7A4E0C', href: 'Absensi.dc.html' },
+      { roles: ['moderator', 'piket', 'kedisiplinan'], title: 'Izin overdue', desc: 'Santri Contoh 11, Keluar Sementara, kembali 12.30 — overdue sejak 13.30', count: '1', bg: '#F9E3E1', fg: '#8E2A22', href: 'Perizinan.dc.html' },
+      { roles: ['moderator', 'piket'], title: 'Izin terlambat (masa tenggang)', desc: 'Santri Contoh 15, kembali 13.15 — menjadi overdue pukul 14.15 bila belum dikonfirmasi', count: '1', bg: '#FBF0DC', fg: '#7A4E0C', href: 'Perizinan.dc.html' },
+      { roles: ['moderator', 'kedisiplinan'], title: 'Pelanggaran menunggu sidang', desc: 'Diputus pemegang akses putusan', count: '4', bg: '#E4ECF8', fg: '#23497E', href: 'Kedisiplinan.dc.html' },
+      { roles: ['moderator'], title: 'Pengurus menunggu role', desc: 'Setelah Serah Terima', count: '2', bg: '#E3EFE8', fg: '#14533C', href: 'ManajemenAkses.dc.html' }
+    ];
     return {
+      peran: NAMA[peran],
+      lingkungan: semua ? 'Semua lingkungan' : 'Lingkungan Putra',
       stats: [
-        { label: 'Hadir hari ini', value: '487', note: 'dari 505 santri aktif', color: '#1E5E3F', href: 'Absensi.dc.html' },
-        { label: 'Izin berjalan', value: '9', note: '2 pulang · 7 keluar', color: '#23497E', href: 'Perizinan.dc.html' },
-        { label: 'Overdue', value: '1', note: 'lewat jam kembali', color: '#8E2A22', href: 'Perizinan.dc.html' },
+        { label: 'Hadir hari ini', value: semua ? '1.031' : '487', note: semua ? 'dari 1.072 santri aktif (505 putra · 567 putri)' : 'dari 505 santri aktif', color: '#1E5E3F', href: 'Absensi.dc.html' },
+        { label: 'Izin berjalan', value: '9', note: '2 pulang · 6 keluar · 1 terlambat', color: '#23497E', href: 'Perizinan.dc.html' },
+        { label: 'Overdue', value: '1', note: 'lewat jam kembali + 60 menit', color: '#8E2A22', href: 'Perizinan.dc.html' },
         { label: 'Dirawat', value: '6', note: 'pusat kesehatan', color: '#7A4E0C', href: 'Kesehatan.dc.html' },
-        { label: 'Menunggu sidang', value: '4', note: 'antrean hakim', color: '#18201C', href: 'Kedisiplinan.dc.html' }
+        { label: 'Menunggu sidang', value: '4', note: 'antrean putusan', color: '#18201C', href: 'Kedisiplinan.dc.html' }
       ],
-      todos: [
-        { title: 'Absensi malam belum lengkap', desc: '3 kamar di Asrama Ibnu Sina belum diisi', count: '3', bg: '#FBF0DC', fg: '#7A4E0C', href: 'Absensi.dc.html' },
-        { title: 'Izin overdue', desc: 'Santri contoh A, Keluar Sementara, lewat 40 menit', count: '1', bg: '#F9E3E1', fg: '#8E2A22', href: 'Perizinan.dc.html' },
-        { title: 'Pelanggaran menunggu sidang', desc: 'Diputus oleh hakim', count: '4', bg: '#E4ECF8', fg: '#23497E', href: 'Kedisiplinan.dc.html' },
-        { title: 'Pengurus menunggu role', desc: 'Setelah Serah Terima', count: '2', bg: '#E3EFE8', fg: '#14533C', href: 'ManajemenAkses.dc.html' }
-      ],
+      todos: T.filter((t) => t.roles.indexOf(peran) >= 0),
       wali: [
-        { time: '07.42', kind: 'Dirawat', text: 'Santri contoh B, sedang dirawat' },
-        { time: '10.15', kind: 'Izin pulang', text: 'Santri contoh C, didampingi wali' },
-        { time: '13.05', kind: 'Overdue', text: 'Santri contoh A, belum kembali' },
-        { time: '15.30', kind: 'Vonis berat', text: 'Santri contoh D (tanpa isi vonis)' }
+        { time: '07.42', kind: 'Dirawat', text: 'Santri Contoh 22, sedang dirawat' },
+        { time: '10.15', kind: 'Izin pulang', text: 'Santri Contoh 13, didampingi wali' },
+        { time: '11.20', kind: 'Vonis berat', text: 'Santri Contoh 44 (tanpa isi vonis)' },
+        { time: '13.30', kind: 'Overdue', text: 'Santri Contoh 11, belum kembali (masa tenggang 60 menit habis)' }
       ]
     };
   }

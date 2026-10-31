@@ -38,8 +38,8 @@ a{color:#1F6B4F}a:hover{color:#14533C}
         <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Kamar
           <select style="height: 44px; min-width: 160px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Ibnu Rusyd-01</option><option>Ibnu Rusyd-02</option><option>Ibnu Rusyd-03</option><option>Ibnu Rusyd-04</option></select>
         </label>
-        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Sesi
-          <select style="height: 44px; min-width: 150px; border: 1px solid #1F6B4F; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 600; background: #FFFFFF"><option>Subuh</option><option>Siang</option><option>Malam</option></select>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Sesi <span style="font-weight: 400; color: #55605A">(opsional)</span>
+          <select style="height: 44px; min-width: 150px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option selected>Harian (bawaan)</option><option>Subuh</option><option>Malam</option></select>
         </label>
       </sc-if>
       <sc-if value="{{ isKegiatan }}" hint-placeholder-val="{{ false }}">
@@ -51,16 +51,15 @@ a{color:#1F6B4F}a:hover{color:#14533C}
         </label>
       </sc-if>
       <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Tanggal
-        <input type="date" value="2026-10-29" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
+        <input type="date" value="2026-10-26" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
       </label>
       <button type="button" onClick="{{ allHadir }}" style="height: 44px; margin-left: auto; border: 1px solid #1F6B4F; color: #1F6B4F; background: #FFFFFF; border-radius: 10px; padding: 0 16px; font: inherit; font-weight: 600; cursor: pointer">Tandai semua hadir</button>
     </section>
 
     <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px">
-      <span style="background: #E3F1E9; color: #1E5E3F; border-radius: 999px; padding: 6px 12px; font-weight: 600">Hadir {{ count.H }}</span>
-      <span style="background: #E4ECF8; color: #23497E; border-radius: 999px; padding: 6px 12px; font-weight: 600">Izin {{ count.I }}</span>
-      <span style="background: #FBF0DC; color: #7A4E0C; border-radius: 999px; padding: 6px 12px; font-weight: 600">Sakit {{ count.S }}</span>
-      <span style="background: #F9E3E1; color: #8E2A22; border-radius: 999px; padding: 6px 12px; font-weight: 600">Alpha {{ count.A }}</span>
+      <sc-for list="{{ chips }}" as="c" hint-placeholder-count="5">
+        <span style="{{ c.style }}">{{ c.label }} {{ c.n }}</span>
+      </sc-for>
     </div>
 
     <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto">
@@ -87,7 +86,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
                     </sc-for>
                   </select>
                   <sc-if value="{{ r.locked }}" hint-placeholder-val="{{ false }}">
-                    <span style="font-size: 12px; color: #55605A">otomatis dari {{ r.source }}</span>
+                    <span style="font-size: 12px; color: #55605A">{{ r.source }}</span>
                   </sc-if>
                 </div>
               </td>
@@ -97,7 +96,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
       </table>
     </section>
     <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px">
-      <span style="font-size: 13px; color: #55605A">Daftar sesi dan status kehadiran diatur di Data Master › Daftar Pilihan.</span>
+      <span style="font-size: 13px; color: #55605A; line-height: 1.5">Daftar sesi dan status kehadiran diatur di Data Master › Daftar Pilihan. Status otomatis terkunci; urutan: skorsing › perizinan/overdue › kesehatan › isian manual.</span>
       <button type="button" style="height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; padding: 0 22px; font: inherit; font-weight: 600; cursor: pointer">Simpan absensi</button>
     </div>
   </main>
@@ -109,31 +108,35 @@ class Component extends DCLogic {
     super(props);
     this.state = {
       mode: 'harian',
-      st: { 1: 'H', 2: 'H', 3: 'I', 4: 'H', 5: 'S', 6: 'H', 7: 'A', 8: 'H' }
+      st: { 1: 'H', 2: 'H', 3: 'P', 4: 'P', 5: 'S', 6: 'H', 7: 'A', 8: 'H' }
     };
   }
   renderVals() {
     const tab = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
-    const colors = { H: ['#E3F1E9', '#1E5E3F'], I: ['#E4ECF8', '#23497E'], S: ['#FBF0DC', '#7A4E0C'], A: ['#F9E3E1', '#8E2A22'] };
-    const full = { H: 'Hadir', I: 'Izin', S: 'Sakit', A: 'Alpha' };
+    // Status kehadiran = Daftar Pilihan (Data Master › Absensi › Status kehadiran)
+    const colors = { H: ['#E3F1E9', '#1E5E3F'], I: ['#E4ECF8', '#23497E'], S: ['#FBF0DC', '#7A4E0C'], A: ['#F9E3E1', '#8E2A22'], P: ['#ECE6F6', '#4B3779'] };
+    const full = { H: 'Hadir', I: 'Izin', S: 'Sakit', A: 'Alpha', P: 'Pulang' };
+    const codes = ['H', 'I', 'S', 'A', 'P'];
+    // Semua penghuni Ibnu Rusyd-01 (sesuai Data Master), Senin 26/10/2026
     const people = [
       [1, '990101', 'Santri Contoh 01', '1 A MTs'], [2, '990102', 'Santri Contoh 02', '1 A MTs'],
-      [3, '990203', 'Santri Contoh 03', '2 B MTs', 'Perizinan'], [4, '990204', 'Santri Contoh 04', '2 C SMP'],
-      [5, '990305', 'Santri Contoh 05', '3 A MTs', 'Kesehatan'], [6, '990306', 'Santri Contoh 06', '3 D SMP'],
-      [7, '990407', 'Santri Contoh 07', '4 B'], [8, '990408', 'Santri Contoh 08', '4 B']
+      [3, '990306', 'Santri Contoh 06', '3 D SMP', 'otomatis: skorsing'], [4, '990213', 'Santri Contoh 13', '2 B MTs', 'otomatis: izin Pulang s.d. 29/10'],
+      [5, '990322', 'Santri Contoh 22', '3 A MTs', 'otomatis: Perawatan (belum selesai dirawat)'], [6, '990126', 'Santri Contoh 26', '1 B MTs'],
+      [7, '990227', 'Santri Contoh 27', '2 C SMP'], [8, '990128', 'Santri Contoh 28', '1 B MTs']
     ];
     const st = this.state.st;
-    const count = { H: 0, I: 0, S: 0, A: 0 };
+    const count = { H: 0, I: 0, S: 0, A: 0, P: 0 };
     Object.values(st).forEach((v) => { count[v]++; });
     const rows = people.map(([id, nis, nama, kelas, source]) => {
       const cur = st[id];
       return {
         nis, nama, kelas, source: source || '', locked: !!source, label: 'Status kehadiran ' + nama,
         selStyle: 'height: 38px; min-width: 120px; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 13px; font-weight: 700; border: 1px solid ' + colors[cur][1] + '; background: ' + colors[cur][0] + '; color: ' + colors[cur][1],
-        opts: ['H', 'I', 'S', 'A'].map((c) => ({ code: c, full: full[c], on: cur === c })),
+        opts: codes.map((c) => ({ code: c, full: full[c], on: cur === c })),
         change: (e) => { const v = e.target.value; if (full[v]) this.setState({ st: { ...st, [id]: v } }); }
       };
     });
+    const chips = codes.map((c) => ({ label: full[c], n: String(count[c]), style: 'background: ' + colors[c][0] + '; color: ' + colors[c][1] + '; border-radius: 999px; padding: 6px 12px; font-weight: 600' }));
     const harian = this.state.mode === 'harian';
     return {
       title: harian ? 'Absensi Harian' : 'Absensi Kegiatan',
@@ -141,8 +144,8 @@ class Component extends DCLogic {
       harianStyle: tab(harian), kegiatanStyle: tab(!harian),
       modeHarian: () => this.setState({ mode: 'harian' }),
       modeKegiatan: () => this.setState({ mode: 'kegiatan' }),
-      allHadir: () => this.setState({ st: { ...st, 1: 'H', 2: 'H', 4: 'H', 6: 'H', 7: 'H', 8: 'H' } }),
-      count, rows
+      allHadir: () => this.setState({ st: { ...st, 1: 'H', 2: 'H', 6: 'H', 7: 'H', 8: 'H' } }),
+      chips, rows
     };
   }
 }

@@ -71,8 +71,15 @@ a{color:#1F6B4F}a:hover{color:#14533C}
         <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Tindak lanjut
           <select style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Kembali ke kegiatan</option><option>Istirahat di kamar</option><option>Rujuk ke klinik / RS</option></select>
         </label>
-        <div style="background: #EEF3EF; border: 1px solid #D5E2DA; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.5; color: #3B4540">Wali hanya menerima kabar "sedang sakit / dirawat", tanpa diagnosa.</div>
-        <button type="button" style="height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; font: inherit; font-weight: 600; cursor: pointer">Simpan pemeriksaan</button>
+        <sc-if value="{{ isRawat }}" hint-placeholder-val="{{ false }}">
+          <div style="background: #EEF3EF; border: 1px solid #D5E2DA; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.5; color: #3B4540">Wali menerima kabar "sedang dirawat", tanpa diagnosa.</div>
+        </sc-if>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px">
+          <button type="button" style="flex: 1 1 200px; height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; font: inherit; font-weight: 600; cursor: pointer">Simpan pemeriksaan</button>
+          <sc-if value="{{ isRawat }}" hint-placeholder-val="{{ false }}">
+            <button type="button" onClick="{{ selesai }}" style="flex: 1 1 200px; height: 46px; border-radius: 10px; border: 1px solid #1F6B4F; background: #FFFFFF; color: #1F6B4F; font: inherit; font-weight: 600; cursor: pointer">Tandai selesai dirawat</button>
+          </sc-if>
+        </div>
       </section>
     </div>
 
@@ -123,7 +130,8 @@ class Component extends DCLogic {
       rawatStyle: pill(!!r[s]), jalanStyle: pill(!r[s]),
       setRawat: () => this.setState({ rawat: { ...r, [s]: true } }),
       setJalan: () => this.setState({ rawat: { ...r, [s]: false } }),
-      jenisNote: r[s] ? 'Absensi hari ini otomatis menjadi Sakit.' : 'Tidak mengubah absensi.',
+      jenisNote: r[s] ? 'Absensi otomatis Sakit (terkunci) sampai ditandai selesai dirawat — bisa beberapa hari.' : 'Tidak mengubah absensi dan tidak mengirim kabar ke wali.',
+      selesai: () => this.setState({ rawat: { ...r, [s]: false } }),
       months: ['Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt'].map((label, i) => ({
         label, n: String(data[i]),
         bar: 'width: 100%; max-width: 56px; border-radius: 6px 6px 0 0; background: ' + (i === 4 ? '#1F6B4F' : '#A9CDB9') + '; height: ' + Math.round(data[i] / max * 80) + 'px'

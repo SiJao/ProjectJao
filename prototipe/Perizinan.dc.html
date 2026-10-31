@@ -23,8 +23,55 @@ a{color:#1F6B4F}a:hover{color:#14533C}
     <header style="display: flex; flex-direction: column; gap: 4px">
       <span style="font-size: 13px; color: #55605A">Administrasi › Kesantrian</span>
       <h1 style="margin: 0; font-size: 28px; font-weight: 700">Perizinan &amp; Gate Pass</h1>
+      <span style="font-size: 13px; color: #55605A">Senin, 26 Oktober 2026 · pukul 13.45 (data contoh)</span>
     </header>
 
+    <div style="display: flex; flex-wrap: wrap; gap: 8px" role="tablist" aria-label="Jenis perizinan">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+        <button type="button" role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{ isLibur }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+        <section style="flex: 1 1 340px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 700">Libur Pondok</h2>
+          <span style="font-size: 13px; color: #55605A; line-height: 1.5">Izin Pulang massal untuk santri putra &amp; putri sekaligus.</span>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Nama libur
+            <input type="text" value="Libur Semester Ganjil 2026/2027" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
+          </label>
+          <div style="display: flex; flex-wrap: wrap; gap: 12px">
+            <label style="flex: 1 1 140px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Pulang
+              <input type="text" value="19/12/2026" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
+            </label>
+            <label style="flex: 1 1 140px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Kembali
+              <input type="text" value="04/01/2027 17.00" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
+            </label>
+          </div>
+          <div style="background: #EEF3EF; border: 1px solid #D5E2DA; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.55; color: #3B4540">Wali menerima <strong>satu pengumuman</strong> libur, bukan email per santri. Selama libur absensi santri otomatis Pulang. Hari kembali: absen kembali massal per kamar; aturan terlambat (masa tenggang 60 menit) &amp; overdue tetap berlaku.</div>
+        </section>
+        <section style="flex: 1.4 1 380px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: flex-end"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Pratinjau</h2><span style="font-size: 13px; color: #55605A">{{ liburPulang }} santri pulang · {{ liburTinggal }} tidak pulang</span></div>
+          <span style="font-size: 13px; color: #55605A">Centang santri yang <strong>tidak pulang</strong> — mereka tidak dibuatkan izin dan tetap diabsen biasa.</span>
+          <div style="border: 1px solid #E6EBE8; border-radius: 10px; overflow: hidden">
+            <sc-for list="{{ liburList }}" as="l" hint-placeholder-count="5">
+              <label style="display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 8px 14px; border-bottom: 1px solid #EEF1EF; font-size: 14px; cursor: pointer">
+                <input type="checkbox" checked="{{ l.on }}" onChange="{{ l.toggle }}" style="width: 18px; height: 18px">
+                <span style="flex: 1; font-weight: 600">{{ l.nama }}</span>
+                <span style="color: #55605A; font-size: 13px">{{ l.ket }}</span>
+              </label>
+            </sc-for>
+          </div>
+          <span style="font-size: 12px; color: #55605A">Menampilkan 5 dari 1.072 santri aktif (505 putra · 567 putri).</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px">
+            <button type="button" style="height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; padding: 0 18px; font: inherit; font-weight: 600; cursor: pointer">Buat izin Pulang ({{ liburPulang }})</button>
+            <button type="button" style="height: 46px; border-radius: 10px; border: 1px solid #1F6B4F; background: #FFFFFF; color: #1F6B4F; padding: 0 18px; font: inherit; font-weight: 600; cursor: pointer">Cetak semua Gate Pass (per santri)</button>
+          </div>
+        </section>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isIzin }}" hint-placeholder-val="{{ true }}">
     <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
       <section style="flex: 1 1 360px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
         <h2 style="margin: 0; font-size: 17px; font-weight: 700">Terbitkan izin</h2>
@@ -75,7 +122,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
     </div>
 
     <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto">
-      <div style="padding: 16px 20px 8px; display: flex; justify-content: space-between; align-items: center"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Izin berjalan</h2><span style="font-size: 12px; color: #55605A">overdue → Alpha + pelanggaran otomatis</span></div>
+      <div style="padding: 16px 20px 8px; display: flex; justify-content: space-between; align-items: center"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Izin berjalan</h2><span style="font-size: 12px; color: #55605A">lewat jam kembali → Terlambat · +60 menit → Overdue (Alpha, pelanggaran, kabar wali)</span></div>
       <table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px">
         <thead>
           <tr style="text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em">
@@ -103,6 +150,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
         </tbody>
       </table>
     </section>
+    </sc-if>
   </main>
 </div>
 </x-dc>
@@ -110,7 +158,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { jenis: 'keluar', back: {} };
+    this.state = { tab: 'izin', jenis: 'keluar', back: {}, tinggal: { 2: true } };
   }
   renderVals() {
     const J = {
@@ -121,13 +169,23 @@ class Component extends DCLogic {
     const cur = J[this.state.jenis];
     const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
     const badge = (bg, fg) => 'display: inline-block; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; background: ' + bg + '; color: ' + fg;
+    // Sekarang (data contoh): 26/10 pukul 13.45. Masa tenggang 60 menit (pengaturan overdue.masa_tenggang_menit).
     const list = [
-      { id: 1, nama: 'Santri Contoh 11', jenis: 'Keluar Sementara', ret: '12.30', over: true },
+      { id: 1, nama: 'Santri Contoh 11', jenis: 'Keluar Sementara', ret: '12.30', st: 'over' },
+      { id: 5, nama: 'Santri Contoh 15', jenis: 'Keluar Sementara', ret: '13.15', st: 'telat' },
       { id: 2, nama: 'Santri Contoh 12', jenis: 'Keluar Sementara', ret: '15.00' },
       { id: 3, nama: 'Santri Contoh 13', jenis: 'Pulang', ret: '29/10/2026' },
       { id: 4, nama: 'Santri Contoh 14', jenis: 'Izin Dinas', ret: '27/10 17.00' }
     ];
+    const LB = [['Santri Contoh 01', 'Putra · Ibnu Rusyd-01'], ['Santri Contoh 02', 'Putra · Ibnu Rusyd-01'], ['Santri Contoh 81', 'Putra · tinggal: lomba di pondok'], ['Santri Contoh 82', 'Putri'], ['Santri Contoh 83', 'Putri']];
+    const tg = this.state.tinggal;
+    const nTinggal = Object.values(tg).filter(Boolean).length;
+    const tabStyle = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
     return {
+      tabs: [['izin', 'Izin per santri'], ['libur', 'Libur Pondok']].map(([k, label]) => ({ label, on: this.state.tab === k, style: tabStyle(this.state.tab === k), pick: () => this.setState({ tab: k }) })),
+      isIzin: this.state.tab === 'izin', isLibur: this.state.tab === 'libur',
+      liburList: LB.map(([nama, ket], i) => ({ nama, ket, on: !!tg[i], toggle: () => this.setState({ tinggal: { ...tg, [i]: !tg[i] } }) })),
+      liburPulang: (1072 - nTinggal).toLocaleString('id-ID'), liburTinggal: String(nTinggal),
       pickJenis: (e) => { if (J[e.target.value]) this.setState({ jenis: e.target.value }); },
       jenis: Object.keys(J).map((k) => ({ key: k, label: J[k].label, on: this.state.jenis === k, style: pill(this.state.jenis === k), pick: () => this.setState({ jenis: k }) })),
       jenisNote: cur.note, jenisLabel: cur.label.toUpperCase(), dep: cur.dep, ret: cur.ret,
@@ -135,8 +193,8 @@ class Component extends DCLogic {
         const done = !!this.state.back[z.id];
         return {
           ...z, open: !done,
-          status: done ? 'Kembali' : (z.over ? 'Overdue' : 'Berjalan'),
-          badge: done ? badge('#E3F1E9', '#1E5E3F') : (z.over ? badge('#F9E3E1', '#8E2A22') : badge('#E4ECF8', '#23497E')),
+          status: done ? 'Kembali' : (z.st === 'over' ? 'Overdue (sejak 13.30)' : (z.st === 'telat' ? 'Terlambat · overdue 14.15' : 'Berjalan')),
+          badge: done ? badge('#E3F1E9', '#1E5E3F') : (z.st === 'over' ? badge('#F9E3E1', '#8E2A22') : (z.st === 'telat' ? badge('#FBF0DC', '#7A4E0C') : badge('#E4ECF8', '#23497E'))),
           back: () => this.setState({ back: { ...this.state.back, [z.id]: true } })
         };
       })

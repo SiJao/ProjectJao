@@ -146,17 +146,17 @@ class Component extends DCLogic {
     const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
     const T = {
       santri: {
-        label: 'Santri', placeholder: 'Cari nama atau NIS', summary: 'Data contoh · 1.072 aktif',
+        label: 'Santri', placeholder: 'Cari nama atau NIS', summary: 'Data contoh · 1.072 aktif (505 putra · 567 putri)',
         cols: ['NIS', 'Nama', 'L/P', 'Kelas', 'Kamar', 'Status'],
         rows: [
           ['990101', 'Santri Contoh 01', 'L', '1 A MTs', 'Ibnu Rusyd-01', 'Aktif'],
           ['990102', 'Santri Contoh 02', 'L', '1 A MTs', 'Ibnu Rusyd-01', 'Aktif'],
           ['990203', 'Santri Contoh 03', 'L', '2 B MTs', 'Ibnu Rusyd-02', 'Aktif'],
-          ['990306', 'Santri Contoh 06', 'L', '3 D SMP', 'Ibnu Sina-03', 'Skorsing'],
+          ['990306', 'Santri Contoh 06', 'L', '3 D SMP', 'Ibnu Rusyd-01', 'Skorsing'],
           ['990407', 'Santri Contoh 07', 'L', '4 B', 'Kholid Bin Walid-05', 'Aktif'],
           ['990509', 'Santri Contoh 09', 'L', '5 C', 'Bilal bin Rabah-02', 'Mutasi keluar']
         ],
-        footnote: 'Keluarga: nama ayah/ibu + WA (untuk Portal Wali). NIK, No KK, penghasilan, dan NISN tidak disimpan.'
+        footnote: 'Keluarga: nama ayah/ibu + WA (untuk Portal Wali). No. WA wali hanya diubah Moderator, karena menjadi kunci penautan Portal Wali. NIK, No KK, penghasilan, dan NISN tidak disimpan. Hanya santri TMI.'
       },
       kelas: {
         label: 'Kelas', placeholder: 'Cari kelas', summary: '53 rombel · tahun ajaran 2026/2027',
@@ -173,26 +173,26 @@ class Component extends DCLogic {
       },
       asrama: {
         label: 'Asrama & Kamar', placeholder: 'Cari asrama atau kamar', summary: '10 asrama · 61 kamar',
-        cols: ['Asrama', 'Kamar', 'Penghuni', 'Wali asuh', 'Asisten'],
+        cols: ['Asrama', 'L/P', 'Kamar', 'Penghuni', 'Wali asuh 2026/2027', 'Asisten'],
         rows: [
-          ['Ibnu Rusyd', 'Ibnu Rusyd-01', '18', '[Nama guru]', '[Nama guru]'],
-          ['Ibnu Rusyd', 'Ibnu Rusyd-02', '17', '[Nama guru]', '—'],
-          ['Ibnu Sina', 'Ibnu Sina-03', '20', '[Nama guru]', '[Nama guru]'],
-          ['Kholid Bin Walid', 'Kholid Bin Walid-05', '16', '[Nama guru]', '—'],
-          ['Thoriq bin Ziyad', 'Thoriq bin Ziyad-02', '19', '[Nama guru]', '[Nama guru]']
+          ['Ibnu Rusyd', 'L', 'Ibnu Rusyd-01', '18', '[Nama guru]', '[Nama guru]'],
+          ['Ibnu Rusyd', 'L', 'Ibnu Rusyd-02', '17', '[Nama guru]', '—'],
+          ['Ibnu Sina', 'L', 'Ibnu Sina-03', '20', '[Nama guru]', '[Nama guru]'],
+          ['Kholid Bin Walid', 'L', 'Kholid Bin Walid-05', '16', '[Nama guru]', '—'],
+          ['Thoriq bin Ziyad', 'L', 'Thoriq bin Ziyad-02', '19', '[Nama guru]', '[Nama guru]']
         ],
-        footnote: 'Rayon = asrama. Wali asuh dan asistennya melekat ke kamar. Kamar hanya untuk santri dengan jenis kelamin yang sesuai.'
+        footnote: 'Rayon = asrama; jenis kelamin kamar mengikuti asrama. Wali asuh dan asistennya ditetapkan per kamar, per tahun ajaran. Kamar hanya untuk santri dengan jenis kelamin yang sesuai.'
       },
       guru: {
         label: 'Guru', placeholder: 'Cari nama atau NIP', summary: 'Akun guru dibuat Moderator',
-        cols: ['NIP', 'Nama', 'L/P', 'Email', 'Akses'],
+        cols: ['NIP', 'Nama', 'L/P', 'Lingkungan', 'Tugas 2026/2027', 'Akses (Manajemen Akses)'],
         rows: [
-          ['9001', '[Nama guru]', 'L', 'nama@daarululuumlido.com', 'Wali asuh'],
-          ['9002', '[Nama guru]', 'L', 'nama@daarululuumlido.com', 'Wali kelas · hakim'],
-          ['9003', '[Nama guru]', 'L', 'nama@daarululuumlido.com', 'Wali kelas'],
-          ['9004', '[Nama guru]', 'L', 'nama@daarululuumlido.com', 'Asisten wali asuh']
+          ['9001', '[Nama guru]', 'L', 'Putra', 'Wali asuh', '—'],
+          ['9002', '[Nama guru]', 'L', 'Putra', 'Wali kelas', 'Putusan kedisiplinan'],
+          ['9003', '[Nama guru]', 'L', 'Semua', 'Wali kelas', '—'],
+          ['9004', '[Nama guru]', 'L', 'Putra', 'Asisten wali asuh', '—']
         ],
-        footnote: 'Peran guru di luar role diatur lewat Manajemen Akses (hanya Moderator).'
+        footnote: 'Akun guru (role Asatidz, login nama@daarululuumlido.com) dibuat Moderator. Lingkungan dan akses di luar role diatur lewat Manajemen Akses (hanya Moderator).'
       },
       ta: {
         label: 'Tahun Ajaran', placeholder: 'Cari tahun ajaran', summary: 'Hanya satu yang aktif',
@@ -208,11 +208,11 @@ class Component extends DCLogic {
     };
     const cur = T[this.state.tab];
     const G = [
-      ['Absensi', 'sesi', 'Sesi absensi', null, [['Subuh'], ['Siang'], ['Malam']], 'Membedakan absensi harian yang dilakukan beberapa kali sehari.'],
-      ['Absensi', 'hadir', 'Status kehadiran', 'Dihitung hadir', [['Hadir', 'Semua', 'Ya'], ['Izin', 'Semua', 'Tidak'], ['Sakit', 'Semua', 'Tidak'], ['Alpha', 'Semua', 'Tidak'], ['Pulang', 'Semua', 'Tidak']], 'Kode dan warna status ikut diatur di sini.'],
+      ['Absensi', 'sesi', 'Sesi absensi', null, [['Harian (bawaan)'], ['Subuh'], ['Malam']], 'Sesi opsional: umumnya sekali sehari memakai pilihan bawaan; sesi lain untuk absensi beberapa kali sehari.'],
+      ['Absensi', 'hadir', 'Status kehadiran', 'Dihitung hadir', [['Hadir', 'Semua', 'Ya'], ['Izin', 'Semua', 'Tidak'], ['Sakit', 'Semua', 'Tidak'], ['Alpha', 'Semua', 'Tidak'], ['Pulang', 'Semua', 'Tidak']], 'Kode dan warna status ikut diatur di sini. Santri skorsing otomatis Pulang (keterangan skorsing).'],
       ['Absensi', 'kegiatan', 'Jenis kegiatan', null, [['Pramuka'], ['Muhadhoroh'], ["Halaqah Qur'an"], ['Olahraga'], ['Kesenian']], 'Dasar grup kegiatan dan Absensi Kegiatan.'],
       ['Perizinan', 'izin', 'Jenis izin', 'Waktu · wali', [['Keluar Sementara', 'Semua', 'Jam'], ['Izin Dinas', 'Semua', 'Tanggal + jam'], ['Pulang', 'Semua', 'Tanggal · wajib wali']], 'Basis waktu menentukan isian form dan format Gate Pass.'],
-      ['Kesehatan', 'kunjungan', 'Jenis kunjungan', 'Ubah absensi', [['Rawat Jalan', 'Semua', '—'], ['Perawatan', 'Semua', 'Sakit · kabar ke wali']], 'Perawatan mengubah absensi hari itu.'],
+      ['Kesehatan', 'kunjungan', 'Jenis kunjungan', 'Ubah absensi', [['Rawat Jalan', 'Semua', '—'], ['Perawatan', 'Semua', 'Sakit · kabar ke wali']], 'Perawatan mengubah absensi menjadi Sakit sampai ditandai selesai dirawat.'],
       ['Kesehatan', 'tindak', 'Tindak lanjut', null, [['Kembali ke kegiatan'], ['Istirahat di kamar'], ['Rujuk ke klinik / RS']], ''],
       ['Kesehatan', 'diagnosa', 'Diagnosa', null, [['Demam'], ['ISPA (batuk pilek)'], ['Gastritis'], ['Dermatitis'], ['Luka ringan']], 'Form selalu menyediakan "Lainnya" dengan teks bebas.'],
       ['Kesehatan', 'obat', 'Obat', null, [['Paracetamol'], ['Antasida'], ['Obat batuk'], ['Salep kulit']], 'Form selalu menyediakan "Lainnya" dengan teks bebas.'],
