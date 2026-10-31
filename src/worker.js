@@ -466,17 +466,31 @@ function bacaKelas(teks) {
 }
 const STATUS_IMPOR = { aktif: "aktif", "mutasi keluar": "mutasi_keluar", skorsing: "skorsing", meninggal: "meninggal", alumni: "alumni" };
 
+// Hemat query: data acuan dibaca sekali, tulisan dikirim dalam db.batch (satu transaksi per kelompok).
+// Batas Worker ±1000 query per permintaan; versi per-baris lama melewatinya pada kelompok 100 baris.
+const TUTUP_STATUS = ["alumni", "mutasi_keluar", "meninggal"];
+const tanda = (n) => Array(n).fill("?").join(",");
+
 on("POST", "/api/impor/santri", async ({ db, u, body }) => {
   wajibModerator(u);
-  const rows = Array.isArray(body.rows) ? body.rows.slice(0, 3000) : [];
+  const rows = Array.isArray(body.rows) ? body.rows.slice(0, 60) : [];
   if (!rows.length) gagal(400, "Tidak ada baris untuk diimpor.");
-  const ta = (await db.prepare("SELECT id FROM tahun_ajaran WHERE status = 'aktif'").first())?.id || null;
-  const jenjang = Object.fromEntries((await db.prepare("SELECT id, nama FROM jenjang").all()).results.map((r) => [r.nama, r.id]));
-  const cache = { kelas: {}, asrama: {}, kamar: {} };
-  for (const r of (await db.prepare("SELECT id, tingkat, rombel, jenjang_id, lingkungan FROM kelas").all()).results) cache.kelas[`${r.tingkat}|${r.rombel}|${r.jenjang_id}|${r.lingkungan}`] = r.id;
-  for (const r of (await db.prepare("SELECT id, nama FROM asrama").all()).results) cache.asrama[r.nama] = r.id;
-  for (const r of (await db.prepare("SELECT id, nama FROM kamar").all()).results) cache.kamar[r.nama] = r.id;
+  const [taR, jjR, klR, asR, kmR] = await db.batch([
+    db.prepare("SELECT id FROM tahun_ajaran WHERE status = 'aktif'"),
+    db.prepare("SELECT id, nama FROM jenjang"),
+    db.prepare("SELECT id, tingkat, rombel, jenjang_id, lingkungan FROM kelas"),
+    db.prepare("SELECT id, nama, lingkungan FROM asrama"),
+    db.prepare("SELECT id, nama, lingkungan FROM kamar"),
+  ]);
+  const ta = taR.results[0]?.id || null;
+  const jenjang = Object.fromEntries(jjR.results.map((r) => [r.nama, r.id]));
+  const kelas = Object.fromEntries(klR.results.map((r) => [`${r.tingkat}|${r.rombel}|${r.jenjang_id}|${r.lingkungan}`, r.id]));
+  const asrama = Object.fromEntries(asR.results.map((r) => [r.nama, r]));
+  const kamar = Object.fromEntries(kmR.results.map((r) => [r.nama, r]));
   const hasil = { baru: 0, diperbarui: 0, ditolak: [] };
+
+  // 1) Periksa tiap baris; kelas/asrama/kamar baru dibuat (jarang, hanya saat pertama muncul).
+  const siap = new Map();
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i], baris = r.baris || i + 1;
     try {
@@ -485,67 +499,83 @@ on("POST", "/api/impor/santri", async ({ db, u, body }) => {
       if (!/^\d{4,10}$/.test(nis)) throw new Error("NIS tidak valid");
       if (!["L", "P"].includes(jk)) throw new Error("L/P tidak valid");
       const ling = jk === "L" ? "putra" : "putri";
-      const status = STATUS_IMPOR[String(r.status || "aktif").trim().toLowerCase()] || "aktif";
       let kelasId = null;
       const kb = bacaKelas(r.kelas);
       if (r.kelas && !kb) throw new Error("Format kelas tidak dikenal: " + r.kelas);
       if (kb) {
         const key = `${kb.tingkat}|${kb.rombel}|${jenjang[kb.jenjang]}|${ling}`;
-        if (!cache.kelas[key]) {
-          const x = await db.prepare("INSERT INTO kelas (tingkat, rombel, jenjang_id, label, lingkungan) VALUES (?,?,?,?,?)").bind(kb.tingkat, kb.rombel, jenjang[kb.jenjang], kb.label, ling).run();
-          cache.kelas[key] = x.meta.last_row_id;
-        }
-        kelasId = cache.kelas[key];
+        if (!kelas[key]) kelas[key] = (await db.prepare("INSERT INTO kelas (tingkat, rombel, jenjang_id, label, lingkungan) VALUES (?,?,?,?,?)").bind(kb.tingkat, kb.rombel, jenjang[kb.jenjang], kb.label, ling).run()).meta.last_row_id;
+        kelasId = kelas[key];
       }
       let kamarId = null;
       const kmr = String(r.kamar || "").trim();
       if (kmr) {
         const m = kmr.match(/^(.*?)-(\d+)$/);
         if (!m) throw new Error("Format kamar tidak dikenal: " + kmr);
-        const asramaNama = m[1].trim();
-        if (!cache.asrama[asramaNama]) {
-          const x = await db.prepare("INSERT INTO asrama (nama, lingkungan) VALUES (?, ?)").bind(asramaNama, ling).run();
-          cache.asrama[asramaNama] = x.meta.last_row_id;
-        }
-        if (!cache.kamar[kmr]) {
-          const as = await db.prepare("SELECT lingkungan FROM asrama WHERE id = ?").bind(cache.asrama[asramaNama]).first();
-          const x = await db.prepare("INSERT INTO kamar (asrama_id, nomor, nama, lingkungan) VALUES (?,?,?,?)").bind(cache.asrama[asramaNama], m[2], kmr, as.lingkungan).run();
-          cache.kamar[kmr] = x.meta.last_row_id;
-        }
-        const km = await db.prepare("SELECT lingkungan FROM kamar WHERE id = ?").bind(cache.kamar[kmr]).first();
-        if (km.lingkungan !== ling) throw new Error("Kamar " + kmr + " bukan untuk santri " + ling);
-        kamarId = cache.kamar[kmr];
+        const an = m[1].trim();
+        if (!asrama[an]) asrama[an] = { id: (await db.prepare("INSERT INTO asrama (nama, lingkungan) VALUES (?, ?)").bind(an, ling).run()).meta.last_row_id, lingkungan: ling };
+        if (!kamar[kmr]) kamar[kmr] = { id: (await db.prepare("INSERT INTO kamar (asrama_id, nomor, nama, lingkungan) VALUES (?,?,?,?)").bind(asrama[an].id, m[2], kmr, asrama[an].lingkungan).run()).meta.last_row_id, lingkungan: asrama[an].lingkungan };
+        if (kamar[kmr].lingkungan !== ling) throw new Error("Kamar " + kmr + " bukan untuk santri " + ling);
+        kamarId = kamar[kmr].id;
       }
-      const ada = await db.prepare("SELECT id FROM santri WHERE nis = ?").bind(nis).first();
-      const v = [bersih(r.nama, 120), jk, bersih(r.tempat_lahir, 60), bersih(r.tanggal_lahir, 10), status, bersih(r.kabupaten, 60), bersih(r.provinsi, 60), kelasId, kamarId];
+      const v = [bersih(r.nama, 120), jk, bersih(r.tempat_lahir, 60), bersih(r.tanggal_lahir, 10), STATUS_IMPOR[String(r.status || "aktif").trim().toLowerCase()] || "aktif", bersih(r.kabupaten, 60), bersih(r.provinsi, 60), kelasId, kamarId];
       if (!v[0]) throw new Error("Nama kosong");
-      let id;
-      if (ada) {
-        id = ada.id;
-        await db.prepare("UPDATE santri SET nama=?, jenis_kelamin=?, tempat_lahir=?, tanggal_lahir=?, status=?, kabupaten=?, provinsi=?, kelas_id=?, kamar_id=?, diubah_at=datetime('now') WHERE id=?").bind(...v, id).run();
-        hasil.diperbarui++;
-      } else {
-        const x = await db.prepare("INSERT INTO santri (nis, nama, jenis_kelamin, tempat_lahir, tanggal_lahir, status, kabupaten, provinsi, kelas_id, kamar_id) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(nis, ...v).run();
-        id = x.meta.last_row_id;
-        hasil.baru++;
-      }
-      const st = [...await pindahRiwayat(db, "riwayat_kelas", "kelas_id", id, kelasId, ada ? "pindah" : "masuk", ta), ...await pindahRiwayat(db, "riwayat_kamar", "kamar_id", id, kamarId, ada ? "pindah" : "masuk", ta)];
-      for (const [hub, nama, hp] of [["ayah", r.ayah, r.wa_ayah], ["ibu", r.ibu, r.wa_ibu]]) {
-        const nm = bersih(nama, 120);
-        if (!nm) continue;
-        const lama = await db.prepare("SELECT w.id FROM wali w JOIN santri_wali sw ON sw.wali_id = w.id WHERE sw.santri_id = ? AND w.hubungan = ?").bind(id, hub).first();
-        if (lama) st.push(db.prepare("UPDATE wali SET nama = ?, no_hp = ?, no_hp_normal = ? WHERE id = ?").bind(nm, bersih(hp, 20), normalHp(hp), lama.id));
-        else {
-          const w = await db.prepare("INSERT INTO wali (nama, hubungan, no_hp, no_hp_normal) VALUES (?,?,?,?)").bind(nm, hub, bersih(hp, 20), normalHp(hp)).run();
-          st.push(db.prepare("INSERT INTO santri_wali (santri_id, wali_id) VALUES (?, ?)").bind(id, w.meta.last_row_id));
-        }
-      }
-      if (st.length) await db.batch(st);
+      if (siap.has(nis)) hasil.ditolak.push({ baris: siap.get(nis).baris, nis, alasan: "NIS ganda di file; dipakai baris " + baris });
+      siap.set(nis, { baris, nis, v, kelasId, kamarId, wali: [["ayah", bersih(r.ayah, 120), r.wa_ayah], ["ibu", bersih(r.ibu, 120), r.wa_ibu]].filter((w) => w[1]) });
     } catch (e) {
       hasil.ditolak.push({ baris, nis: r.nis || "", alasan: e.message });
     }
   }
-  await catat(db, u, "data", "impor", "santri", null, `Impor santri: ${hasil.baru} baru, ${hasil.diperbarui} diperbarui, ${hasil.ditolak.length} ditolak`);
+  const daftar = [...siap.values()];
+  if (!daftar.length) return json(hasil);
+
+  // 2) Santri: perbarui yang sudah ada, tambah yang baru — satu batch.
+  const nisList = daftar.map((d) => d.nis);
+  const ada = Object.fromEntries((await db.prepare(`SELECT id, nis, status FROM santri WHERE nis IN (${tanda(nisList.length)})`).bind(...nisList).all()).results.map((r) => [r.nis, r]));
+  const tulis = daftar.map((d) => ada[d.nis]
+    ? db.prepare("UPDATE santri SET nama=?, jenis_kelamin=?, tempat_lahir=?, tanggal_lahir=?, status=?, kabupaten=?, provinsi=?, kelas_id=?, kamar_id=?, diubah_at=datetime('now') WHERE id=?").bind(...d.v, ada[d.nis].id)
+    : db.prepare("INSERT INTO santri (nis, nama, jenis_kelamin, tempat_lahir, tanggal_lahir, status, kabupaten, provinsi, kelas_id, kamar_id) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(d.nis, ...d.v));
+  const hasilTulis = await db.batch(tulis);
+  daftar.forEach((d, i) => {
+    d.lama = ada[d.nis] || null;
+    d.id = d.lama ? d.lama.id : hasilTulis[i].meta.last_row_id;
+    hasil[d.lama ? "diperbarui" : "baru"]++;
+  });
+
+  // 3) Riwayat kelas/kamar, wali, dan penutupan akun — dibaca sekali, ditulis satu batch.
+  const ids = daftar.map((d) => d.id), q = tanda(ids.length);
+  const [rkR, rmR, wR] = await db.batch([
+    db.prepare(`SELECT santri_id, kelas_id t FROM riwayat_kelas WHERE selesai IS NULL AND santri_id IN (${q})`).bind(...ids),
+    db.prepare(`SELECT santri_id, kamar_id t FROM riwayat_kamar WHERE selesai IS NULL AND santri_id IN (${q})`).bind(...ids),
+    db.prepare(`SELECT sw.santri_id, w.id, w.hubungan FROM wali w JOIN santri_wali sw ON sw.wali_id = w.id WHERE sw.santri_id IN (${q})`).bind(...ids),
+  ]);
+  const bukaKelas = Object.fromEntries(rkR.results.map((r) => [r.santri_id, r.t]));
+  const bukaKamar = Object.fromEntries(rmR.results.map((r) => [r.santri_id, r.t]));
+  const waliAda = Object.fromEntries(wR.results.map((r) => [`${r.santri_id}|${r.hubungan}`, r.id]));
+  const hari = hariIni(), st = [];
+  for (const d of daftar) {
+    const sebab = d.lama ? "pindah" : "masuk";
+    if (bukaKelas[d.id] !== d.kelasId && !(bukaKelas[d.id] === undefined && !d.kelasId)) {
+      st.push(db.prepare("UPDATE riwayat_kelas SET selesai = ? WHERE santri_id = ? AND selesai IS NULL").bind(hari, d.id));
+      if (d.kelasId) st.push(db.prepare("INSERT INTO riwayat_kelas (santri_id, kelas_id, tahun_ajaran_id, mulai, sebab) VALUES (?,?,?,?,?)").bind(d.id, d.kelasId, ta, hari, sebab));
+    }
+    if (bukaKamar[d.id] !== d.kamarId && !(bukaKamar[d.id] === undefined && !d.kamarId)) {
+      st.push(db.prepare("UPDATE riwayat_kamar SET selesai = ? WHERE santri_id = ? AND selesai IS NULL").bind(hari, d.id));
+      if (d.kamarId) st.push(db.prepare("INSERT INTO riwayat_kamar (santri_id, kamar_id, mulai, sebab) VALUES (?,?,?,?)").bind(d.id, d.kamarId, hari, sebab));
+    }
+    for (const [hub, nm, hp] of d.wali) {
+      const wid = waliAda[`${d.id}|${hub}`];
+      if (wid) st.push(db.prepare("UPDATE wali SET nama = ?, no_hp = ?, no_hp_normal = ? WHERE id = ?").bind(nm, bersih(hp, 20), normalHp(hp), wid));
+      else st.push(
+        db.prepare("INSERT INTO wali (nama, hubungan, no_hp, no_hp_normal) VALUES (?,?,?,?)").bind(nm, hub, bersih(hp, 20), normalHp(hp)),
+        db.prepare("INSERT INTO santri_wali (santri_id, wali_id) VALUES (?, last_insert_rowid())").bind(d.id));
+    }
+    if (d.lama && d.lama.status !== d.v[4] && TUTUP_STATUS.includes(d.v[4]))
+      st.push(db.prepare("UPDATE users SET status = 'nonaktif' WHERE santri_id = ?").bind(d.id));
+  }
+  st.push(db.prepare("INSERT INTO riwayat_perubahan (user_id, kategori, aksi, tabel, data_id, ringkasan, lingkungan) VALUES (?,?,?,?,?,?,?)")
+    .bind(u.id, "data", "impor", "santri", null, `Impor santri: ${hasil.baru} baru, ${hasil.diperbarui} diperbarui, ${hasil.ditolak.length} ditolak`, "semua"));
+  await db.batch(st);
   return json(hasil);
 });
 

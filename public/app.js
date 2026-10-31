@@ -329,14 +329,15 @@ const DataMaster = {
     async function jalankanImpor() {
       f.sibuk = true; f.galat = "";
       const total = { baru: 0, diperbarui: 0, ditolak: [] };
+      let i = 0;
       try {
-        for (let i = 0; i < f.impor.rows.length; i += 100) {
-          const r = await api("/impor/santri", { rows: f.impor.rows.slice(i, i + 100) });
+        for (; i < f.impor.rows.length; i += 50) {
+          const r = await api("/impor/santri", { rows: f.impor.rows.slice(i, i + 50) });
           total.baru += r.baru; total.diperbarui += r.diperbarui; total.ditolak.push(...r.ditolak);
-          f.imporHasil = { ...total, proses: Math.min(i + 100, f.impor.rows.length) };
+          f.imporHasil = { ...total, proses: Math.min(i + 50, f.impor.rows.length) };
         }
         f.impor = null; await muatMaster();
-      } catch (e) { f.galat = e.message; } finally { f.sibuk = false; }
+      } catch (e) { f.galat = `${e.message} — berhenti pada santri ke-${i + 1}. Klik Impor sekarang lagi; NIS yang sudah masuk hanya diperbarui, tidak dobel.`; } finally { f.sibuk = false; }
     }
     onMounted(async () => { await muatMaster(); cari(); });
     return { tab, f, m, moderator, bisaPilihan, cari, simpanMaster, bukaSantri, simpanSantri, KELOMPOK, isiPilihan, tambahPilihan, ubahPilihan, baru, tambahKamar, bacaFile, jalankanImpor, namaKelas };
