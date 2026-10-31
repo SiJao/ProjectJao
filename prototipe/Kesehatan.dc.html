@@ -34,7 +34,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
         <sc-for list="{{ visits }}" as="v" hint-placeholder-count="5">
           <button type="button" onClick="{{ v.pick }}" style="{{ v.style }}">
             <span style="display: flex; flex-direction: column; gap: 2px; text-align: left"><span style="font-weight: 600">{{ v.nama }}</span><span style="font-size: 13px; color: #55605A">{{ v.kamar }} · {{ v.keluhan }}</span></span>
-            <span style="{{ v.badge }}">{{ v.jenis }}</span>
+            <span style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px"><span style="{{ v.badge }}">{{ v.jenis }}</span><sc-if value="{{ v.selesai }}" hint-placeholder-val="{{ false }}"><span style="border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; white-space: nowrap; background: #E3F1E9; color: #1E5E3F">Selesai dirawat</span></sc-if></span>
           </button>
         </sc-for>
       </section>
@@ -42,6 +42,28 @@ a{color:#1F6B4F}a:hover{color:#14533C}
       <section style="flex: 1.3 1 380px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px">
           <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Pemeriksaan · {{ sel.nama }}</h2><span style="font-size: 13px; color: #55605A">{{ sel.kamar }} · keluhan: {{ sel.keluhan }}</span></div>
+          <sc-if value="{{ isSelesai }}" hint-placeholder-val="{{ false }}">
+            <span style="border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; white-space: nowrap; background: #E3F1E9; color: #1E5E3F">Selesai dirawat</span>
+          </sc-if>
+        </div>
+        <div style="border: 1px solid #E6EBE8; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; background: #FAFBFA">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline"><strong style="font-size: 14px">Profil kesehatan</strong><span style="font-size: 12px; color: #55605A">{{ profilNote }}</span></div>
+          <sc-if value="{{ bisaEditProfil }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-wrap: wrap; gap: 12px">
+              <label style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Alergi
+                <input type="text" value="{{ profil.alergi }}" onChange="{{ onAlergi }}" style="height: 40px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
+              </label>
+              <label style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Penyakit kronis
+                <input type="text" value="{{ profil.kronis }}" onChange="{{ onKronis }}" style="height: 40px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
+              </label>
+            </div>
+          </sc-if>
+          <sc-if value="{{ lihatProfil }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 13px">
+              <span><span style="color: #55605A">Alergi:</span> <strong>{{ profil.alergi }}</strong></span>
+              <span><span style="color: #55605A">Penyakit kronis:</span> <strong>{{ profil.kronis }}</strong></span>
+            </div>
+          </sc-if>
         </div>
         <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Jenis kunjungan
           <div style="display: flex; flex-wrap: wrap; gap: 6px">
@@ -51,14 +73,22 @@ a{color:#1F6B4F}a:hover{color:#14533C}
           <span style="font-weight: 400; color: #55605A">{{ jenisNote }}</span>
         </div>
         <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Diagnosa
-          <select onChange="{{ onDiag }}" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option value="Demam">Demam</option><option value="ISPA">ISPA (batuk pilek)</option><option value="Gastritis">Gastritis</option><option value="Dermatitis">Dermatitis</option><option value="Luka ringan">Luka ringan</option><option value="Lainnya">Lainnya…</option></select>
+          <select onChange="{{ onDiag }}" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
+            <sc-for list="{{ diagOpts }}" as="o" hint-placeholder-count="6">
+              <option value="{{ o.v }}" selected="{{ o.on }}">{{ o.label }}</option>
+            </sc-for>
+          </select>
         </label>
         <sc-if value="{{ diagLain }}" hint-placeholder-val="{{ false }}">
           <input type="text" aria-label="Diagnosa lainnya" placeholder="Tulis diagnosa lain" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit">
         </sc-if>
         <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end">
           <label style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Resep · obat
-            <select onChange="{{ onObat }}" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option value="Paracetamol">Paracetamol</option><option value="Antasida">Antasida</option><option value="Obat batuk">Obat batuk</option><option value="Salep kulit">Salep kulit</option><option value="Lainnya">Lainnya…</option></select>
+            <select onChange="{{ onObat }}" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
+              <sc-for list="{{ obatOpts }}" as="o" hint-placeholder-count="5">
+                <option value="{{ o.v }}" selected="{{ o.on }}">{{ o.label }}</option>
+              </sc-for>
+            </select>
           </label>
           <label style="flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Aturan pakai
             <input type="text" placeholder="3 × 1 sesudah makan" style="height: 44px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400">
@@ -76,7 +106,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
         </sc-if>
         <div style="display: flex; flex-wrap: wrap; gap: 10px">
           <button type="button" style="flex: 1 1 200px; height: 46px; border-radius: 10px; background: #1F6B4F; color: #FFFFFF; border: 0; font: inherit; font-weight: 600; cursor: pointer">Simpan pemeriksaan</button>
-          <sc-if value="{{ isRawat }}" hint-placeholder-val="{{ false }}">
+          <sc-if value="{{ bisaSelesai }}" hint-placeholder-val="{{ false }}">
             <button type="button" onClick="{{ selesai }}" style="flex: 1 1 200px; height: 46px; border-radius: 10px; border: 1px solid #1F6B4F; background: #FFFFFF; color: #1F6B4F; font: inherit; font-weight: 600; cursor: pointer">Tandai selesai dirawat</button>
           </sc-if>
         </div>
@@ -102,7 +132,10 @@ a{color:#1F6B4F}a:hover{color:#14533C}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { diag: 'Demam', obat: 'Paracetamol', sel: 0, rawat: { 0: false, 1: true, 2: false, 3: true, 4: false } };
+    let peran = 'moderator';
+    try { peran = window.localStorage.getItem('hisada.peran') || 'moderator'; } catch (e) {}
+    // diag / obat / selesai / profil disimpan per pasien (kunci = indeks kunjungan terpilih)
+    this.state = { diag: {}, obat: {}, sel: 0, rawat: { 0: false, 1: true, 2: false, 3: true, 4: false }, selesai: {}, profil: {}, peran };
   }
   renderVals() {
     const V = [
@@ -114,24 +147,47 @@ class Component extends DCLogic {
     ];
     const r = this.state.rawat;
     const s = this.state.sel;
+    const done = this.state.selesai;
+    const D = [['Demam', 'Demam'], ['ISPA', 'ISPA (batuk pilek)'], ['Gastritis', 'Gastritis'], ['Dermatitis', 'Dermatitis'], ['Luka ringan', 'Luka ringan'], ['Lainnya', 'Lainnya…']];
+    const O = [['Paracetamol', 'Paracetamol'], ['Antasida', 'Antasida'], ['Obat batuk', 'Obat batuk'], ['Salep kulit', 'Salep kulit'], ['Lainnya', 'Lainnya…']];
+    const diag = this.state.diag[s] || 'Demam';
+    const obat = this.state.obat[s] || 'Paracetamol';
+    const PROF = [
+      { alergi: 'Tidak ada', kronis: 'Tidak ada' },
+      { alergi: 'Udang', kronis: 'Maag' },
+      { alergi: 'Tidak ada', kronis: 'Eksim' },
+      { alergi: 'Debu', kronis: 'Asma ringan' },
+      { alergi: 'Tidak ada', kronis: 'Tidak ada' }
+    ];
+    const prof = { ...PROF[s], ...(this.state.profil[s] || {}) };
+    const bisaEdit = this.state.peran === 'moderator';
+    const setProf = (k) => (e) => { const v = e && e.target ? e.target.value : ''; this.setState({ profil: { ...this.state.profil, [s]: { ...(this.state.profil[s] || {}), [k]: v || '—' } } }); };
     const badge = (on) => 'border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; white-space: nowrap; ' + (on ? 'background: #FBF0DC; color: #7A4E0C' : 'background: #EEF1EF; color: #3B4540');
     const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
     const data = [18, 22, 15, 27, 34, 29];
     const max = 34;
     return {
       visits: V.map((v, i) => ({
-        ...v, jenis: r[i] ? 'Perawatan' : 'Rawat Jalan', badge: badge(r[i]),
+        ...v, jenis: r[i] ? 'Perawatan' : 'Rawat Jalan', badge: badge(r[i] && !done[i]), selesai: !!(r[i] && done[i]),
         style: 'display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 20px; border: 0; border-top: 1px solid #EEF1EF; font: inherit; color: #18201C; cursor: pointer; ' + (i === s ? 'background: #EEF5F1' : 'background: #FFFFFF'),
         pick: () => this.setState({ sel: i })
       })),
-      onDiag: (e) => this.setState({ diag: e.target.value }), diagLain: this.state.diag === 'Lainnya',
-      onObat: (e) => this.setState({ obat: e.target.value }), obatLain: this.state.obat === 'Lainnya',
+      diagOpts: D.map(([v, label]) => ({ v, label, on: v === diag })),
+      obatOpts: O.map(([v, label]) => ({ v, label, on: v === obat })),
+      onDiag: (e) => { const v = e && e.target ? e.target.value : ''; if (D.some((x) => x[0] === v)) this.setState({ diag: { ...this.state.diag, [s]: v } }); },
+      diagLain: diag === 'Lainnya',
+      onObat: (e) => { const v = e && e.target ? e.target.value : ''; if (O.some((x) => x[0] === v)) this.setState({ obat: { ...this.state.obat, [s]: v } }); },
+      obatLain: obat === 'Lainnya',
+      profil: prof, bisaEditProfil: bisaEdit, lihatProfil: !bisaEdit,
+      profilNote: bisaEdit ? 'Diedit Moderator / pemegang akses Profil kesehatan' : 'Lihat saja · diedit pemegang akses Profil kesehatan',
+      onAlergi: setProf('alergi'), onKronis: setProf('kronis'),
+      isSelesai: !!(r[s] && done[s]), bisaSelesai: !!(r[s] && !done[s]),
       sel: V[s], isRawat: !!r[s], isJalan: !r[s],
       rawatStyle: pill(!!r[s]), jalanStyle: pill(!r[s]),
       setRawat: () => this.setState({ rawat: { ...r, [s]: true } }),
-      setJalan: () => this.setState({ rawat: { ...r, [s]: false } }),
-      jenisNote: r[s] ? 'Absensi otomatis Sakit (terkunci) sampai ditandai selesai dirawat — bisa beberapa hari.' : 'Tidak mengubah absensi dan tidak mengirim kabar ke wali.',
-      selesai: () => this.setState({ rawat: { ...r, [s]: false } }),
+      setJalan: () => this.setState({ rawat: { ...r, [s]: false }, selesai: { ...done, [s]: false } }),
+      jenisNote: r[s] ? (done[s] ? 'Selesai dirawat — jenis kunjungan tetap Perawatan; absensi kembali normal mulai sesi berikutnya.' : 'Absensi otomatis Sakit (terkunci) sampai ditandai selesai dirawat — bisa beberapa hari.') : 'Tidak mengubah absensi dan tidak mengirim kabar ke wali.',
+      selesai: () => this.setState({ selesai: { ...done, [s]: true } }),
       months: ['Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt'].map((label, i) => ({
         label, n: String(data[i]),
         bar: 'width: 100%; max-width: 56px; border-radius: 6px 6px 0 0; background: ' + (i === 4 ? '#1F6B4F' : '#A9CDB9') + '; height: ' + Math.round(data[i] / max * 80) + 'px'

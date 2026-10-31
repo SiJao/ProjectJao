@@ -33,10 +33,18 @@ a{color:#1F6B4F}a:hover{color:#14533C}
     <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 18px 20px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end">
       <sc-if value="{{ isHarian }}" hint-placeholder-val="{{ true }}">
         <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Asrama
-          <select style="height: 44px; min-width: 180px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Ibnu Rusyd</option><option>Ibnu Sina</option><option>Kholid Bin Walid</option></select>
+          <select aria-label="Asrama" onChange="{{ pickAsrama }}" style="height: 44px; min-width: 180px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
+            <sc-for list="{{ asramaOpts }}" as="o" hint-placeholder-count="3">
+              <option value="{{ o.v }}" selected="{{ o.on }}">{{ o.v }}</option>
+            </sc-for>
+          </select>
         </label>
         <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Kamar
-          <select style="height: 44px; min-width: 160px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Ibnu Rusyd-01</option><option>Ibnu Rusyd-02</option><option>Ibnu Rusyd-03</option><option>Ibnu Rusyd-04</option></select>
+          <select aria-label="Kamar" onChange="{{ pickKamar }}" style="height: 44px; min-width: 160px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
+            <sc-for list="{{ kamarOpts }}" as="o" hint-placeholder-count="4">
+              <option value="{{ o.v }}" selected="{{ o.on }}">{{ o.v }}</option>
+            </sc-for>
+          </select>
         </label>
         <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Sesi <span style="font-weight: 400; color: #55605A">(opsional)</span>
           <select style="height: 44px; min-width: 150px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option selected>Harian (bawaan)</option><option>Subuh</option><option>Malam</option></select>
@@ -44,10 +52,18 @@ a{color:#1F6B4F}a:hover{color:#14533C}
       </sc-if>
       <sc-if value="{{ isKegiatan }}" hint-placeholder-val="{{ false }}">
         <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Kegiatan
-          <select style="height: 44px; min-width: 180px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Pramuka</option><option>Muhadhoroh</option><option>Halaqah Qur'an</option><option>Olahraga</option><option>Kesenian</option></select>
+          <select aria-label="Kegiatan" onChange="{{ pickKegiatan }}" style="height: 44px; min-width: 180px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
+            <sc-for list="{{ kegiatanOpts }}" as="o" hint-placeholder-count="5">
+              <option value="{{ o.v }}" selected="{{ o.on }}">{{ o.v }}</option>
+            </sc-for>
+          </select>
         </label>
         <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Grup
-          <select style="height: 44px; min-width: 150px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF"><option>Grup 1</option><option>Grup 2</option><option>Grup 3</option></select>
+          <select aria-label="Grup" onChange="{{ pickGrup }}" style="height: 44px; min-width: 150px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 400; background: #FFFFFF">
+            <sc-for list="{{ grupOpts }}" as="o" hint-placeholder-count="3">
+              <option value="{{ o.v }}" selected="{{ o.on }}">{{ o.v }}</option>
+            </sc-for>
+          </select>
         </label>
       </sc-if>
       <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Tanggal
@@ -62,6 +78,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
       </sc-for>
     </div>
 
+    <p style="margin: 0; font-size: 13px; color: #55605A">{{ daftarNote }}</p>
     <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto">
       <table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 620px">
         <thead>
@@ -94,6 +111,9 @@ a{color:#1F6B4F}a:hover{color:#14533C}
           </sc-for>
         </tbody>
       </table>
+      <sc-if value="{{ kosong }}" hint-placeholder-val="{{ false }}">
+        <p style="margin: 0; padding: 16px; font-size: 14px; color: #55605A">Data contoh hanya tersedia untuk kamar Ibnu Rusyd-01.</p>
+      </sc-if>
     </section>
     <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px">
       <span style="font-size: 13px; color: #55605A; line-height: 1.5">Daftar sesi dan status kehadiran diatur di Data Master › Daftar Pilihan. Status otomatis terkunci; urutan: skorsing › perizinan/overdue › kesehatan › isian manual.</span>
@@ -108,7 +128,9 @@ class Component extends DCLogic {
     super(props);
     this.state = {
       mode: 'harian',
-      st: { 1: 'H', 2: 'H', 3: 'P', 4: 'P', 5: 'S', 6: 'H', 7: 'A', 8: 'H' }
+      st: { 1: 'H', 2: 'H', 3: 'P', 4: 'P', 5: 'S', 6: 'H', 7: 'A', 8: 'H' },
+      asrama: 'Ibnu Rusyd', kamar: 'Ibnu Rusyd-01',
+      kegiatan: 'Pramuka', grup: 'DLT 1', stK: {}
     };
   }
   renderVals() {
@@ -124,27 +146,78 @@ class Component extends DCLogic {
       [5, '990322', 'Santri Contoh 22', '3 A MTs', 'otomatis: Perawatan (belum selesai dirawat)'], [6, '990126', 'Santri Contoh 26', '1 B MTs'],
       [7, '990227', 'Santri Contoh 27', '2 C SMP'], [8, '990128', 'Santri Contoh 28', '1 B MTs']
     ];
+    // Asrama → kamar (kamar mengikuti asrama yang dipilih)
+    const AS = {
+      'Ibnu Rusyd': ['Ibnu Rusyd-01', 'Ibnu Rusyd-02', 'Ibnu Rusyd-03', 'Ibnu Rusyd-04'],
+      'Ibnu Sina': ['Ibnu Sina-01', 'Ibnu Sina-02', 'Ibnu Sina-03', 'Ibnu Sina-04'],
+      'Kholid Bin Walid': ['Kholid Bin Walid-01', 'Kholid Bin Walid-03', 'Kholid Bin Walid-05']
+    };
+    // Kegiatan → grup (Pramuka memakai DLT) · anggota grup terpisah dari penghuni kamar
+    const KEG = ['Pramuka', 'Muhadhoroh', "Halaqah Qur'an", 'Olahraga', 'Kesenian'];
+    const grupOf = (k) => (k === 'Pramuka' ? ['DLT 1', 'DLT 2'] : ['Grup 1', 'Grup 2', 'Grup 3']);
+    const POOL = [4, 5, 8, 10, 16, 17, 18, 19, 20, 29, 30, 34, 35, 36, 37, 38, 39, 40, 45, 46, 47, 48, 49, 50, 60, 67, 68, 69, 76, 77, 78, 79, 80, 85, 86, 87, 88, 89, 90, 94, 98, 99];
+    const KLS = { 1: '1 C MTs', 2: '2 A MTs', 3: '3 B MTs', 4: '4 C', 5: '5 B' };
+    const pad = (n) => (n < 10 ? '0' : '') + n;
+    const anggota = (keg, grup) => {
+      const k = KEG.indexOf(keg);
+      const g = grupOf(keg).indexOf(grup);
+      const start = (k * 9 + g * 4) % (POOL.length - 4);
+      let ns = POOL.slice(start, start + 4);
+      // Santri Contoh 03 ikut Pramuka DLT 2 dan Muhadhoroh Grup 2 (sesuai Rapor)
+      if ((keg === 'Pramuka' && grup === 'DLT 2') || (keg === 'Muhadhoroh' && grup === 'Grup 2')) ns = [3].concat(ns.slice(0, 3));
+      return ns.map((n) => {
+        const t = n === 3 ? 2 : 1 + (n % 5);
+        return ['k' + n, '990' + t + pad(n), 'Santri Contoh ' + pad(n), n === 3 ? '2 B MTs' : KLS[t]];
+      });
+    };
+    const harian = this.state.mode === 'harian';
+    const kamarList = AS[this.state.asrama] || AS['Ibnu Rusyd'];
+    const kamar = kamarList.includes(this.state.kamar) ? this.state.kamar : kamarList[0];
+    const keg = KEG.includes(this.state.kegiatan) ? this.state.kegiatan : 'Pramuka';
+    const grupList = grupOf(keg);
+    const grup = grupList.includes(this.state.grup) ? this.state.grup : grupList[0];
     const st = this.state.st;
+    const stK = this.state.stK;
+    const gk = keg + '|' + grup + '|';
+    const list = harian ? (kamar === 'Ibnu Rusyd-01' ? people : []) : anggota(keg, grup);
     const count = { H: 0, I: 0, S: 0, A: 0, P: 0 };
-    Object.values(st).forEach((v) => { count[v]++; });
-    const rows = people.map(([id, nis, nama, kelas, source]) => {
-      const cur = st[id];
+    const rows = list.map(([id, nis, nama, kelas, source]) => {
+      const cur = harian ? st[id] : (stK[gk + id] || 'H');
+      count[cur]++;
       return {
         nis, nama, kelas, source: source || '', locked: !!source, label: 'Status kehadiran ' + nama,
         selStyle: 'height: 38px; min-width: 120px; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 13px; font-weight: 700; border: 1px solid ' + colors[cur][1] + '; background: ' + colors[cur][0] + '; color: ' + colors[cur][1],
         opts: codes.map((c) => ({ code: c, full: full[c], on: cur === c })),
-        change: (e) => { const v = e.target.value; if (full[v]) this.setState({ st: { ...st, [id]: v } }); }
+        change: (e) => {
+          const v = e && e.target ? e.target.value : '';
+          if (!full[v]) return;
+          if (harian) this.setState({ st: { ...st, [id]: v } });
+          else this.setState({ stK: { ...stK, [gk + id]: v } });
+        }
       };
     });
     const chips = codes.map((c) => ({ label: full[c], n: String(count[c]), style: 'background: ' + colors[c][0] + '; color: ' + colors[c][1] + '; border-radius: 999px; padding: 6px 12px; font-weight: 600' }));
-    const harian = this.state.mode === 'harian';
+    const val = (e) => (e && e.target ? e.target.value : '');
     return {
       title: harian ? 'Absensi Harian' : 'Absensi Kegiatan',
       isHarian: harian, isKegiatan: !harian,
       harianStyle: tab(harian), kegiatanStyle: tab(!harian),
       modeHarian: () => this.setState({ mode: 'harian' }),
       modeKegiatan: () => this.setState({ mode: 'kegiatan' }),
-      allHadir: () => this.setState({ st: { ...st, 1: 'H', 2: 'H', 6: 'H', 7: 'H', 8: 'H' } }),
+      allHadir: () => {
+        if (harian) this.setState({ st: { ...st, 1: 'H', 2: 'H', 6: 'H', 7: 'H', 8: 'H' } });
+        else { const nx = { ...stK }; list.forEach((r) => { nx[gk + r[0]] = 'H'; }); this.setState({ stK: nx }); }
+      },
+      asramaOpts: Object.keys(AS).map((v) => ({ v, on: v === this.state.asrama })),
+      kamarOpts: kamarList.map((v) => ({ v, on: v === kamar })),
+      kegiatanOpts: KEG.map((v) => ({ v, on: v === keg })),
+      grupOpts: grupList.map((v) => ({ v, on: v === grup })),
+      pickAsrama: (e) => { const v = val(e); if (AS[v]) this.setState({ asrama: v, kamar: AS[v][0] }); },
+      pickKamar: (e) => { const v = val(e); if (kamarList.includes(v)) this.setState({ kamar: v }); },
+      pickKegiatan: (e) => { const v = val(e); if (KEG.includes(v)) this.setState({ kegiatan: v, grup: grupOf(v)[0] }); },
+      pickGrup: (e) => { const v = val(e); if (grupList.includes(v)) this.setState({ grup: v }); },
+      kosong: rows.length === 0,
+      daftarNote: harian ? 'Penghuni kamar ' + kamar + ' · ' + rows.length + ' santri' : 'Anggota ' + keg + ' · ' + grup + ' · ' + rows.length + ' santri (daftar anggota grup, bukan penghuni kamar)',
       chips, rows
     };
   }

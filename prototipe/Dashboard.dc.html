@@ -52,8 +52,8 @@ a{color:#1F6B4F}a:hover{color:#14533C}
         </sc-for>
       </section>
       <section style="flex: 1 1 300px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
-        <h2 style="margin: 0; font-size: 17px; font-weight: 700">Kabar ke wali hari ini</h2>
-        <p style="margin: 0; font-size: 13px; color: #55605A; line-height: 1.5">Dikirim per kejadian, tanpa data sensitif.</p>
+        <h2 style="margin: 0; font-size: 17px; font-weight: 700">Kabar ke wali hari ini <span style="font-size: 12px; font-weight: 600; color: #55605A">(contoh sebagian)</span></h2>
+        <p style="margin: 0; font-size: 13px; color: #55605A; line-height: 1.5">Dikirim per kejadian, tanpa data sensitif. Daftar di bawah contoh sebagian.</p>
         <sc-for list="{{ wali }}" as="w" hint-placeholder-count="4">
           <div style="display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.45; padding: 8px 0; border-top: 1px solid #EEF1EF">
             <span style="color: #55605A; min-width: 42px">{{ w.time }}</span>
@@ -70,7 +70,7 @@ class Component extends DCLogic {
   renderVals() {
     let peran = 'moderator';
     try { peran = window.localStorage.getItem('hisada.peran') || 'moderator'; } catch (e) {}
-    const NAMA = { moderator: 'Moderator', sekretaris: 'Sekretaris', piket: 'Piket', kesehatan: 'Kesehatan', kedisiplinan: 'Kedisiplinan', asatidz: 'Ustadz' };
+    const NAMA = { moderator: 'Moderator', sekretaris: 'Sekretaris', piket: 'Piket', kesehatan: 'Kesehatan', kedisiplinan: 'Kedisiplinan', asatidz: 'Asatidz' };
     if (!NAMA[peran]) peran = 'moderator';
     const semua = peran === 'moderator';
     // Data contoh satu hari: Senin 26/10/2026 pukul 13.45 (sama dengan layar lain)
@@ -86,7 +86,7 @@ class Component extends DCLogic {
       lingkungan: semua ? 'Semua lingkungan' : 'Lingkungan Putra',
       stats: [
         { label: 'Hadir hari ini', value: semua ? '1.031' : '487', note: semua ? 'dari 1.072 santri aktif (505 putra · 567 putri)' : 'dari 505 santri aktif', color: '#1E5E3F', href: 'Absensi.dc.html' },
-        { label: 'Izin berjalan', value: '9', note: '2 pulang · 6 keluar · 1 terlambat', color: '#23497E', href: 'Perizinan.dc.html' },
+        { label: 'Izin berjalan', value: '9', note: '2 pulang · 5 keluar · 1 dinas · 1 terlambat', color: '#23497E', href: 'Perizinan.dc.html' },
         { label: 'Overdue', value: '1', note: 'lewat jam kembali + 60 menit', color: '#8E2A22', href: 'Perizinan.dc.html' },
         { label: 'Dirawat', value: '6', note: 'pusat kesehatan', color: '#7A4E0C', href: 'Kesehatan.dc.html' },
         { label: 'Menunggu sidang', value: '4', note: 'antrean putusan', color: '#18201C', href: 'Kedisiplinan.dc.html' }
@@ -94,6 +94,7 @@ class Component extends DCLogic {
       todos: T.filter((t) => t.roles.indexOf(peran) >= 0),
       wali: [
         { time: '07.42', kind: 'Dirawat', text: 'Santri Contoh 22, sedang dirawat' },
+        { time: '09.05', kind: 'Dirawat', text: 'Santri Contoh 24, sedang dirawat' },
         { time: '10.15', kind: 'Izin pulang', text: 'Santri Contoh 13, didampingi wali' },
         { time: '11.20', kind: 'Vonis berat', text: 'Santri Contoh 44 (tanpa isi vonis)' },
         { time: '13.30', kind: 'Overdue', text: 'Santri Contoh 11, belum kembali (masa tenggang 60 menit habis)' }

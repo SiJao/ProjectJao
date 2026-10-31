@@ -29,10 +29,11 @@ Administrasi HISADA
 │   │   └── Keluarga & kontak wali
 │   ├── Data Guru / Asatidz
 │   ├── Data Kelas
-│   │   ├── Tingkat 1–6 + rombel
+│   │   ├── Tingkat 1–6 + rombel + jenjang (MTs/SMP · MA)
 │   │   └── Wali kelas (per tahun ajaran)
-│   ├── Data Kamar
-│   └── Tahun Ajaran: persiapan · aktif · arsip
+│   ├── Data Asrama & Kamar
+│   ├── Tahun Ajaran: persiapan · aktif · arsip
+│   └── Daftar Pilihan (per kelompok, bisa diedit tanpa ubah kode)
 ├── Kesantrian
 │   ├── Absensi
 │   │   ├── Absensi Harian (per kamar)
@@ -244,7 +245,7 @@ Kegiatan mingguan, semesteran, dan tahunan cukup dicatat di [Kalender Akademik](
 Prototipe tampilan yang bisa diklik untuk **13 layar** (Login, Dashboard, seluruh menu Administrasi dan Fungsi), memakai **data contoh** (nama fiktif, NIS/NIP palsu berawalan 99). Belum terhubung ke database. Sumber dan daftar layar: [prototipe/](prototipe/README.md).
 
 - Sidebar mengikuti mindmap: **Beranda · Administrasi · Fungsi**.
-- Sudut pandang saat ini: **Sekretaris**.
+- Bisa dilihat sebagai **role apa pun** (pilihan di sidebar); menu mengikuti Peta Akses.
 
 ---
 
@@ -268,6 +269,8 @@ flowchart TD
     C -- "Kedisiplinan jika diberi akses<br/>input / putusan" --> M4["Kedisiplinan Santri"]
     C -- "Sekretaris" --> M5["Korespondensi, Prestasi, Inventaris,<br/>Rapor, Kalender, Kegiatan & Ekstrakurikuler,<br/>bagian pengurus, pengumuman"]
     C -- "Asatidz" --> M6["Lihat data santri<br/>di lingkungannya"]
+    C -- "Asatidz jika diberi akses<br/>(mis. guru hakim/pengasuhan)" --> M4
+    C -- "Asatidz jika diberi akses<br/>(mis. wali kamar)" --> M1
     C -- "Moderator" --> M7["Semua modul"]
 
     S["Cakupan data pengurus:<br/>putra / putri sesuai jenis kelaminnya"] -.-> C
@@ -314,7 +317,7 @@ Akses yang sudah ditetapkan untuk role pengurus:
 
 | Akses | Untuk role |
 |---|---|
-| Absensi | Kesehatan, Kedisiplinan |
+| Absensi | Kesehatan, Kedisiplinan · guru sesuai tugas (wali kamar, pelatih, guru halaqah) |
 | Kesehatan | Kesehatan (role saja belum cukup — wajib diberi akses) |
 | Perizinan | Piket |
 | Input pelanggaran · Putusan kedisiplinan | Dipilih manual per orang (pengurus atau guru, mis. guru hakim) |
@@ -324,6 +327,7 @@ Akses yang sudah ditetapkan untuk role pengurus:
 ### Cakupan data Putra / Putri
 - Pengurus santri **otomatis** hanya melihat dan mengelola data santri sesuai **jenis kelaminnya** (putra → putra, putri → putri).
 - Moderator melihat semua.
+- Satu database; **setiap data ditandai lingkungan** putra/putri, **termasuk Tata Warkat** (Kalender, Korespondensi, Inventaris). Daftar pilihan, jabatan, dan guru boleh bernilai `semua` (K-88).
 
 ### Peta akses
 
@@ -333,7 +337,7 @@ Keterangan: ✔ otomatis · ☑ jika diberi lewat Manajemen Akses · 👁 lihat 
 |---|---|---|---|---|---|---|
 | Dashboard, Kalender (lihat), Cari Santri/Guru | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | Kalender (edit) | ✖ | ✖ | ✖ | ✔ | ✖ | ✔ |
-| Absensi harian & kegiatan | ✔ | ☑ | ☑ | ✔ | 👁 | ✔ |
+| Absensi harian & kegiatan | ✔ | ☑ | ☑ | ✔ | 👁 · ☑ (sesuai tugas) | ✔ |
 | Perizinan & Gate Pass | ☑ | ✖ | ✖ | ✖ | 👁 | ✔ |
 | Kesehatan | ✖ | ☑ | ✖ | ✖ | ✖ | ✔ |
 | Kedisiplinan: input pelanggaran | ✖ | ✖ | ☑ | ✖ | ☑ | ✔ |
@@ -344,6 +348,7 @@ Keterangan: ✔ otomatis · ☑ jika diberi lewat Manajemen Akses · 👁 lihat 
 | Riwayat Perubahan | ✖ | ✖ | ✖ | ✔ (masa jabatannya) | ✖ | ✔ (semua) |
 | Isi bagian pengurus, pengumuman email | ✖ | ✖ | ✖ | ✔ | ✖ | ✔ |
 | Data Master (termasuk no. HP wali) | ✖ | ✖ | ✖ | ✖ | ✖ | ✔ |
+| Edit daftar pilihan tertentu (mis. obat, diagnosa) | ☑ | ☑ | ☑ | ☑ | ☑ | ✔ |
 | Profil kesehatan | ✖ | ☑ | ✖ | ✖ | ✖ | ✔ |
 | Update Kamar, PAW | ⏳ | ⏳ | ⏳ | ⏳ | ✖ | ✔ |
 | Update Kelas Tahunan, Serah Terima, role & akses, backup, email ke wali tertentu, tautkan wali manual | ✖ | ✖ | ✖ | ✖ | ✖ | ✔ |
@@ -357,7 +362,8 @@ flowchart LR
     A["Update Kelas Tahunan<br/>± Juli"] --> B["Santri baru Kelas 1<br/>diinput massal"]
     B --> C["Update Kamar<br/>1-2x setahun"]
     C --> D["Serah Terima Jabatan<br/>akhir Semester 1"]
-    D --> E["Moderator tetapkan role<br/>pengurus baru"]
+    D --> D2["Sekretaris baru isi bagian<br/>pengurus lain"]
+    D2 --> E["Moderator tetapkan role<br/>& akses pengurus baru"]
     E --> A
 ```
 
@@ -384,7 +390,7 @@ flowchart LR
 **Riwayat yang tidak pernah ditimpa:**
 - **Riwayat kelas** — setiap masa tinggal di sebuah kelas, termasuk **pindah rombel** di tengah tahun (dicatat setiap kali + masuk Riwayat Perubahan).
 - **Riwayat kamar** — setiap perpindahan kamar.
-- **Status santri** — perubahan ke Alumni/Keluar otomatis **menonaktifkan akun login**.
+- **Status santri** — perubahan ke alumni / mutasi keluar / meninggal otomatis **menonaktifkan akun login**.
 
 ### Tahun Ajaran
 
@@ -624,14 +630,14 @@ flowchart TD
 
 **Alur Serah Terima** — tiga pelaku: **Moderator** (tombol + tunjuk Sekretaris) → **Sekretaris baru** (isi bagian) → **Moderator** (tetapkan role).
 
-1. **Moderator** menekan **Serah Terima Jabatan** dan menunjuk **1–2 Sekretaris baru**.
+1. **Moderator** menekan **Serah Terima Jabatan** dan menunjuk **1–2 Sekretaris baru**. Satu tombol untuk putra **dan** putri sekaligus, satu masa khidmat untuk kedua lingkungan (K-97).
 2. **Peringatan** selalu muncul (jumlah pengurus lama, waktu Serah Terima terakhir), lalu **password Moderator yang sedang login**.
 3. Dalam satu proses: masa khidmat lama & semua jabatan **diarsipkan** (bukan dihapus), akun pengurus lama **dinonaktifkan** (santrinya tetap aktif), masa khidmat baru dibuat, Sekretaris baru langsung aktif.
 4. **Sekretaris baru** mengisi bagian/jabatan pengurus lain — lewat **upload file** (NIS + jabatan) **atau pilih banyak sekaligus**. Hanya santri aktif Kelas 5; baris yang tidak valid **ditolak** dan proses tidak lanjut sampai diperbaiki.
 5. Akun pengurus dibuat otomatis (`NIS@daarululuumlido.com`, password sementara NIS + tanggal lahir).
 6. **Moderator** menetapkan role & Manajemen Akses tiap pengurus.
 
-Selama menunggu langkah 6, **Absensi tetap berjalan** karena Sekretaris otomatis memiliki akses Absensi.
+Selama menunggu langkah 6, **Absensi tetap berjalan** karena Sekretaris otomatis memiliki akses Absensi. **Perizinan & Gate Pass hanya bisa dibuat Moderator** sampai akses Perizinan diberikan lewat Manajemen Akses (risiko diterima, K-96). Kesehatan & Kedisiplinan juga menunggu akses.
 
 ```mermaid
 flowchart TD
@@ -706,7 +712,7 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
 - **Email ke wali tertentu** — **hanya Moderator** (mis. surat pemanggilan).
 - **Kirim ulang** email yang gagal (Moderator).
 
-**Aturan isi:** email hanya berisi kabar singkat **tanpa data sensitif** (diagnosa, isi vonis, NIK); rinciannya dibaca setelah login. Semua email melewati **antrean** dan tercatat. Di server testing berlaku **Mode Uji** (semua email dialihkan ke kotak surat tim IT).
+**Aturan isi:** email hanya berisi kabar singkat **tanpa data sensitif** (diagnosa, isi vonis); rinciannya dibaca setelah login. Semua email melewati **antrean** dan tercatat. Di server testing berlaku **Mode Uji** (semua email dialihkan ke kotak surat tim IT).
 
 ### Portal Wali Santri
 
@@ -729,7 +735,7 @@ flowchart TD
     D -- "cocok" --> E["Tertaut otomatis<br/>+ email ke wali lain yang sudah tertaut"]
     D -- "tidak cocok" --> F{"Sudah gagal 5x hari ini?"}
     F -- "ya" --> G["Penautan dikunci 24 jam"]
-    F -- "belum" --> H["Cadangan:<br/>Moderator tautkan manual, atau<br/>no. HP diperbarui lalu coba lagi"]
+    F -- "belum" --> H["Cadangan:<br/>Moderator tautkan manual, atau<br/>no. HP diperbarui Moderator lalu coba lagi"]
     E --> I(["Lihat data anak<br/>+ kabar per kejadian"])
 ```
 
@@ -765,6 +771,10 @@ flowchart TD
 | Dokter | Diagnosa & resep diinput dokter sendiri atau oleh pengurus jaga? |
 | Serah Terima & kelompok kegiatan | Penempatan pengurus di kelompok (tahsin, muhadhoroh, pramuka) ikut berganti saat Serah Terima? |
 | Kegiatan baru | Kelas & pengajar, tahsin, syakia, muhadhoroh, belajar malam, menu makan: masuk sistem sekaligus atau bertahap? |
+| Perizinan oleh guru (P-50) | Bolehkah guru Bagian Keamanan diberi akses Perizinan lewat Manajemen Akses? |
+| Gate Pass (P-51) | Hapus tanda tangan *Dormitory Guardian* (di kenyataan hanya Bagian Keamanan)? |
+| Libur Pondok (P-52) | Izin & Gate Pass dibuat per santri tetapi sekaligus? |
+| Kunjungan & kiriman (P-53) | Sambangan dan kiriman uang/barang masuk sistem sekarang, nanti, atau tidak? |
 
 ---
 

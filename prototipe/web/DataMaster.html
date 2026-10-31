@@ -43,7 +43,7 @@ class Component extends DCLogic {
         footnote: 'Keluarga: nama ayah/ibu + WA (untuk Portal Wali). No. WA wali hanya diubah Moderator, karena menjadi kunci penautan Portal Wali. NIK, No KK, penghasilan, dan NISN tidak disimpan. Hanya santri TMI.'
       },
       kelas: {
-        label: 'Kelas', placeholder: 'Cari kelas', summary: '53 rombel · tahun ajaran 2026/2027',
+        label: 'Kelas', placeholder: 'Cari kelas', summary: '53 rombel (statis) · wali kelas 2026/2027',
         cols: ['Kelas', 'Tingkat', 'Jenjang', 'Wali kelas', 'Asisten'],
         rows: [
           ['1 A MTs', '1', 'MTs', '[Nama guru]', '[Nama guru]'],
@@ -59,7 +59,7 @@ class Component extends DCLogic {
         label: 'Asrama & Kamar', placeholder: 'Cari asrama atau kamar', summary: '10 asrama · 61 kamar',
         cols: ['Asrama', 'L/P', 'Kamar', 'Penghuni', 'Wali asuh 2026/2027', 'Asisten'],
         rows: [
-          ['Ibnu Rusyd', 'L', 'Ibnu Rusyd-01', '18', '[Nama guru]', '[Nama guru]'],
+          ['Ibnu Rusyd', 'L', 'Ibnu Rusyd-01', '8', '[Nama guru]', '[Nama guru]'],
           ['Ibnu Rusyd', 'L', 'Ibnu Rusyd-02', '17', '[Nama guru]', '—'],
           ['Ibnu Sina', 'L', 'Ibnu Sina-03', '20', '[Nama guru]', '[Nama guru]'],
           ['Kholid Bin Walid', 'L', 'Kholid Bin Walid-05', '16', '[Nama guru]', '—'],
@@ -71,10 +71,10 @@ class Component extends DCLogic {
         label: 'Guru', placeholder: 'Cari nama atau NIP', summary: 'Akun guru dibuat Moderator',
         cols: ['NIP', 'Nama', 'L/P', 'Lingkungan', 'Tugas 2026/2027', 'Akses (Manajemen Akses)'],
         rows: [
-          ['9001', '[Nama guru]', 'L', 'Putra', 'Wali asuh', '—'],
-          ['9002', '[Nama guru]', 'L', 'Putra', 'Wali kelas', 'Putusan kedisiplinan'],
-          ['9003', '[Nama guru]', 'L', 'Semua', 'Wali kelas', '—'],
-          ['9004', '[Nama guru]', 'L', 'Putra', 'Asisten wali asuh', '—']
+          ['9901', '[Nama guru]', 'L', 'Putra', 'Wali asuh', '—'],
+          ['9902', '[Nama guru]', 'L', 'Putra', 'Wali kelas', 'Putusan kedisiplinan'],
+          ['9903', '[Nama guru]', 'L', 'Semua', 'Wali kelas', '—'],
+          ['9904', '[Nama guru]', 'L', 'Putra', 'Asisten wali asuh', '—']
         ],
         footnote: 'Akun guru (role Asatidz, login nama@daarululuumlido.com) dibuat Moderator. Lingkungan dan akses di luar role diatur lewat Manajemen Akses (hanya Moderator).'
       },
@@ -101,7 +101,7 @@ class Component extends DCLogic {
       ['Kesehatan', 'diagnosa', 'Diagnosa', null, [['Demam'], ['ISPA (batuk pilek)'], ['Gastritis'], ['Dermatitis'], ['Luka ringan']], 'Form selalu menyediakan "Lainnya" dengan teks bebas.'],
       ['Kesehatan', 'obat', 'Obat', null, [['Paracetamol'], ['Antasida'], ['Obat batuk'], ['Salep kulit']], 'Form selalu menyediakan "Lainnya" dengan teks bebas.'],
       ['Kedisiplinan', 'kategori', 'Kategori pelanggaran', null, [['Keamanan'], ['Bahasa'], ['Ibadah'], ['Kebersihan']], ''],
-      ['Kedisiplinan', 'vonis', 'Tingkat vonis', 'Kabar ke wali', [['Ringan', 'Semua', 'Tidak'], ['Sedang', 'Semua', 'Tidak'], ['Berat', 'Semua', 'Ya (tanpa isi vonis)'], ['Pemutihan', 'Semua', 'Tidak · membatalkan kasus']], ''],
+      ['Kedisiplinan', 'vonis', 'Tingkat vonis', 'Kabar ke wali', [['Ringan', 'Semua', 'Tidak'], ['Sedang', 'Semua', 'Tidak'], ['Berat', 'Semua', 'Ya (tanpa isi vonis)'], ['Pemutihan', 'Semua', 'Tidak · putusan baru, vonis lama tetap tersimpan']], ''],
       ['Pengembangan Diri', 'ekskul', 'Ekstrakurikuler', null, [['Basket', 'Putra'], ['Volley', 'Semua'], ['Hadroh', 'Semua'], ['Marching Band', 'Putri'], ['Kaligrafi', 'Semua']], 'Ekstrakurikuler putra dan putri boleh berbeda.'],
       ['Pengembangan Diri', 'lomba', 'Tingkat lomba', null, [['Pondok'], ['Kecamatan'], ['Kabupaten'], ['Provinsi'], ['Nasional']], ''],
       ['Pengembangan Diri', 'hasil', 'Hasil lomba', null, [['Juara 1'], ['Juara 2'], ['Juara 3'], ['Harapan 1'], ['Peserta']], '']

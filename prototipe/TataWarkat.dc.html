@@ -34,8 +34,19 @@ a{color:#1F6B4F}a:hover{color:#14533C}
     <sc-if value="{{ isKal }}" hint-placeholder-val="{{ true }}">
       <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
         <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px">
-          <h2 style="margin: 0; font-size: 17px; font-weight: 700">Kalender Akademik · Semester 1 2026/2027</h2>
-          <button type="button" style="height: 40px; border-radius: 10px; border: 1px solid #1F6B4F; background: #FFFFFF; color: #1F6B4F; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Tambah agenda</button>
+          <h2 style="margin: 0; font-size: 17px; font-weight: 700">Kalender Akademik · {{ tampilanLabel }}</h2>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #3B4540">Tampilan
+              <select aria-label="Tampilan kalender" onChange="{{ pickTampilan }}" style="height: 40px; border: 1px solid #C9D2CC; border-radius: 10px; padding: 0 10px; font: inherit; font-size: 13px; background: #FFFFFF">
+                <sc-for list="{{ tampilan }}" as="v" hint-placeholder-count="4">
+                  <option value="{{ v.key }}" selected="{{ v.on }}">{{ v.label }}</option>
+                </sc-for>
+              </select>
+            </label>
+            <sc-if value="{{ bisaUbah }}" hint-placeholder-val="{{ true }}">
+              <button type="button" style="height: 40px; border-radius: 10px; border: 1px solid #1F6B4F; background: #FFFFFF; color: #1F6B4F; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Tambah agenda</button>
+            </sc-if>
+          </div>
         </div>
         <sc-for list="{{ agenda }}" as="a" hint-placeholder-count="6">
           <div style="display: flex; gap: 16px; align-items: center; padding: 10px 0; border-top: 1px solid #EEF1EF">
@@ -44,7 +55,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
             <span style="font-size: 12px; color: #55605A; border: 1px solid #DDE3DF; border-radius: 999px; padding: 2px 9px">{{ a.jenis }}</span>
           </div>
         </sc-for>
-        <p style="margin: 0; font-size: 13px; color: #55605A">Semua role melihat · Sekretaris dan Moderator mengubah.</p>
+        <p style="margin: 0; font-size: 13px; color: #55605A">Kategori: Umum · Akademik · Pengasuhan. {{ catatanKal }}</p>
       </section>
     </sc-if>
 
@@ -92,21 +103,34 @@ a{color:#1F6B4F}a:hover{color:#14533C}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { tab: 'kal', arah: 'keluar' };
+    let peran = 'moderator';
+    try { peran = window.localStorage.getItem('hisada.peran') || 'moderator'; } catch (e) {}
+    this.state = { tab: 'kal', arah: 'keluar', peran, tampilan: '1s' };
   }
   renderVals() {
     const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
     const keluar = this.state.arah === 'keluar';
+    // Sekretaris & Moderator: semua tab dan bisa mengubah · Piket, Kesehatan, Kedisiplinan, Asatidz: Kalender saja (lihat)
+    const penuh = !['piket', 'kesehatan', 'kedisiplinan', 'asatidz'].includes(this.state.peran);
+    const TABS = [['kal', 'Kalender Akademik'], ['surat', 'Korespondensi'], ['inv', 'Inventaris Barang']].filter(([k]) => penuh || k === 'kal');
+    const tab = penuh ? this.state.tab : 'kal';
+    const V = [['1b', '1 Bulan', 'Oktober 2026'], ['2b', '2 Bulan', 'Oktober–November 2026'], ['1s', '1 Semester', 'Semester 1 2026/2027'], ['2s', '2 Semester', 'Tahun ajaran 2026/2027']];
+    const vCur = V.find((x) => x[0] === this.state.tampilan) || V[2];
     return {
-      tabs: [['kal', 'Kalender Akademik'], ['surat', 'Korespondensi'], ['inv', 'Inventaris Barang']].map(([k, label]) => ({ label, on: this.state.tab === k, style: pill(this.state.tab === k), pick: () => this.setState({ tab: k }) })),
-      isKal: this.state.tab === 'kal', isSurat: this.state.tab === 'surat', isInv: this.state.tab === 'inv',
+      tabs: TABS.map(([k, label]) => ({ label, on: tab === k, style: pill(tab === k), pick: () => this.setState({ tab: k }) })),
+      isKal: tab === 'kal', isSurat: tab === 'surat', isInv: tab === 'inv',
+      bisaUbah: penuh,
+      catatanKal: penuh ? 'Semua role melihat · Sekretaris dan Moderator mengubah.' : 'Lihat saja · agenda diubah Sekretaris dan Moderator.',
+      tampilan: V.map(([key, label]) => ({ key, label, on: key === vCur[0] })),
+      tampilanLabel: vCur[2],
+      pickTampilan: (e) => { const v = e && e.target ? e.target.value : ''; if (V.some((x) => x[0] === v)) this.setState({ tampilan: v }); },
       agenda: [
-        { tgl: '[Tanggal]', ket: 'Kedatangan santri baru', jenis: 'Pondok' },
-        { tgl: '[Tanggal]', ket: 'Masa pengenalan pesantren', jenis: 'Pondok' },
-        { tgl: '[Tanggal]', ket: 'Khutbatul Arsy', jenis: 'Pondok' },
+        { tgl: '[Tanggal]', ket: 'Kedatangan santri baru', jenis: 'Pengasuhan' },
+        { tgl: '[Tanggal]', ket: 'Masa pengenalan pesantren', jenis: 'Pengasuhan' },
+        { tgl: '[Tanggal]', ket: 'Khutbatul Arsy', jenis: 'Umum' },
         { tgl: '[Tanggal]', ket: 'Ujian tengah semester', jenis: 'Akademik' },
-        { tgl: '[Tanggal]', ket: 'Serah Terima Jabatan HISADA', jenis: 'HISADA' },
-        { tgl: '[Tanggal]', ket: 'Libur akhir semester', jenis: 'Libur' }
+        { tgl: '[Tanggal]', ket: 'Serah Terima Jabatan HISADA', jenis: 'Pengasuhan' },
+        { tgl: '[Tanggal]', ket: 'Libur akhir semester', jenis: 'Umum' }
       ],
       arah: [['keluar', 'Surat keluar'], ['masuk', 'Surat masuk']].map(([k, label]) => ({ label, on: this.state.arah === k, style: pill(this.state.arah === k), pick: () => this.setState({ arah: k }) })),
       kolom4: keluar ? 'Tujuan' : 'Disposisi',

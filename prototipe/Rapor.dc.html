@@ -55,8 +55,8 @@ a{color:#1F6B4F}a:hover{color:#14533C}
 
       <section style="display: flex; flex-direction: column; gap: 10px">
         <h2 style="margin: 0; font-size: 15px; font-weight: 700">Kehadiran</h2>
-        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px">
-          <sc-for list="{{ hadir }}" as="h" hint-placeholder-count="4">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px">
+          <sc-for list="{{ hadir }}" as="h" hint-placeholder-count="5">
             <div style="border: 1px solid #E6EBE8; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #55605A">{{ h.label }}</span><span style="font-size: 22px; font-weight: 700">{{ h.n }}</span></div>
           </sc-for>
         </div>
@@ -71,12 +71,12 @@ a{color:#1F6B4F}a:hover{color:#14533C}
         </section>
         <section style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 8px">
           <h2 style="margin: 0; font-size: 15px; font-weight: 700">Prestasi &amp; Ekstrakurikuler</h2>
-          <div style="display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #EEF1EF"><span>Pidato Bahasa Arab · Provinsi</span><span style="font-weight: 600">Juara 1</span></div>
+          <div style="display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #EEF1EF"><span>Cerdas Cermat · Kabupaten</span><span style="font-weight: 600">Juara 2</span></div>
           <div style="display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #EEF1EF"><span>Pramuka · DLT 2</span><span style="font-weight: 600">hadir 94%</span></div>
-          <div style="display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #EEF1EF"><span>Muhadhoroh · Grup 4</span><span style="font-weight: 600">hadir 100%</span></div>
+          <div style="display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 8px 0; border-bottom: 1px solid #EEF1EF"><span>Muhadhoroh · Grup 2</span><span style="font-weight: 600">hadir 100%</span></div>
         </section>
       </div>
-      <p style="margin: 0; font-size: 12px; color: #55605A">Kelas yang tercetak diambil dari riwayat kelas pada periode ini. Label MIA/IIS tidak tercetak.</p>
+      <p style="margin: 0; font-size: 12px; color: #55605A">Kelas yang tercetak diambil dari riwayat kelas pada periode ini. Label MIA/IIS tidak tercetak. Kehadiran Pulang termasuk hari skorsing.</p>
     </article>
   </main>
 </div>
@@ -94,8 +94,8 @@ class Component extends DCLogic {
       ranges: [['90', '90 hari terakhir'], ['ta', '1 tahun ajaran']].map(([k, label]) => ({ label, on: this.state.range === k, style: pill(this.state.range === k), pick: () => this.setState({ range: k }) })),
       periode: is90 ? '28 Jul – 26 Okt 2026' : 'Tahun ajaran 2026/2027',
       hadir: is90
-        ? [{ label: 'Hadir', n: '84' }, { label: 'Izin', n: '3' }, { label: 'Sakit', n: '2' }, { label: 'Alpha', n: '1' }]
-        : [{ label: 'Hadir', n: '96' }, { label: 'Izin', n: '4' }, { label: 'Sakit', n: '2' }, { label: 'Alpha', n: '1' }],
+        ? [{ label: 'Hadir', n: '82' }, { label: 'Izin', n: '3' }, { label: 'Sakit', n: '2' }, { label: 'Alpha', n: '1' }, { label: 'Pulang', n: '2' }]
+        : [{ label: 'Hadir', n: '94' }, { label: 'Izin', n: '4' }, { label: 'Sakit', n: '2' }, { label: 'Alpha', n: '1' }, { label: 'Pulang', n: '2' }],
       disiplin: [{ ket: 'Keamanan · terlambat kembali', vonis: 'Sedang' }, { ket: 'Bahasa', vonis: 'Ringan' }]
     };
   }

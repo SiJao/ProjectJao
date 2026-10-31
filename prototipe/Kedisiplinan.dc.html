@@ -104,6 +104,15 @@ a{color:#1F6B4F}a:hover{color:#14533C}
         </table>
       </section>
     </sc-if>
+
+    <section id="daftar-malam" style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Daftar pelanggar hari ini · Senin 26/10</h2><span style="font-size: 13px; color: #55605A">Nama saja · untuk dibacakan malam hari.</span></div>
+      <ol style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.8">
+        <sc-for list="{{ daftarMalam }}" as="n" hint-placeholder-count="5">
+          <li>{{ n.nama }}</li>
+        </sc-for>
+      </ol>
+    </section>
   </main>
 </div>
 </x-dc>
@@ -111,21 +120,24 @@ a{color:#1F6B4F}a:hover{color:#14533C}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { tab: 'sidang', sel: 0, vonis: {} };
+    let peran = 'moderator';
+    try { peran = window.localStorage.getItem('hisada.peran') || 'moderator'; } catch (e) {}
+    this.state = { tab: 'sidang', sel: 0, vonis: {}, peran };
   }
   renderVals() {
     const pill = (on) => 'height: 40px; border-radius: 999px; padding: 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #1F6B4F; color: #FFFFFF; border: 1px solid #1F6B4F' : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
-    // Pengguna contoh: Santri Contoh 64 (Kedisiplinan) dengan akses input pelanggaran + putusan kedisiplinan
+    // Kasus Santri Contoh 32 dicatat oleh Santri Contoh 64 (Kedisiplinan). Hanya saat dilihat sebagai role Kedisiplinan kasus itu "milik Anda".
+    const akuPencatat = this.state.peran === 'kedisiplinan';
     const C = [
       { nama: 'Santri Contoh 11', kategori: 'Keamanan', ket: 'Overdue: tidak kembali dari izin Keluar Sementara (otomatis, 13.30)', oleh: 'sistem (overdue) — boleh diputus siapa pun yang memegang akses putusan' },
       { nama: 'Santri Contoh 31', kategori: 'Bahasa', ket: 'Tidak berbahasa resmi di asrama', oleh: 'Santri Contoh 65 (Bagian Bahasa)' },
-      { nama: 'Santri Contoh 32', kategori: 'Ibadah', ket: 'Terlambat shalat berjamaah', oleh: 'Anda — Santri Contoh 64', sendiri: true },
+      { nama: 'Santri Contoh 32', kategori: 'Ibadah', ket: 'Terlambat shalat berjamaah', oleh: akuPencatat ? 'Anda — Santri Contoh 64' : 'Santri Contoh 64 (Kedisiplinan)', sendiri: akuPencatat },
       { nama: 'Santri Contoh 33', kategori: 'Kebersihan', ket: 'Kamar tidak dirapikan', oleh: 'Santri Contoh 66 (Bagian Kebersihan)' }
     ];
     const VL = [['ringan', 'Ringan'], ['sedang', 'Sedang'], ['berat', 'Berat'], ['putih', 'Pemutihan']];
     const s = this.state.sel;
     const cv = this.state.vonis[s];
-    const notes = { ringan: 'Tidak dikirim ke wali.', sedang: 'Tidak dikirim ke wali.', berat: 'Wali diberi tahu saat itu juga, tanpa isi vonis.', putih: 'Dibatalkan dengan alasan; data tetap tersimpan.' };
+    const notes = { ringan: 'Tidak dikirim ke wali.', sedang: 'Tidak dikirim ke wali.', berat: 'Wali diberi tahu saat itu juga, tanpa isi vonis.', putih: 'Putusan baru dengan alasan; vonis lama tetap tersimpan.' };
     const vstyle = (on, k) => 'height: 44px; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ' + (on ? (k === 'berat' ? 'background: #F9E3E1; color: #8E2A22; border: 1px solid #8E2A22' : 'background: #E3EFE8; color: #14533C; border: 1px solid #1F6B4F') : 'background: #FFFFFF; color: #2E3833; border: 1px solid #C9D2CC');
     const labels = { ringan: 'Ringan', sedang: 'Sedang', berat: 'Berat', putih: 'Pemutihan' };
     return {
@@ -141,6 +153,7 @@ class Component extends DCLogic {
       noVonis: !cv, pickVonis: (e) => this.setState({ vonis: { ...this.state.vonis, [s]: e.target.value || undefined } }),
       vonis: VL.map(([k, label]) => ({ key: k, label, on: cv === k, style: vstyle(cv === k, k), pick: () => this.setState({ vonis: { ...this.state.vonis, [s]: k } }) })),
       vonisNote: cv ? notes[cv] : 'Pilih vonis.',
+      daftarMalam: ['Santri Contoh 11', 'Santri Contoh 31', 'Santri Contoh 32', 'Santri Contoh 33', 'Santri Contoh 44'].map((nama) => ({ nama })),
       history: [
         { tgl: '26/10', nama: 'Santri Contoh 44', kat: 'Keamanan', vonis: 'Berat — wali dikabari 11.20' },
         { tgl: '24/10', nama: 'Santri Contoh 41', kat: 'Keamanan', vonis: 'Sedang' },

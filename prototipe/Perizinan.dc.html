@@ -104,7 +104,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
       <section aria-label="Pratinjau Gate Pass" style="flex: 1 1 320px; min-width: 0; background: #FFFFFF; border: 1px solid #C9D2CC; border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 14px; font-size: 13px">
         <div style="display: flex; gap: 12px; align-items: center; border-bottom: 2px solid #18201C; padding-bottom: 12px">
           <div style="width: 40px; height: 40px; border-radius: 999px; border: 2px solid #1F6B4F; color: #1F6B4F; display: flex; align-items: center; justify-content: center; font-weight: 700">DU</div>
-          <div style="display: flex; flex-direction: column; gap: 2px"><strong style="font-size: 14px">Pesantren Modern Daarul 'Uluum Lido</strong><span style="color: #55605A">SEKRETARIS HISADA</span></div>
+          <div style="display: flex; flex-direction: column; gap: 2px"><strong style="font-size: 14px">Pesantren Modern Daarul 'Uluum Lido</strong><span style="color: #55605A">[Alamat pondok]</span><span style="color: #55605A">SEKRETARIS HISADA</span></div>
         </div>
         <div style="text-align: center; font-weight: 700; letter-spacing: 0.12em; font-size: 15px">GATE PASS · {{ jenisLabel }}</div>
         <div style="display: grid; grid-template-columns: 120px 1fr; row-gap: 8px">
@@ -122,7 +122,7 @@ a{color:#1F6B4F}a:hover{color:#14533C}
     </div>
 
     <section style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 14px; overflow-x: auto">
-      <div style="padding: 16px 20px 8px; display: flex; justify-content: space-between; align-items: center"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Izin berjalan</h2><span style="font-size: 12px; color: #55605A">lewat jam kembali → Terlambat · +60 menit → Overdue (Alpha, pelanggaran, kabar wali)</span></div>
+      <div style="padding: 16px 20px 8px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center"><div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 17px; font-weight: 700">Izin berjalan</h2><span style="font-size: 12px; color: #55605A">Contoh sebagian · menampilkan 5 dari 10 (9 izin berjalan + 1 overdue)</span></div><span style="font-size: 12px; color: #55605A">lewat jam kembali → Terlambat · +60 menit → Overdue (Alpha, pelanggaran, kabar wali)</span></div>
       <table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px">
         <thead>
           <tr style="text-align: left; color: #55605A; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em">
@@ -162,7 +162,7 @@ class Component extends DCLogic {
   }
   renderVals() {
     const J = {
-      keluar: { label: 'Keluar Sementara', note: 'Jam saja, mulai otomatis dari jam input.', dep: '13.10', ret: '15.00' },
+      keluar: { label: 'Keluar Sementara', note: 'Jam saja, mulai otomatis dari jam input.', dep: '13.45', ret: '15.00' },
       dinas: { label: 'Izin Dinas', note: 'Tanggal + jam, bisa lintas hari.', dep: '26/10 13.10', ret: '27/10 17.00' },
       pulang: { label: 'Pulang', note: 'Rentang tanggal. Wali wajib mendampingi.', dep: '26/10/2026', ret: '29/10/2026' }
     };
