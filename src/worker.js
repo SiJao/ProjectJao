@@ -557,6 +557,9 @@ on("GET", "/api/santri", async ({ db, u, url }) => {
   const q = (url.searchParams.get("q") || "").trim();
   if (q) { w.push("(s.nama LIKE ? OR s.nis LIKE ?)"); a.push(`%${q}%`, `${q}%`); }
   for (const k of ["kamar_id", "kelas_id"]) if (url.searchParams.get(k)) { w.push(`s.${k} = ?`); a.push(+url.searchParams.get(k)); }
+  // filter pencarian tambahan: lingkungan (bagi yang melihat keduanya) dan jenis kelamin
+  if (["putra", "putri"].includes(url.searchParams.get("ling"))) { w.push("s.lingkungan = ?"); a.push(url.searchParams.get("ling")); }
+  if (["L", "P"].includes(url.searchParams.get("jk"))) { w.push("s.jenis_kelamin = ?"); a.push(url.searchParams.get("jk")); }
   const st = url.searchParams.get("status") || "aktif";
   if (st !== "semua") { w.push("s.status = ?"); a.push(st); }
   const lim = Math.min(+url.searchParams.get("limit") || 50, 2000);
@@ -618,6 +621,57 @@ on("POST", "/api/santri", async ({ db, u, body }) => {
   if (st.length) await db.batch(st);
   await catat(db, u, "data", body.id ? "ubah" : "tambah", "santri", id, `${d.nis} ${d.nama}`, ling);
   return json({ ok: true, id });
+});
+
+// ---------------------------------------------------------------- guru: pencarian langsung & impor massal
+// Cakupan: guru berlingkungan 'semua' terlihat semua orang; selain itu sesuai lingkungan pengguna.
+on("GET", "/api/guru", async ({ db, u, url }) => {
+  const w = [`(g.lingkungan = 'semua' OR g.lingkungan IN (${u.ling.map(() => "?").join(",")}))`], a = [...u.ling];
+  const q = (url.searchParams.get("q") || "").trim();
+  if (q) { w.push("(g.nama LIKE ? OR g.nip LIKE ?)"); a.push(`%${q}%`, `${q}%`); }
+  const lf = url.searchParams.get("lingkungan");
+  if (["putra", "putri", "semua"].includes(lf)) { w.push("g.lingkungan = ?"); a.push(lf); }
+  if (url.searchParams.get("aktif") !== "semua") w.push("g.aktif = 1");
+  const lim = Math.min(+url.searchParams.get("limit") || 5, 50);
+  const kolom = u.role === "moderator" ? "g.*" : "g.id, g.nip, g.nama, g.jenis_kelamin, g.lingkungan, g.aktif";
+  const r = await db.prepare(`SELECT ${kolom} FROM guru g WHERE ${w.join(" AND ")} ORDER BY g.nama LIMIT ?`).bind(...a, lim).all();
+  return json(r.results);
+});
+
+// Impor guru massal (CSV dibaca di browser): kunci = NIP; baris yang sudah ada diperbarui.
+// Jenis kelamin boleh kosong bila nama bergelar "Ust." (L) / "Ustz./Ustzh./Ustadzah" (P).
+on("POST", "/api/impor/guru", async ({ db, u, body }) => {
+  wajibModerator(u);
+  const rows = Array.isArray(body.rows) ? body.rows.slice(0, 300) : [];
+  if (!rows.length) gagal(400, "Tidak ada baris untuk diimpor.");
+  const hasil = { baru: 0, diperbarui: 0, ditolak: [] }, sah = new Map();
+  for (const r of rows) {
+    const nip = String(r.nip || "").trim(), nama = bersih(r.nama, 120);
+    let jk = String(r.jk || "").trim().toUpperCase();
+    if (!jk && nama) jk = /^(ustz|ustadzah)/i.test(nama) ? "P" : /^(ust\.|ustadz\b)/i.test(nama) ? "L" : "";
+    const ling = String(r.lingkungan || "").trim().toLowerCase() || "semua";
+    const email = bersih(r.email, 120);
+    try {
+      if (!/^\d{1,10}$/.test(nip)) throw new Error("NIP tidak valid");
+      if (!nama) throw new Error("Nama kosong");
+      if (!["L", "P"].includes(jk)) throw new Error("L/P tidak valid (isi L atau P)");
+      if (!["putra", "putri", "semua"].includes(ling)) throw new Error("Lingkungan harus putra / putri / semua");
+      if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Email tidak valid");
+      if (sah.has(nip)) hasil.ditolak.push({ baris: sah.get(nip).baris, nip, alasan: "NIP ganda di file; dipakai baris " + r.baris });
+      sah.set(nip, { baris: r.baris, nip, nama, jk, ling, email, hp: bersih(r.no_hp, 20) });
+    } catch (e) { hasil.ditolak.push({ baris: r.baris, nip, alasan: e.message }); }
+  }
+  const daftar = [...sah.values()];
+  if (daftar.length) {
+    const ada = new Set((await db.prepare(`SELECT nip FROM guru WHERE nip IN (${tanda(daftar.length)})`).bind(...daftar.map((d) => d.nip)).all()).results.map((r) => r.nip));
+    const st = daftar.map((d) => db.prepare(`INSERT INTO guru (nip, nama, jenis_kelamin, no_hp, email, lingkungan) VALUES (?,?,?,?,?,?)
+      ON CONFLICT (nip) DO UPDATE SET nama = excluded.nama, jenis_kelamin = excluded.jenis_kelamin, no_hp = COALESCE(excluded.no_hp, guru.no_hp),
+        email = COALESCE(excluded.email, guru.email), lingkungan = excluded.lingkungan`).bind(d.nip, d.nama, d.jk, d.hp, d.email, d.ling));
+    daftar.forEach((d) => hasil[ada.has(d.nip) ? "diperbarui" : "baru"]++);
+    st.push(stmtCatat(db, u, "data", "impor", "guru", null, `Impor guru: ${hasil.baru} baru, ${hasil.diperbarui} diperbarui, ${hasil.ditolak.length} ditolak`));
+    await db.batch(st);
+  }
+  return json(hasil);
 });
 
 // Impor data santri dari spreadsheet sekretariat (K-77…K-83).

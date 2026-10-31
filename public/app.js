@@ -341,22 +341,118 @@ const Absensi = {
 };
 
 // ---------------------------------------------------------------- Perizinan
-const CariSantri = {
-  props: ["modelValue"], emits: ["update:modelValue"],
-  setup(props, { emit }) {
-    const q = ref(""), hasil = ref([]), pilih = ref(null);
-    let t;
-    watch(q, (v) => { clearTimeout(t); if (v.length < 2) { hasil.value = []; return; } t = setTimeout(async () => { hasil.value = await api("/santri?limit=15&q=" + encodeURIComponent(v)); }, 250); });
-    const ambil = (s) => { pilih.value = s; emit("update:modelValue", s); hasil.value = []; q.value = ""; };
-    return { q, hasil, pilih, ambil, namaKelas };
+// ---------------------------------------------------------------- pencarian langsung (semua form)
+// Aturan: hasil muncul saat mengetik (jeda 250 ms, min. 2 huruf), maksimal 5 saran per kata kunci, dengan filter.
+const MAKS_SARAN = 5;
+const STATUS_SANTRI = [["aktif", "Aktif"], ["skorsing", "Skorsing"], ["alumni", "Alumni"], ["mutasi_keluar", "Mutasi keluar"], ["meninggal", "Meninggal"], ["semua", "Semua status"]];
+const kueri = (o) => Object.entries(o).filter(([, v]) => v !== "" && v != null).map(([k, v]) => k + "=" + encodeURIComponent(v)).join("&");
+// Navigasi saran dengan keyboard: ↑ ↓ pilih, Enter ambil, Esc tutup.
+function navSaran(hasil, ambil) {
+  const sorot = ref(-1);
+  watch(hasil, () => { sorot.value = -1; });
+  const tombol = (e) => {
+    const n = hasil.value.length; if (!n) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); sorot.value = (sorot.value + 1) % n; }
+    else if (e.key === "ArrowUp") { e.preventDefault(); sorot.value = (sorot.value - 1 + n) % n; }
+    else if (e.key === "Enter" && sorot.value >= 0) { e.preventDefault(); ambil(hasil.value[sorot.value]); }
+    else if (e.key === "Escape") hasil.value = [];
+  };
+  return { sorot, tombol };
+}
+
+// Filter pencarian santri yang dipakai bersama: kelas, kamar, status, lingkungan (bila pengguna melihat putra & putri), L/P.
+const SaringSantri = {
+  props: { modelValue: Object, jk: { type: Boolean, default: false } },
+  setup(props) {
+    if (!negara.master) muatMaster().catch(() => {});
+    const m = computed(() => negara.master || {});
+    const f = props.modelValue;
+    const duaLing = computed(() => negara.me && negara.me.lingkungan === "semua");
+    const kelas = computed(() => (m.value.kelas || []).filter((k) => k.aktif && (!f.ling || k.lingkungan === f.ling)));
+    const kamar = computed(() => (m.value.kamar || []).filter((k) => k.aktif && (!f.ling || k.lingkungan === f.ling)));
+    return { f, kelas, kamar, duaLing, namaKelas, STATUS_SANTRI };
   },
-  components: { FotoSantri },
-  template: `<div style="position:relative">
-    <div v-if="pilih" class="baris" style="align-items:center"><div class="santri-sel"><FotoSantri :s="pilih"/><span><strong>{{ pilih.nama }}</strong><div class="redup">{{ pilih.nis }} · {{ pilih.kelas }} · {{ pilih.kamar }}</div></span></div><button class="kedua kecil" @click="pilih=null; $emit('update:modelValue', null)">Ganti</button></div>
-    <input v-else v-model="q" placeholder="Ketik nama atau NIS (min. 2 huruf)" style="width:100%">
-    <div v-if="hasil.length" class="kartu saran">
-      <button v-for="s in hasil" type="button" @click="ambil(s)"><span class="santri-sel"><FotoSantri :s="s" ukuran="kecil"/><span><strong>{{ s.nama }}</strong> <span class="redup">{{ s.nis }} · {{ s.kelas }} · {{ s.kamar }}</span></span></span></button>
-    </div></div>`,
+  template: `<div class="baris" style="gap:8px">
+    <label class="isian" v-if="duaLing">Lingkungan<select v-model="f.ling" @change="f.kelas_id=''; f.kamar_id=''"><option value="">Putra & putri</option><option value="putra">Putra</option><option value="putri">Putri</option></select></label>
+    <label class="isian">Kelas<select v-model="f.kelas_id"><option value="">Semua kelas</option><option v-for="k in kelas" :value="k.id">{{ namaKelas(k) }}{{ duaLing && !f.ling ? ' (' + k.lingkungan + ')' : '' }}</option></select></label>
+    <label class="isian">Kamar<select v-model="f.kamar_id"><option value="">Semua kamar</option><option v-for="k in kamar" :value="k.id">{{ k.nama }}</option></select></label>
+    <label class="isian">Status<select v-model="f.status"><option v-for="s in STATUS_SANTRI" :value="s[0]">{{ s[1] }}</option></select></label>
+    <label class="isian" v-if="jk">L/P<select v-model="f.jk"><option value="">L & P</option><option value="L">L</option><option value="P">P</option></select></label>
+  </div>`,
+};
+
+const CariSantri = {
+  props: { modelValue: Object, status: { type: String, default: "aktif" } },
+  emits: ["update:modelValue"],
+  components: { FotoSantri, SaringSantri },
+  setup(props, { emit }) {
+    const q = ref(""), hasil = ref([]), pilih = ref(props.modelValue || null), dicari = ref(false), buka = ref(false);
+    const saring = reactive({ ling: "", kelas_id: "", kamar_id: "", status: props.status, jk: "" });
+    const aktifSaring = computed(() => ["ling", "kelas_id", "kamar_id", "jk"].filter((k) => saring[k]).length + (saring.status !== props.status ? 1 : 0));
+    let t, nomor = 0;
+    const cari = () => {
+      clearTimeout(t);
+      if (q.value.trim().length < 2) { hasil.value = []; dicari.value = false; return; }
+      t = setTimeout(async () => {
+        const ini = ++nomor; // abaikan jawaban lama yang datang terlambat
+        const r = await api("/santri?" + kueri({ limit: MAKS_SARAN, q: q.value.trim(), ...saring })).catch(() => []);
+        if (ini === nomor) { hasil.value = r.slice(0, MAKS_SARAN); dicari.value = true; }
+      }, 250);
+    };
+    watch(q, cari); watch(saring, cari, { deep: true });
+    watch(() => props.modelValue, (v) => { pilih.value = v || null; });
+    const ambil = (s) => { pilih.value = s; emit("update:modelValue", s); hasil.value = []; q.value = ""; dicari.value = false; };
+    return { q, hasil, pilih, ambil, dicari, buka, saring, aktifSaring, ...navSaran(hasil, ambil) };
+  },
+  template: `<div style="position:relative;display:flex;flex-direction:column;gap:8px">
+    <div v-if="pilih" class="baris" style="align-items:center"><div class="santri-sel"><FotoSantri :s="pilih"/><span><strong>{{ pilih.nama }}</strong><div class="redup">{{ pilih.nis }} · {{ pilih.kelas }} · {{ pilih.kamar }}</div></span></div><button type="button" class="kedua kecil" @click="pilih=null; $emit('update:modelValue', null)">Ganti</button></div>
+    <template v-else>
+      <div class="baris" style="gap:8px;align-items:center;flex-wrap:nowrap">
+        <input v-model="q" @keydown="tombol" placeholder="Ketik nama atau NIS (min. 2 huruf)" style="flex:1;min-width:0" role="combobox" :aria-expanded="hasil.length > 0" aria-autocomplete="list" aria-label="Cari santri">
+        <button type="button" class="kedua kecil" :aria-expanded="buka" @click="buka = !buka">Filter{{ aktifSaring ? ' (' + aktifSaring + ')' : '' }}</button>
+      </div>
+      <SaringSantri v-if="buka" v-model="saring"/>
+      <div v-if="hasil.length" class="kartu saran" role="listbox">
+        <button v-for="(s, i) in hasil" :key="s.id" type="button" role="option" :aria-selected="i === sorot" :style="i === sorot ? 'background:var(--hijau-pucat)' : ''" @click="ambil(s)"><span class="santri-sel"><FotoSantri :s="s" ukuran="kecil"/><span><strong>{{ s.nama }}</strong> <span class="redup">{{ s.nis }} · {{ s.kelas || '—' }} · {{ s.kamar || '—' }}{{ s.status !== 'aktif' ? ' · ' + s.status : '' }}</span></span></span></button>
+        <div class="redup" style="padding:4px 8px">Maks. 5 hasil. Perjelas kata kunci atau pakai filter bila belum ketemu.</div>
+      </div>
+      <div v-else-if="dicari" class="redup">Tidak ada santri yang cocok{{ aktifSaring ? ' dengan filter ini' : '' }}.</div>
+    </template></div>`,
+};
+
+// Pencarian guru: langsung, maks. 5 saran, filter lingkungan. v-model → {id, nip, nama, lingkungan, …}
+const CariGuru = {
+  props: { modelValue: Object, lingkungan: { type: String, default: "" } },
+  emits: ["update:modelValue"],
+  setup(props, { emit }) {
+    const q = ref(""), hasil = ref([]), pilih = ref(props.modelValue || null), dicari = ref(false), ling = ref(props.lingkungan);
+    let t, nomor = 0;
+    const cari = () => {
+      clearTimeout(t);
+      if (q.value.trim().length < 2) { hasil.value = []; dicari.value = false; return; }
+      t = setTimeout(async () => {
+        const ini = ++nomor;
+        const r = await api("/guru?" + kueri({ limit: MAKS_SARAN, q: q.value.trim(), lingkungan: ling.value })).catch(() => []);
+        if (ini === nomor) { hasil.value = r.slice(0, MAKS_SARAN); dicari.value = true; }
+      }, 250);
+    };
+    watch(q, cari); watch(ling, cari);
+    watch(() => props.modelValue, (v) => { pilih.value = v || null; });
+    const ambil = (g) => { pilih.value = g; emit("update:modelValue", g); hasil.value = []; q.value = ""; dicari.value = false; };
+    return { q, hasil, pilih, ambil, dicari, ling, ...navSaran(hasil, ambil) };
+  },
+  template: `<div style="position:relative;display:flex;flex-direction:column;gap:8px">
+    <div v-if="pilih" class="baris" style="align-items:center"><span><strong>{{ pilih.nama }}</strong> <span class="redup">NIP {{ pilih.nip }} · {{ pilih.lingkungan }}</span></span><button type="button" class="kedua kecil" @click="pilih=null; $emit('update:modelValue', null)">Ganti</button></div>
+    <template v-else>
+      <div class="baris" style="gap:8px;align-items:center;flex-wrap:nowrap">
+        <input v-model="q" @keydown="tombol" placeholder="Ketik nama atau NIP guru (min. 2 huruf)" style="flex:1;min-width:0" role="combobox" :aria-expanded="hasil.length > 0" aria-label="Cari guru">
+        <select v-model="ling" aria-label="Filter lingkungan guru" style="flex:none;width:auto"><option value="">Semua lingkungan</option><option value="putra">Putra</option><option value="putri">Putri</option><option value="semua">Guru 'semua'</option></select>
+      </div>
+      <div v-if="hasil.length" class="kartu saran" role="listbox">
+        <button v-for="(g, i) in hasil" :key="g.id" type="button" role="option" :aria-selected="i === sorot" :style="i === sorot ? 'background:var(--hijau-pucat)' : ''" @click="ambil(g)"><span><strong>{{ g.nama }}</strong> <span class="redup">NIP {{ g.nip }} · {{ g.lingkungan }}</span></span></button>
+      </div>
+      <div v-else-if="dicari" class="redup">Tidak ada guru yang cocok.</div>
+    </template></div>`,
 };
 
 const Perizinan = {
@@ -471,7 +567,7 @@ const KELOMPOK = [
 ];
 
 const DataMaster = {
-  components: { Pesan, FotoSantri },
+  components: { Pesan, FotoSantri, SaringSantri },
   directives: { baris: vBaris },
   setup() {
     const tab = ref("santri");
@@ -479,7 +575,70 @@ const DataMaster = {
     const m = computed(() => negara.master || {});
     const moderator = computed(() => negara.me && negara.me.role === "moderator");
     const bisaPilihan = (k) => moderator.value || (negara.me.akses || []).includes("pilihan." + k);
-    async function cari() { f.memuat = true; try { f.santri = await api("/santri?limit=200&status=semua&q=" + encodeURIComponent(f.q)); } catch (e) { f.galat = e.message; } finally { f.memuat = false; } }
+    // Pencarian langsung: tabel & 5 saran teratas ikut berubah saat mengetik / mengganti filter.
+    const saring = reactive({ ling: "", kelas_id: "", kamar_id: "", status: "semua", jk: "" });
+    const saran = ref(false);
+    let tCari, nCari = 0;
+    async function cari() {
+      const ini = ++nCari; f.memuat = true;
+      try { const r = await api("/santri?" + kueri({ limit: 200, q: f.q.trim(), ...saring })); if (ini === nCari) f.santri = r; }
+      catch (e) { f.galat = e.message; } finally { if (ini === nCari) f.memuat = false; }
+    }
+    const cariNanti = () => { clearTimeout(tCari); tCari = setTimeout(cari, 250); };
+    watch(() => f.q, (v) => { saran.value = v.trim().length >= 2; cariNanti(); });
+    watch(saring, cariNanti, { deep: true });
+    const saranSantri = computed(() => saran.value && f.q.trim().length >= 2 ? f.santri.slice(0, MAKS_SARAN) : []);
+    const pilihSaran = (s) => { saran.value = false; bukaSantri(s); };
+    const navS = reactive(navSaran(saranSantri, pilihSaran));
+    const tutupSaran = () => setTimeout(() => { saran.value = false; }, 150);
+
+    // Guru: pencarian langsung di daftar (5 saran), filter lingkungan & status, ubah, impor massal CSV.
+    const g = reactive({ q: "", ling: "", aktif: "1", saran: false, impor: null, hasil: null, sibuk: false });
+    const guruTersaring = computed(() => {
+      const q = g.q.trim().toLowerCase();
+      return (m.value.guru || []).filter((x) => (!g.ling || x.lingkungan === g.ling) && (g.aktif === "" || String(x.aktif) === g.aktif)
+        && (!q || x.nama.toLowerCase().includes(q) || String(x.nip).startsWith(q)));
+    });
+    const saranGuru = computed(() => g.saran && g.q.trim().length >= 2 ? guruTersaring.value.slice(0, MAKS_SARAN) : []);
+    watch(() => g.q, (v) => { g.saran = v.trim().length >= 2; });
+    const guruKosong = () => ({ nip: "", nama: "", jenis_kelamin: "L", email: "", no_hp: "", lingkungan: "semua" });
+    const isiGuru = (o) => { Object.keys(baru.guru).forEach((k) => delete baru.guru[k]); Object.assign(baru.guru, o); };
+    const ubahGuru = (x) => { isiGuru({ id: x.id, nip: x.nip, nama: x.nama, jenis_kelamin: x.jenis_kelamin, email: x.email || "", no_hp: x.no_hp || "", lingkungan: x.lingkungan, aktif: x.aktif }); g.saran = false; };
+    const navG = reactive(navSaran(saranGuru, ubahGuru));
+    const tutupSaranGuru = () => setTimeout(() => { g.saran = false; }, 150);
+    async function simpanGuru() { await simpanMaster("guru", baru.guru); if (!f.galat) isiGuru(guruKosong()); }
+    // CSV guru: kolom NIP + nama wajib; nama kolom lain fleksibel (mis. sheet walikelas: wali_kelas, kontak, Email).
+    const ALIAS_GURU = { nip: ["NIP"], nama: ["NAMA", "NAMA GURU", "WALI_KELAS", "WALI KELAS", "WALI KAMAR", "WALI ASUH", "GURU"], jk: ["L/P", "JK", "JENIS KELAMIN"],
+      email: ["EMAIL", "EMAIL PONDOK"], no_hp: ["NO HP", "NO_HP", "HP", "KONTAK", "WA", "WHATSAPP"], lingkungan: ["LINGKUNGAN"] };
+    async function bacaGuru(ev) {
+      f.galat = ""; g.hasil = null;
+      const file = ev.target.files[0]; if (!file) return;
+      const rows = parseCsv((await file.text()).replace(/^﻿/, ""));
+      const h = rows.findIndex((r) => r.map((x) => x.trim().toUpperCase()).includes("NIP"));
+      if (h < 0) { f.galat = "Kolom NIP tidak ditemukan di file."; return; }
+      const H = rows[h].map((x) => x.trim().toUpperCase());
+      const col = Object.fromEntries(Object.entries(ALIAS_GURU).map(([k, al]) => [k, H.findIndex((x) => al.includes(x))])); // kolom pertama yang cocok
+      if (col.nama < 0) { f.galat = "Kolom nama guru tidak ditemukan (NAMA / WALI_KELAS / WALI ASUH)."; return; }
+      const data = [];
+      rows.slice(h + 1).forEach((r, i) => {
+        const o = { baris: h + i + 2 };
+        for (const [k, ix] of Object.entries(col)) o[k] = ix >= 0 ? (r[ix] || "").trim() : "";
+        if (/^\d+$/.test(o.nip) && o.nama) data.push(o);
+      });
+      g.impor = { nama: file.name, rows: data };
+    }
+    async function imporGuru() {
+      g.sibuk = true; f.galat = "";
+      const total = { baru: 0, diperbarui: 0, ditolak: [] };
+      try {
+        for (let i = 0; i < g.impor.rows.length; i += 300) {
+          const r = await api("/impor/guru", { rows: g.impor.rows.slice(i, i + 300) });
+          total.baru += r.baru; total.diperbarui += r.diperbarui; total.ditolak.push(...r.ditolak);
+        }
+        g.hasil = total; g.impor = null; await muatMaster();
+      } catch (e) { f.galat = e.message; } finally { g.sibuk = false; }
+    }
+    const templatGuru = () => unduhCsv("templat-guru.csv", [["NIP", "NAMA", "L/P", "EMAIL", "NO HP", "LINGKUNGAN"], ["9901", "Ust. Contoh Guru", "L", "contoh@daarululuumlido.com", "081200000000", "putra"]]);
     async function simpanMaster(tabel, data) { f.galat = ""; f.ok = ""; try { await api("/master/" + tabel, data); f.ok = "Tersimpan."; await muatMaster(); } catch (e) { f.galat = e.message; } }
     async function bukaSantri(s) { f.edit = s ? await api("/santri/" + s.id) : { nis: "", nama: "", jenis_kelamin: "L", status: "aktif" }; }
     async function simpanSantri() { f.galat = ""; try { await api("/santri", f.edit); f.ok = "Data santri tersimpan."; f.edit = null; cari(); muatMaster(); } catch (e) { f.galat = e.message; } }
@@ -546,14 +705,28 @@ const DataMaster = {
       } catch (e) { f.galat = `${e.message} — berhenti pada santri ke-${i + 1}. Klik Impor sekarang lagi; NIS yang sudah masuk hanya diperbarui, tidak dobel.`; } finally { f.sibuk = false; }
     }
     onMounted(async () => { await muatMaster(); cari(); });
-    return { tab, f, m, moderator, bisaPilihan, cari, simpanMaster, bukaSantri, simpanSantri, KELOMPOK, isiPilihan, tambahPilihan, ubahPilihan, baru, tambahKamar, bacaFile, jalankanImpor, namaKelas };
+    return { tab, f, m, moderator, bisaPilihan, cari, simpanMaster, bukaSantri, simpanSantri, KELOMPOK, isiPilihan, tambahPilihan, ubahPilihan, baru, tambahKamar, bacaFile, jalankanImpor, namaKelas,
+      saring, saranSantri, pilihSaran, navS, tutupSaran, g, guruTersaring, saranGuru, ubahGuru, navG, tutupSaranGuru, simpanGuru, guruKosong, isiGuru, bacaGuru, imporGuru, templatGuru };
   },
   template: `<div><span class="jejak">Administrasi</span><h1>Data Master</h1></div>
   <div class="tab"><button v-for="t in [['santri','Santri'],['kelas','Kelas'],['asrama','Asrama & Kamar'],['guru','Guru'],['ta','Tahun Ajaran'],['pilihan','Daftar Pilihan'],['impor','Impor Santri'],['atur','Pengaturan']].filter(t => moderator || t[0]==='pilihan' || t[0]==='santri')" :class="{aktif: tab===t[0]}" @click="tab=t[0]; f.ok=''; f.galat=''">{{ t[1] }}</button></div>
   <Pesan :galat="f.galat" :ok="f.ok"/>
 
   <template v-if="tab==='santri'">
-    <div class="baris"><input v-model="f.q" placeholder="Cari nama atau NIS" @keyup.enter="cari" style="flex:1 1 260px"><button class="kedua" @click="cari">Cari</button><button v-if="moderator" @click="bukaSantri(null)">Tambah santri</button></div>
+    <div class="kartu" style="display:flex;flex-direction:column;gap:10px">
+      <div class="baris" style="align-items:flex-start">
+        <div style="position:relative;flex:1 1 260px">
+          <input v-model="f.q" @keydown="navS.tombol" @blur="tutupSaran" placeholder="Cari nama atau NIS — hasil muncul saat mengetik" style="width:100%" role="combobox" :aria-expanded="saranSantri.length > 0" aria-label="Cari santri">
+          <div v-if="saranSantri.length" class="kartu saran" role="listbox">
+            <button v-for="(s, i) in saranSantri" :key="s.id" type="button" role="option" :aria-selected="i === navS.sorot" :style="i === navS.sorot ? 'background:var(--hijau-pucat)' : ''" @mousedown.prevent="pilihSaran(s)">
+              <span class="santri-sel"><FotoSantri :s="s" ukuran="kecil"/><span><strong>{{ s.nama }}</strong> <span class="redup">{{ s.nis }} · {{ s.kelas || '—' }} · {{ s.kamar || '—' }}</span></span></span></button>
+          </div>
+        </div>
+        <button v-if="moderator" @click="bukaSantri(null)">Tambah santri</button>
+      </div>
+      <SaringSantri v-model="saring" :jk="true"/>
+      <span class="redup">{{ f.memuat ? 'Mencari…' : f.santri.length + (f.santri.length === 200 ? '+ (tampil 200 pertama; perjelas pencarian)' : '') + ' santri' }}</span>
+    </div>
     <div v-if="f.edit" class="kartu" style="display:flex;flex-direction:column;gap:12px">
       <div class="santri-sel" style="gap:16px"><FotoSantri v-if="f.edit.id" :s="f.edit" ukuran="besar"/><div><h2>{{ f.edit.id ? 'Ubah santri' : 'Santri baru' }}</h2><span v-if="f.edit.id" class="redup">{{ f.edit.nis }} · {{ f.edit.nama }}{{ f.edit.foto_url ? '' : ' · belum ada foto' }}</span></div></div>
       <div class="baris">
@@ -599,15 +772,45 @@ const DataMaster = {
   </template>
 
   <template v-if="tab==='guru'">
-    <div class="kartu baris">
-      <label class="isian">NIP<input v-model="baru.guru.nip"></label><label class="isian">Nama<input v-model="baru.guru.nama"></label>
-      <label class="isian">L/P<select v-model="baru.guru.jenis_kelamin"><option>L</option><option>P</option></select></label>
-      <label class="isian">Email pondok<input v-model="baru.guru.email"></label>
-      <label class="isian">Lingkungan<select v-model="baru.guru.lingkungan"><option>semua</option><option>putra</option><option>putri</option></select></label>
-      <button @click="simpanMaster('guru', baru.guru)">Tambah guru</button>
+    <div class="dua-kolom">
+      <div class="kartu" style="display:flex;flex-direction:column;gap:10px">
+        <h2>{{ baru.guru.id ? 'Ubah guru' : 'Tambah guru' }}</h2>
+        <div class="baris">
+          <label class="isian">NIP<input v-model="baru.guru.nip" inputmode="numeric" style="width:110px"></label><label class="isian" style="flex:1 1 220px">Nama<input v-model="baru.guru.nama"></label>
+          <label class="isian">L/P<select v-model="baru.guru.jenis_kelamin"><option>L</option><option>P</option></select></label>
+        </div><div class="baris">
+          <label class="isian" style="flex:1 1 200px">Email pondok<input v-model="baru.guru.email" type="email"></label>
+          <label class="isian">No. HP<input v-model="baru.guru.no_hp" inputmode="tel"></label>
+          <label class="isian">Lingkungan<select v-model="baru.guru.lingkungan"><option>semua</option><option>putra</option><option>putri</option></select></label>
+          <label v-if="baru.guru.id" class="isian">Status<select v-model.number="baru.guru.aktif"><option :value="1">Aktif</option><option :value="0">Nonaktif</option></select></label>
+        </div>
+        <div class="baris"><button @click="simpanGuru">{{ baru.guru.id ? 'Simpan perubahan' : 'Tambah guru' }}</button><button v-if="baru.guru.id" class="kedua" @click="isiGuru(guruKosong())">Batal ubah</button></div>
+      </div>
+      <div class="kartu" style="display:flex;flex-direction:column;gap:10px">
+        <h2>Impor guru massal (CSV)</h2>
+        <p class="redup" style="margin:0">Kolom wajib <strong>NIP</strong> dan <strong>nama</strong>; boleh juga L/P, EMAIL, NO HP, LINGKUNGAN. Sheet <em>walikelas</em> / <em>walikamar</em> sekretariat bisa langsung dipakai (kolom wali_kelas, kontak, Email). L/P kosong dibaca dari gelar Ust. (L) / Ustzh. (P). NIP yang sudah ada diperbarui.</p>
+        <div class="baris"><input type="file" accept=".csv,text/csv" @change="bacaGuru" style="flex:1"><button type="button" class="kedua kecil" @click="templatGuru">Unduh templat</button></div>
+        <div v-if="g.impor" class="pesan info">{{ g.impor.nama }}: <strong>{{ g.impor.rows.length }}</strong> guru terbaca.
+          <div style="margin-top:8px"><button :disabled="g.sibuk || !g.impor.rows.length" @click="imporGuru">{{ g.sibuk ? 'Mengimpor…' : 'Impor sekarang' }}</button></div></div>
+        <div v-if="g.hasil" class="pesan ok">Baru {{ g.hasil.baru }} · diperbarui {{ g.hasil.diperbarui }} · ditolak {{ g.hasil.ditolak.length }}</div>
+        <div v-if="g.hasil && g.hasil.ditolak.length" class="tabel"><table><thead><tr><th>Baris</th><th>NIP</th><th>Alasan</th></tr></thead><tbody><tr v-for="d in g.hasil.ditolak"><td>{{ d.baris }}</td><td>{{ d.nip }}</td><td>{{ d.alasan }}</td></tr></tbody></table></div>
+      </div>
     </div>
-    <div class="tabel"><table><thead><tr><th>NIP</th><th>Nama</th><th>Email</th><th>Lingkungan</th></tr></thead>
-      <tbody><tr v-for="g in m.guru" :key="g.id"><td>{{ g.nip }}</td><td><strong>{{ g.nama }}</strong></td><td>{{ g.email }}</td><td>{{ g.lingkungan }}</td></tr></tbody></table></div>
+    <div class="kartu baris" style="align-items:flex-end">
+      <div style="position:relative;flex:1 1 260px">
+        <label class="isian">Cari guru<input v-model="g.q" @keydown="navG.tombol" @blur="tutupSaranGuru" placeholder="Nama atau NIP — hasil muncul saat mengetik" role="combobox" :aria-expanded="saranGuru.length > 0"></label>
+        <div v-if="saranGuru.length" class="kartu saran" role="listbox">
+          <button v-for="(x, i) in saranGuru" :key="x.id" type="button" role="option" :aria-selected="i === navG.sorot" :style="i === navG.sorot ? 'background:var(--hijau-pucat)' : ''" @mousedown.prevent="ubahGuru(x)"><span><strong>{{ x.nama }}</strong> <span class="redup">NIP {{ x.nip }} · {{ x.lingkungan }}</span></span></button>
+        </div>
+      </div>
+      <label class="isian">Lingkungan<select v-model="g.ling"><option value="">Semua</option><option>putra</option><option>putri</option><option>semua</option></select></label>
+      <label class="isian">Status<select v-model="g.aktif"><option value="1">Aktif</option><option value="0">Nonaktif</option><option value="">Semua</option></select></label>
+      <span class="redup">{{ guruTersaring.length }} guru</span>
+    </div>
+    <div class="tabel"><table><thead><tr><th>NIP</th><th>Nama</th><th>L/P</th><th>Email</th><th>No. HP</th><th>Lingkungan</th><th></th></tr></thead>
+      <tbody v-baris><tr v-for="x in guruTersaring" :key="x.id" :style="{color: x.aktif ? '' : '#6B756F'}"><td>{{ x.nip }}</td><td><strong>{{ x.nama }}</strong></td><td>{{ x.jenis_kelamin }}</td><td>{{ x.email }}</td><td>{{ x.no_hp }}</td><td>{{ x.lingkungan }}</td>
+        <td><button class="kedua kecil" @click="ubahGuru(x)">Ubah</button></td></tr></tbody></table>
+      <p v-if="!guruTersaring.length" class="redup" style="padding:14px">{{ g.q || g.ling ? 'Tidak ada guru yang cocok.' : 'Belum ada data guru. Tambah satu per satu atau impor CSV.' }}</p></div>
   </template>
 
   <template v-if="tab==='ta'">
