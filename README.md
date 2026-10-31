@@ -7,7 +7,7 @@ Abaikan jabatan, fokus kepada objek (sistem yang abadi tetap berjalan dan diperl
 # Sistem Hisada
 ### Himpunan Santri Daarul Uluum Lido — Sistem Informasi Manajemen Kesantrian
 
-Rencana teknologi: PHP native + MySQL/MariaDB, tanpa framework, tanpa build-tool JavaScript; aset front-end di-vendor lokal (tanpa dependensi CDN).
+Teknologi: **Cloudflare Workers + D1** (SQLite), tanpa framework dan tanpa build-tool; tampilan Vue 3 di-vendor lokal. Login dengan **akun Google pondok** (OAuth) atau password cadangan. Aplikasi: https://hisada.216326.workers.dev
 
 > **Status dokumen (31 Oktober 2026):** dokumen ini berisi **hasil desain sistem** (Mindmap, Analisis, Flowchart) yang sudah disepakati. **Belum ada kode** yang mengikuti desain ini; kode PHP lama sudah dihapus dari repo pada 27 Oktober 2026 (lihat [Status Implementasi](#status-implementasi)). Tampilan bisa dicoba lewat [Prototipe Tampilan](#prototipe-tampilan). Hal yang belum diputuskan dikumpulkan di [Belum Diputuskan](#belum-diputuskan).
 
@@ -780,7 +780,15 @@ flowchart TD
 
 ## Status Implementasi
 
-**Seluruh desain di atas belum dikoding.** Kode PHP lama **sudah dihapus dari repo** (27 Oktober 2026) dan masih bisa dilihat di riwayat git, commit `6ddf02a`. Perbedaannya dengan desain baru, sebagai acuan:
+Dibangun bertahap di Cloudflare Workers + D1; peluncuran resmi tetap sekaligus (K-98).
+
+| Tahap | Isi | Status |
+|---|---|---|
+| **1** | Login (Google + password cadangan), akun & role, Manajemen Akses, Data Master + Daftar Pilihan, impor santri dari spreadsheet, Absensi harian (sesi, status otomatis dari izin/overdue/skorsing), Perizinan + Gate Pass (masa tenggang & overdue), Riwayat Perubahan | ✅ Dikoding & diuji (59 uji API) |
+| 2 | Kesehatan, Kedisiplinan (input/putusan), Update Data (Update Kelas Tahunan, Update Kamar, Serah Terima, PAW) | ⏳ |
+| 3 | Absensi Kegiatan, Pengembangan Diri, Rapor, Tata Warkat, Notifikasi email, Portal Wali, Backup, Export | ⏳ |
+
+Kode PHP lama sudah dihapus dari repo (27 Oktober 2026); masih bisa dilihat di riwayat git, commit `6ddf02a`. Perbedaannya dengan desain baru, sebagai acuan:
 
 | Desain baru | Kode lama (sudah dihapus) |
 |---|---|
@@ -793,16 +801,18 @@ flowchart TD
 | Portal Wali dengan akun mandiri | Akun wali dibuat admin per keluarga |
 | Cakupan data putra/putri, role Asatidz | Belum ada |
 
-Urutan berikutnya: **Desain Database** → **Spesifikasi Final per modul** → Coding → Testing → Deployment. Sistem baru diluncurkan **sekaligus**, didahului rencana pindah: gladi migrasi di salinan data, waktu peluncuran di minggu tenang, backup, dan langkah kembali bila gagal.
-
 ---
 
 ## Struktur Repo
 
 ```
 ├── README.md        # Desain sistem (dokumen ini)
-├── wrangler.jsonc   # Cloudflare Workers: menayangkan prototipe/web (deploy otomatis dari GitHub)
-└── prototipe/       # Prototipe tampilan (data contoh)
+├── wrangler.jsonc   # Cloudflare Workers + D1 (deploy otomatis dari GitHub setiap push ke main)
+├── src/
+│   ├── worker.js        # Server aplikasi: semua /api/*
+│   └── schema.js        # Skema database D1 (migrasi otomatis)
+├── public/          # Aplikasi web (Vue 3): index.html, app.js, style.css
+└── prototipe/       # Prototipe tampilan (data contoh) — tayang di GitHub Pages
     ├── *.dc.html        # Sumber kanvas Design
     ├── build-web.js     # Pembuat versi web
     └── web/             # Versi HTML biasa, bisa dibuka di browser / hosting

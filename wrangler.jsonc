@@ -1,9 +1,24 @@
-// Cloudflare Workers — menayangkan prototipe tampilan HISADA (file statis, tanpa database).
-// Halaman utama = prototipe/web/index.html (Login). Deploy otomatis dari GitHub (Workers Builds).
+// Cloudflare Workers — aplikasi HISADA (Workers + D1).
+// Deploy otomatis dari GitHub (Workers Builds) setiap push ke main.
+// Rahasia diatur di dashboard Cloudflare (Settings → Variables and Secrets), BUKAN di file ini:
+//   SETUP_KEY            — kunci sekali pakai untuk membuat Moderator pertama
+//   GOOGLE_CLIENT_SECRET — Client Secret OAuth Google
 {
   "name": "hisada",
+  "main": "src/worker.js",
   "compatibility_date": "2026-10-01",
   "assets": {
-    "directory": "./prototipe/web"
-  }
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "hisada", "database_id": "8d0c1711-289c-4708-80ba-b2b169135cb3" }
+  ],
+  "vars": {
+    "GOOGLE_CLIENT_ID": "710546920311-lvlipfed7s6er003bmv6qq7ebmd7qfke.apps.googleusercontent.com",
+    "GOOGLE_HD": "daarululuumlido.com"
+  },
+  "keep_vars": true,
+  "observability": { "enabled": true }
 }
