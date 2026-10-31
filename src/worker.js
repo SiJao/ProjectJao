@@ -395,7 +395,7 @@ on("GET", "/api/santri", async ({ db, u, url }) => {
   const lim = Math.min(+url.searchParams.get("limit") || 50, 2000);
   const r = await db.prepare(
     `SELECT s.id, s.nis, s.nama, s.jenis_kelamin, s.lingkungan, s.status, s.tanggal_lahir, s.tempat_lahir, s.kabupaten, s.provinsi,
-            s.kelas_id, s.kamar_id, km.nama kamar, (k.tingkat || ' ' || k.rombel || ' ' || j.nama || COALESCE(' ' || k.label, '')) kelas
+            s.kelas_id, s.kamar_id, s.foto_url, km.nama kamar, (k.tingkat || ' ' || k.rombel || ' ' || j.nama || COALESCE(' ' || k.label, '')) kelas
      FROM santri s LEFT JOIN kamar km ON km.id = s.kamar_id LEFT JOIN kelas k ON k.id = s.kelas_id LEFT JOIN jenjang j ON j.id = k.jenjang_id
      WHERE ${w.join(" AND ")} ORDER BY s.nama LIMIT ?`).bind(...a, lim).all();
   return json(r.results);
@@ -579,6 +579,34 @@ on("POST", "/api/impor/santri", async ({ db, u, body }) => {
   return json(hasil);
 });
 
+// Impor link foto dari tab "santriphoto" (kolom induk = NIS, "Uk Besar (h_2048)" = link). Hanya link CDN sekretariat yang diterima.
+const FOTO_SAH = /^https:\/\/ik\.imagekit\.io\/dulidobogor\/[^\s"'<>]{1,400}$/;
+on("POST", "/api/impor/foto", async ({ db, u, body }) => {
+  wajibModerator(u);
+  const rows = Array.isArray(body.rows) ? body.rows.slice(0, 500) : [];
+  if (!rows.length) gagal(400, "Tidak ada baris untuk diimpor.");
+  const hasil = { diperbarui: 0, tidak_dikenal: 0, ditolak: [] };
+  const sah = [];
+  for (const r of rows) {
+    const nis = String(r.nis || "").trim(), foto = String(r.foto || "").trim();
+    if (!/^\d{4,10}$/.test(nis)) hasil.ditolak.push({ baris: r.baris, nis, alasan: "NIS tidak valid" });
+    else if (!FOTO_SAH.test(foto)) hasil.ditolak.push({ baris: r.baris, nis, alasan: "Link foto bukan dari CDN sekretariat" });
+    else sah.push({ nis, foto });
+  }
+  if (sah.length) {
+    // Satu pernyataan untuk semua baris (json_each) supaya tetap jauh di bawah batas query per permintaan.
+    const data = JSON.stringify(sah);
+    const [up, cocok] = await db.batch([
+      db.prepare("UPDATE santri SET foto_url = j.foto, diubah_at = datetime('now') FROM (SELECT json_extract(value, '$.nis') nis, json_extract(value, '$.foto') foto FROM json_each(?)) j WHERE santri.nis = j.nis AND COALESCE(santri.foto_url, '') <> j.foto").bind(data),
+      db.prepare("SELECT COUNT(*) n FROM santri WHERE nis IN (SELECT json_extract(value, '$.nis') FROM json_each(?))").bind(data),
+    ]);
+    hasil.diperbarui = up.meta.changes;
+    hasil.tidak_dikenal = sah.length - cocok.results[0].n;
+  }
+  if (hasil.diperbarui) await catat(db, u, "data", "impor", "santri", null, `Impor foto santri: ${hasil.diperbarui} diperbarui`);
+  return json(hasil);
+});
+
 // ---------------------------------------------------------------- pengguna & Manajemen Akses (Moderator)
 on("GET", "/api/users", async ({ db, u }) => {
   wajibModerator(u);
@@ -681,7 +709,7 @@ on("GET", "/api/izin", async ({ db, u, url }) => {
   const l = lingIn(u, "z.lingkungan");
   const aktif = url.searchParams.get("status") !== "riwayat";
   const r = await db.prepare(
-    `SELECT z.*, s.nis, s.nama, ji.nama jenis, ji.basis_waktu, km.nama kamar,
+    `SELECT z.*, s.nis, s.nama, s.foto_url, ji.nama jenis, ji.basis_waktu, km.nama kamar,
             (k.tingkat || ' ' || k.rombel || ' ' || j.nama) kelas, ub.nama penerbit
      FROM izin z JOIN santri s ON s.id = z.santri_id JOIN jenis_izin ji ON ji.id = z.jenis_izin_id
      LEFT JOIN kamar km ON km.id = s.kamar_id LEFT JOIN kelas k ON k.id = s.kelas_id LEFT JOIN jenjang j ON j.id = k.jenjang_id
@@ -694,7 +722,7 @@ on("GET", "/api/izin", async ({ db, u, url }) => {
 on("GET", "/api/izin/:id", async ({ db, u, p }) => {
   wajib(u, "perizinan");
   const z = await db.prepare(
-    `SELECT z.*, s.nis, s.nama, ji.nama jenis, ji.basis_waktu, km.nama kamar, (k.tingkat || ' ' || k.rombel || ' ' || j.nama) kelas
+    `SELECT z.*, s.nis, s.nama, s.foto_url, ji.nama jenis, ji.basis_waktu, km.nama kamar, (k.tingkat || ' ' || k.rombel || ' ' || j.nama) kelas
      FROM izin z JOIN santri s ON s.id = z.santri_id JOIN jenis_izin ji ON ji.id = z.jenis_izin_id
      LEFT JOIN kamar km ON km.id = s.kamar_id LEFT JOIN kelas k ON k.id = s.kelas_id LEFT JOIN jenjang j ON j.id = k.jenjang_id WHERE z.id = ?`).bind(p.id).first();
   if (!z) gagal(404, "Izin tidak ditemukan.");
@@ -787,7 +815,7 @@ on("GET", "/api/absensi", async ({ db, u, url }) => {
   const km = await db.prepare("SELECT * FROM kamar WHERE id = ?").bind(kamarId).first();
   if (!km) gagal(400, "Pilih kamar.");
   cekLing(u, km.lingkungan);
-  const santri = (await db.prepare("SELECT id, nis, nama, status FROM santri WHERE kamar_id = ? AND status IN ('aktif','skorsing') ORDER BY nama").bind(kamarId).all()).results;
+  const santri = (await db.prepare("SELECT id, nis, nama, status, foto_url FROM santri WHERE kamar_id = ? AND status IN ('aktif','skorsing') ORDER BY nama").bind(kamarId).all()).results;
   const sesi = await db.prepare("SELECT * FROM absensi_sesi WHERE jenis = 'harian' AND tanggal = ? AND sesi_pilihan_id = ? AND target_id = ?").bind(tanggal, sesiId, kamarId).first();
   const tersimpan = sesi ? Object.fromEntries((await db.prepare("SELECT * FROM absensi WHERE sesi_id = ?").bind(sesi.id).all()).results.map((a) => [a.santri_id, a])) : {};
   const oto = await statusOtomatis(db, santri.map((s) => s.id), tanggal);

@@ -1,8 +1,8 @@
 // HISADA — aplikasi web (Vue 3 tanpa build tool). Berbicara dengan /api/* di worker.
-const { createApp, reactive, ref, computed, onMounted, watch } = Vue;
+const { createApp, reactive, ref, computed, onMounted, watch, nextTick } = Vue;
 
 // ---------------------------------------------------------------- API & state global
-const negara = reactive({ me: null, status: null, master: null, rute: "", galat: "" });
+const negara = reactive({ me: null, status: null, master: null, rute: "", galat: "", fotoBesar: null });
 
 async function api(path, data) {
   const opsi = data === undefined ? {} : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) };
@@ -18,6 +18,65 @@ async function muatMaster() { negara.master = await api("/master"); return negar
 const hariIni = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
 const LABEL_ROLE = { moderator: "Moderator", sekretaris: "Sekretaris", piket: "Piket", kesehatan: "Kesehatan", kedisiplinan: "Kedisiplinan", asatidz: "Asatidz" };
 const namaKelas = (k) => k ? `${k.tingkat} ${k.rombel} ${k.jenjang || ""}${k.label ? " " + k.label : ""}`.trim() : "";
+
+// ---------------------------------------------------------------- animasi (anime.js) — mati bila "kurangi gerakan" aktif di perangkat
+const A = window.anime;
+const GERAK = !!A && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+const gerak = {
+  // isi halaman muncul berurutan dari bawah
+  masuk(el) {
+    if (!GERAK || !el) return;
+    A.animate([...el.children].slice(0, 14), { opacity: [0, 1], y: [16, 0], duration: 650, delay: A.stagger(55), ease: "outExpo" });
+  },
+  // baris tabel baru muncul berurutan (dibatasi 20 baris agar ringan)
+  baris(el) {
+    const n = el.children.length;
+    if (el._n === n) return;
+    el._n = n;
+    if (GERAK && n) A.animate([...el.children].slice(0, 20), { opacity: [0, 1], x: [-10, 0], duration: 420, delay: A.stagger(22), ease: "outQuad" });
+  },
+  hitung(el, nilai) {
+    const n = +nilai || 0;
+    if (!GERAK) { el.textContent = n; return; }
+    const o = { v: +el.textContent || 0 };
+    A.animate(o, { v: n, duration: 1100, ease: "outExpo", onUpdate: () => { el.textContent = Math.round(o.v); } });
+  },
+};
+const vHitung = { mounted: (el, b) => gerak.hitung(el, b.value), updated: (el, b) => { if (b.value !== b.oldValue) gerak.hitung(el, b.value); } };
+const vBaris = { mounted: (el) => gerak.baris(el), updated: (el) => gerak.baris(el) };
+
+// ---------------------------------------------------------------- foto santri
+// Link tersimpan = ukuran besar (h_2048). Di daftar dipakai versi kecil dari CDN yang sama; gagal → ukuran besar → inisial.
+const UKURAN_BESAR = /\/h_2048(?=[,/])/;
+const fotoKecil = (url, h) => url && UKURAN_BESAR.test(url) ? url.replace(UKURAN_BESAR, "/h_" + h) : url;
+const inisial = (nama) => String(nama || "?").trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+const FotoSantri = {
+  props: { s: Object, ukuran: { type: String, default: "" } },
+  setup(props) {
+    const tahap = ref(0);
+    watch(() => props.s && props.s.foto_url, () => { tahap.value = 0; });
+    const src = computed(() => {
+      const u = props.s && props.s.foto_url;
+      if (!u || tahap.value > 1) return "";
+      if (props.ukuran === "besar" || tahap.value === 1) return u;
+      return fotoKecil(u, props.ukuran === "kecil" ? 96 : 128);
+    });
+    const perbesar = () => { if (props.s && props.s.foto_url) negara.fotoBesar = { url: props.s.foto_url, nama: props.s.nama }; };
+    return { tahap, src, perbesar, inisial };
+  },
+  template: `<img v-if="src" :src="src" :alt="'Foto ' + s.nama" class="foto" :class="ukuran" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="tahap++" @click="perbesar" style="cursor:zoom-in">
+    <span v-else class="foto inisial" :class="ukuran" aria-hidden="true">{{ inisial(s && s.nama) }}</span>`,
+};
+
+// ikon menu (garis sederhana)
+const IKON = {
+  "/": '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  "/data-master": '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
+  "/absensi": '<path d="M9 11l2 2 4-4"/><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 17h8"/>',
+  "/perizinan": '<path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/><path d="M10 17l-5-5 5-5"/><path d="M5 12h11"/>',
+  "/pengguna": '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.4 3.4-5.5 6.5-5.5s5.7 2.1 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/><path d="M18 14.8c1.8.8 3 2.6 3.5 5.2"/>',
+  "/riwayat": '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+};
 
 // ---------------------------------------------------------------- komponen kecil
 const Pesan = { props: ["galat", "ok"], template: `<div v-if="galat" class="pesan galat">{{ galat }}</div><div v-if="ok" class="pesan ok">{{ ok }}</div>` };
@@ -39,11 +98,25 @@ const Masuk = {
       try { await api("/setup", { kunci: f.kunci, nama: f.nama, email: f.email, password: f.password }); negara.status = await api("/status"); f.ok = "Moderator pertama dibuat. Silakan masuk."; }
       catch (e) { f.galat = e.message; } finally { f.sibuk = false; }
     }
-    return { f, negara, masuk, setup };
+    const merek = ref(null), form = ref(null);
+    onMounted(() => {
+      if (!GERAK) return;
+      const [logo, ...teks] = merek.value.children;
+      A.animate(logo, { scale: [0.6, 1], rotate: [-8, 0], opacity: [0, 1], duration: 1100, ease: A.spring({ bounce: 0.35, duration: 1000 }) });
+      A.animate(teks, { opacity: [0, 1], y: [14, 0], duration: 800, delay: A.stagger(90, { start: 250 }), ease: "outExpo" });
+      A.animate(form.value, { opacity: [0, 1], x: [24, 0], duration: 800, delay: 200, ease: "outExpo" });
+    });
+    return { f, negara, masuk, setup, merek, form };
   },
   template: `
-  <div class="masuk"><div class="kartu">
-    <div style="display:flex;align-items:center;gap:10px"><span class="logo">H</span><div><strong style="font-size:18px">HISADA</strong><div class="redup">Sistem Administrasi Himpunan Santri</div></div></div>
+  <div class="masuk">
+  <section class="masuk-merek" ref="merek">
+    <img src="/img/logo-hisada-256.png" alt="Logo HISADA" width="230" height="230">
+    <h1>HISADA</h1>
+    <span class="garis-emas"></span>
+    <p>Sistem Administrasi Himpunan Santri<br>Pesantren Modern Daarul 'Uluum Lido</p>
+  </section>
+  <div class="masuk-form"><div class="kartu" ref="form">
     <template v-if="negara.status && negara.status.perlu_setup">
       <h2>Setup pertama</h2>
       <p class="redup" v-if="!negara.status.setup_tersedia">Belum ada akun. Isi variabel rahasia <code>SETUP_KEY</code> di dashboard Cloudflare untuk membuat Moderator pertama.</p>
@@ -70,7 +143,7 @@ const Masuk = {
       </template>
       <Pesan :galat="f.galat" :ok="f.ok"/>
     </template>
-  </div></div>`,
+  </div></div></div>`,
 };
 
 const GantiPassword = {
@@ -96,26 +169,29 @@ const GantiPassword = {
 
 // ---------------------------------------------------------------- Dashboard
 const Beranda = {
+  directives: { hitung: vHitung },
   setup() {
     const d = ref(null), galat = ref("");
     onMounted(async () => { try { d.value = await api("/ringkasan"); } catch (e) { galat.value = e.message; } });
     return { d, galat, negara, LABEL_ROLE };
   },
-  template: `<div><span class="jejak">{{ d ? d.waktu + ' WIB' : '' }}</span><h1>Assalamu'alaikum, {{ negara.me.nama }}</h1></div>
+  template: `<section class="sapaan"><span class="jejak">{{ d ? d.waktu + ' WIB' : '' }}</span><h1>Assalamu'alaikum, {{ negara.me.nama }}</h1>
+    <span class="jejak">{{ negara.me.role ? LABEL_ROLE[negara.me.role] : 'Menunggu role' }} · HISADA</span><img src="/img/logo-hisada-256.png" alt=""></section>
   <div v-if="galat" class="pesan galat">{{ galat }}</div>
   <div class="kisi" v-if="d">
-    <div class="kartu"><div class="redup">Santri aktif putra</div><div class="angka">{{ d.santri_putra }}</div></div>
-    <div class="kartu"><div class="redup">Santri aktif putri</div><div class="angka">{{ d.santri_putri }}</div></div>
-    <a class="kartu" href="#/perizinan" style="text-decoration:none;color:inherit"><div class="redup">Izin berjalan</div><div class="angka" style="color:var(--biru)">{{ d.izin_berjalan }}</div><div class="redup">{{ d.izin_terlambat }} terlambat</div></a>
-    <a class="kartu" href="#/perizinan" style="text-decoration:none;color:inherit"><div class="redup">Overdue</div><div class="angka" style="color:var(--merah)">{{ d.izin_overdue }}</div></a>
-    <a class="kartu" href="#/absensi" style="text-decoration:none;color:inherit"><div class="redup">Absensi kamar hari ini</div><div class="angka">{{ d.absensi_terisi }}<span class="redup" style="font-size:16px"> / {{ d.kamar_aktif }}</span></div></a>
+    <div class="kartu stat"><div class="redup">Santri aktif putra</div><div class="angka" v-hitung="d.santri_putra"></div></div>
+    <div class="kartu stat"><div class="redup">Santri aktif putri</div><div class="angka" v-hitung="d.santri_putri"></div></div>
+    <a class="kartu stat" href="#/perizinan"><div class="redup">Izin berjalan</div><div class="angka" style="color:var(--biru)" v-hitung="d.izin_berjalan"></div><div class="redup">{{ d.izin_terlambat }} terlambat</div></a>
+    <a class="kartu stat" href="#/perizinan"><div class="redup">Overdue</div><div class="angka" style="color:var(--merah)" v-hitung="d.izin_overdue"></div></a>
+    <a class="kartu stat" href="#/absensi"><div class="redup">Absensi kamar hari ini</div><div class="angka"><span v-hitung="d.absensi_terisi"></span><span class="redup" style="font-size:16px"> / {{ d.kamar_aktif }}</span></div></a>
   </div>
   <div class="pesan info">Tahap 1 aktif: Data Master, Daftar Pilihan, Akun & Manajemen Akses, Absensi harian, Perizinan + Gate Pass, Riwayat. Modul lain menyusul (Kesehatan, Kedisiplinan, Update Data, dst.).</div>`,
 };
 
 // ---------------------------------------------------------------- Absensi
 const Absensi = {
-  components: { Pesan },
+  components: { Pesan, FotoSantri },
+  directives: { baris: vBaris },
   setup() {
     const f = reactive({ asrama_id: "", kamar_id: "", tanggal: hariIni(), sesi_id: "", data: null, galat: "", ok: "", rekap: [] });
     const m = computed(() => negara.master || {});
@@ -155,9 +231,9 @@ const Absensi = {
   <template v-if="f.data">
     <div class="baris" style="justify-content:space-between"><span class="redup">{{ f.data.terisi ? 'Sudah diisi ' + f.data.diisi_at + ' — menyimpan ulang akan memperbarui.' : 'Belum diisi.' }}</span><button class="kedua" @click="semuaHadir">Tandai semua hadir</button></div>
     <div class="tabel"><table>
-      <thead><tr><th>NIS</th><th>Nama</th><th>Status</th><th>Keterangan</th></tr></thead>
-      <tbody><tr v-for="s in f.data.santri" :key="s.id">
-        <td class="redup">{{ s.nis }}</td><td><strong>{{ s.nama }}</strong></td>
+      <thead><tr><th>Santri</th><th>Status</th><th>Keterangan</th></tr></thead>
+      <tbody v-baris><tr v-for="s in f.data.santri" :key="s.id">
+        <td><div class="santri-sel"><FotoSantri :s="s"/><span><strong>{{ s.nama }}</strong><div class="redup">{{ s.nis }}</div></span></div></td>
         <td><select v-model="s.status_kehadiran_id" :disabled="!!s.otomatis" :style="{borderColor: warna(s.status_kehadiran_id), color: warna(s.status_kehadiran_id), fontWeight: 700}">
           <option :value="null" disabled>— pilih —</option><option v-for="st in statusList" :value="st.id">{{ st.nama }}</option></select></td>
         <td class="redup">{{ s.otomatis ? 'Otomatis: ' + s.keterangan : '' }}</td>
@@ -178,16 +254,18 @@ const CariSantri = {
     const ambil = (s) => { pilih.value = s; emit("update:modelValue", s); hasil.value = []; q.value = ""; };
     return { q, hasil, pilih, ambil, namaKelas };
   },
+  components: { FotoSantri },
   template: `<div style="position:relative">
-    <div v-if="pilih" class="baris" style="align-items:center"><strong>{{ pilih.nama }}</strong><span class="redup">{{ pilih.nis }} · {{ pilih.kelas }} · {{ pilih.kamar }}</span><button class="kedua kecil" @click="pilih=null; $emit('update:modelValue', null)">Ganti</button></div>
+    <div v-if="pilih" class="baris" style="align-items:center"><div class="santri-sel"><FotoSantri :s="pilih"/><span><strong>{{ pilih.nama }}</strong><div class="redup">{{ pilih.nis }} · {{ pilih.kelas }} · {{ pilih.kamar }}</div></span></div><button class="kedua kecil" @click="pilih=null; $emit('update:modelValue', null)">Ganti</button></div>
     <input v-else v-model="q" placeholder="Ketik nama atau NIS (min. 2 huruf)" style="width:100%">
-    <div v-if="hasil.length" class="kartu" style="position:absolute;z-index:5;left:0;right:0;padding:6px;max-height:260px;overflow:auto">
-      <div v-for="s in hasil" @click="ambil(s)" style="padding:8px;cursor:pointer;border-radius:8px" @mouseover="$event.currentTarget.style.background='#EEF5F1'" @mouseout="$event.currentTarget.style.background=''"><strong>{{ s.nama }}</strong> <span class="redup">{{ s.nis }} · {{ s.kelas }} · {{ s.kamar }}</span></div>
+    <div v-if="hasil.length" class="kartu saran">
+      <button v-for="s in hasil" type="button" @click="ambil(s)"><span class="santri-sel"><FotoSantri :s="s" ukuran="kecil"/><span><strong>{{ s.nama }}</strong> <span class="redup">{{ s.nis }} · {{ s.kelas }} · {{ s.kamar }}</span></span></span></button>
     </div></div>`,
 };
 
 const Perizinan = {
-  components: { Pesan, CariSantri },
+  components: { Pesan, CariSantri, FotoSantri },
+  directives: { baris: vBaris },
   setup() {
     const f = reactive({ santri: null, jenis_izin_id: "", keterangan: "", berangkat: "", kembali: "", jam: "", pendamping: "", galat: "", ok: "", daftar: [], riwayat: false });
     const jenis = computed(() => ((negara.master || {}).jenis_izin || []).filter((j) => j.aktif));
@@ -237,8 +315,8 @@ const Perizinan = {
   <div class="baris" style="justify-content:space-between"><h2>{{ f.riwayat ? 'Riwayat izin' : 'Izin berjalan' }}</h2><label class="redup" style="display:flex;gap:8px;align-items:center"><input type="checkbox" v-model="f.riwayat"> Tampilkan riwayat</label></div>
   <div class="tabel"><table>
     <thead><tr><th>Santri</th><th>Jenis</th><th>Berangkat</th><th>Kembali</th><th>Status</th><th></th></tr></thead>
-    <tbody><tr v-for="z in f.daftar" :key="z.id">
-      <td><strong>{{ z.nama }}</strong><div class="redup">{{ z.nis }} · {{ z.kamar }}</div></td><td>{{ z.jenis }}</td><td>{{ z.berangkat }}</td>
+    <tbody v-baris><tr v-for="z in f.daftar" :key="z.id">
+      <td><div class="santri-sel"><FotoSantri :s="z"/><span><strong>{{ z.nama }}</strong><div class="redup">{{ z.nis }} · {{ z.kamar }}</div></span></div></td><td>{{ z.jenis }}</td><td>{{ z.berangkat }}</td>
       <td>{{ z.kembali_at || z.rencana_kembali }}</td>
       <td><span class="lencana" :class="lencana(z.keadaan)">{{ z.keadaan }}</span></td>
       <td style="white-space:nowrap"><a class="tombol kedua kecil" style="height:34px" :href="'#/gatepass/' + z.id" target="_blank">Gate Pass</a>
@@ -251,22 +329,31 @@ const GatePass = {
   setup() {
     const z = ref(null), galat = ref("");
     const id = location.hash.split("/").pop();
-    onMounted(async () => { try { z.value = await api("/izin/" + id); setTimeout(() => window.print(), 400); } catch (e) { galat.value = e.message; } });
+    onMounted(async () => {
+      try { z.value = await api("/izin/" + id); } catch (e) { galat.value = e.message; return; }
+      await nextTick();
+      // tunggu foto & logo termuat (maks. 4 detik) supaya ikut tercetak
+      const imgs = [...document.querySelectorAll(".gatepass img")].filter((i) => !i.complete);
+      await Promise.race([Promise.all(imgs.map((i) => new Promise((r) => { i.onload = i.onerror = r; }))), new Promise((r) => setTimeout(r, 4000))]);
+      setTimeout(() => window.print(), 200);
+    });
     const fmt = (s, b) => !s ? "" : b === "jam" ? s.slice(11) : b === "tanggal" ? s.slice(0, 10) : s;
     return { z, galat, fmt };
   },
   template: `<div v-if="galat" class="pesan galat">{{ galat }}</div>
   <div v-if="z" class="gatepass">
-    <div style="border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px"><strong style="font-size:16px">Pesantren Modern Daarul 'Uluum Lido</strong><div>SEKRETARIS HISADA</div></div>
+    <div class="kepala"><img src="/img/logo-hisada-256.png" alt=""><div><strong style="font-size:16px">Pesantren Modern Daarul 'Uluum Lido</strong><div>SEKRETARIS HISADA</div></div></div>
     <div style="text-align:center;font-weight:700;letter-spacing:.12em;margin-bottom:14px">GATE PASS · {{ z.jenis.toUpperCase() }}</div>
-    <table><tbody>
+    <div style="display:flex;gap:16px;align-items:flex-start">
+    <img v-if="z.foto_url" class="foto-gp" :src="z.foto_url" :alt="'Foto ' + z.nama" referrerpolicy="no-referrer">
+    <table style="flex:1"><tbody>
       <tr><td style="width:150px">Name</td><td><strong>{{ z.nama }}</strong> ({{ z.nis }})</td></tr>
       <tr><td>Class / Room</td><td>{{ z.kelas }} · {{ z.kamar }}</td></tr>
       <tr><td>Reason</td><td>{{ z.keterangan }}</td></tr>
       <tr><td>Departure</td><td>{{ fmt(z.berangkat, z.basis_waktu) }}</td></tr>
       <tr><td>Return</td><td>{{ fmt(z.rencana_kembali, z.basis_waktu) }}</td></tr>
       <tr v-if="z.pendamping"><td>Pendamping</td><td>{{ z.pendamping }}</td></tr>
-    </tbody></table>
+    </tbody></table></div>
     <div style="margin-top:44px;text-align:right"><div style="display:inline-block;border-top:1px solid #000;padding-top:6px;min-width:200px;text-align:center">Security Department</div></div>
     <p class="redup tidak-cetak">No. izin {{ z.id }}</p>
   </div>`,
@@ -281,14 +368,15 @@ const KELOMPOK = [
 ];
 
 const DataMaster = {
-  components: { Pesan },
+  components: { Pesan, FotoSantri },
+  directives: { baris: vBaris },
   setup() {
     const tab = ref("santri");
-    const f = reactive({ galat: "", ok: "", q: "", santri: [], edit: null, kelompok: "sesi_absensi", baru: "", ling: "semua", impor: null, imporHasil: null, sibuk: false });
+    const f = reactive({ galat: "", ok: "", q: "", santri: [], memuat: false, edit: null, kelompok: "sesi_absensi", baru: "", ling: "semua", impor: null, imporHasil: null, sibuk: false });
     const m = computed(() => negara.master || {});
     const moderator = computed(() => negara.me && negara.me.role === "moderator");
     const bisaPilihan = (k) => moderator.value || (negara.me.akses || []).includes("pilihan." + k);
-    async function cari() { try { f.santri = await api("/santri?limit=200&status=semua&q=" + encodeURIComponent(f.q)); } catch (e) { f.galat = e.message; } }
+    async function cari() { f.memuat = true; try { f.santri = await api("/santri?limit=200&status=semua&q=" + encodeURIComponent(f.q)); } catch (e) { f.galat = e.message; } finally { f.memuat = false; } }
     async function simpanMaster(tabel, data) { f.galat = ""; f.ok = ""; try { await api("/master/" + tabel, data); f.ok = "Tersimpan."; await muatMaster(); } catch (e) { f.galat = e.message; } }
     async function bukaSantri(s) { f.edit = s ? await api("/santri/" + s.id) : { nis: "", nama: "", jenis_kelamin: "L", status: "aktif" }; }
     async function simpanSantri() { f.galat = ""; try { await api("/santri", f.edit); f.ok = "Data santri tersimpan."; f.edit = null; cari(); muatMaster(); } catch (e) { f.galat = e.message; } }
@@ -311,6 +399,20 @@ const DataMaster = {
       f.galat = ""; f.imporHasil = null;
       const file = ev.target.files[0]; if (!file) return;
       const rows = parseCsv(await file.text());
+      // Tab "santriphoto": induk = NIS, "Uk Besar (h_2048)" = link foto. Hanya dua kolom itu yang dikirim.
+      const hf = rows.findIndex((r) => r.map((x) => x.trim().toUpperCase()).includes("INDUK"));
+      if (hf >= 0) {
+        const H = rows[hf].map((x) => x.trim().toUpperCase());
+        const cNis = H.indexOf("INDUK"), cFoto = H.findIndex((x) => x.startsWith("UK BESAR"));
+        if (cFoto < 0) { f.galat = "Kolom \"Uk Besar (h_2048)\" tidak ditemukan di file foto."; return; }
+        const data = [];
+        rows.slice(hf + 1).forEach((r, i) => {
+          const nis = (r[cNis] || "").trim(), foto = (r[cFoto] || "").trim();
+          if (/^\d+$/.test(nis) && foto) data.push({ baris: hf + i + 2, nis, foto });
+        });
+        f.impor = { jenis: "foto", nama: file.name, rows: data, kolomDibuang: H.filter(Boolean).length - 2 };
+        return;
+      }
       const h = rows.findIndex((r) => r.map((x) => x.trim().toUpperCase()).includes("NIS") && r.map((x) => x.trim().toUpperCase()).includes("NAMA"));
       if (h < 0) { f.galat = "Kolom NIS dan NAMA tidak ditemukan. Unduh sheet data sebagai CSV."; return; }
       const H = rows[h].map((x) => x.trim().toUpperCase());
@@ -324,19 +426,20 @@ const DataMaster = {
         o.tanggal_lahir = tgl(o.tanggal_lahir);
         data.push(o);
       });
-      f.impor = { nama: file.name, rows: data, kolomDibuang: H.filter((x) => x && !Object.values(ambil).includes(H.indexOf(x))).length };
+      f.impor = { jenis: "santri", nama: file.name, rows: data, kolomDibuang: H.filter((x) => x && !Object.values(ambil).includes(H.indexOf(x))).length };
     }
     async function jalankanImpor() {
       f.sibuk = true; f.galat = "";
-      const total = { baru: 0, diperbarui: 0, ditolak: [] };
+      const foto = f.impor.jenis === "foto", per = foto ? 400 : 50;
+      const total = { jenis: f.impor.jenis, baru: 0, diperbarui: 0, tidak_dikenal: 0, ditolak: [] };
       let i = 0;
       try {
-        for (; i < f.impor.rows.length; i += 50) {
-          const r = await api("/impor/santri", { rows: f.impor.rows.slice(i, i + 50) });
-          total.baru += r.baru; total.diperbarui += r.diperbarui; total.ditolak.push(...r.ditolak);
-          f.imporHasil = { ...total, proses: Math.min(i + 50, f.impor.rows.length) };
+        for (; i < f.impor.rows.length; i += per) {
+          const r = await api(foto ? "/impor/foto" : "/impor/santri", { rows: f.impor.rows.slice(i, i + per) });
+          total.baru += r.baru || 0; total.diperbarui += r.diperbarui; total.tidak_dikenal += r.tidak_dikenal || 0; total.ditolak.push(...r.ditolak);
+          f.imporHasil = { ...total, proses: Math.min(i + per, f.impor.rows.length) };
         }
-        f.impor = null; await muatMaster();
+        f.impor = null; await muatMaster(); cari();
       } catch (e) { f.galat = `${e.message} — berhenti pada santri ke-${i + 1}. Klik Impor sekarang lagi; NIS yang sudah masuk hanya diperbarui, tidak dobel.`; } finally { f.sibuk = false; }
     }
     onMounted(async () => { await muatMaster(); cari(); });
@@ -349,7 +452,7 @@ const DataMaster = {
   <template v-if="tab==='santri'">
     <div class="baris"><input v-model="f.q" placeholder="Cari nama atau NIS" @keyup.enter="cari" style="flex:1 1 260px"><button class="kedua" @click="cari">Cari</button><button v-if="moderator" @click="bukaSantri(null)">Tambah santri</button></div>
     <div v-if="f.edit" class="kartu" style="display:flex;flex-direction:column;gap:12px">
-      <h2>{{ f.edit.id ? 'Ubah santri' : 'Santri baru' }}</h2>
+      <div class="santri-sel" style="gap:16px"><FotoSantri v-if="f.edit.id" :s="f.edit" ukuran="besar"/><div><h2>{{ f.edit.id ? 'Ubah santri' : 'Santri baru' }}</h2><span v-if="f.edit.id" class="redup">{{ f.edit.nis }} · {{ f.edit.nama }}{{ f.edit.foto_url ? '' : ' · belum ada foto' }}</span></div></div>
       <div class="baris">
         <label class="isian">NIS<input v-model="f.edit.nis"></label><label class="isian" style="flex:1 1 240px">Nama<input v-model="f.edit.nama"></label>
         <label class="isian">L/P<select v-model="f.edit.jenis_kelamin"><option value="L">L</option><option value="P">P</option></select></label>
@@ -363,9 +466,10 @@ const DataMaster = {
       <div v-if="f.edit.wali && f.edit.wali.length" class="redup">Wali: <span v-for="w in f.edit.wali">{{ w.hubungan }} {{ w.nama }} ({{ w.no_hp || '—' }}) · </span></div>
       <div class="baris"><button @click="simpanSantri">Simpan</button><button class="kedua" @click="f.edit=null">Batal</button></div>
     </div>
-    <div class="tabel"><table><thead><tr><th>NIS</th><th>Nama</th><th>L/P</th><th>Kelas</th><th>Kamar</th><th>Status</th><th></th></tr></thead>
-      <tbody><tr v-for="s in f.santri" :key="s.id"><td class="redup">{{ s.nis }}</td><td><strong>{{ s.nama }}</strong></td><td>{{ s.jenis_kelamin }}</td><td>{{ s.kelas }}</td><td>{{ s.kamar }}</td><td><span class="lencana" :class="{hijau: s.status==='aktif'}">{{ s.status }}</span></td><td><button v-if="moderator" class="kedua kecil" @click="bukaSantri(s)">Ubah</button></td></tr></tbody></table>
-      <p v-if="!f.santri.length" class="redup" style="padding:14px">Belum ada data. Gunakan tab Impor Santri.</p></div>
+    <div class="tabel"><table><thead><tr><th>Santri</th><th>L/P</th><th>Kelas</th><th>Kamar</th><th>Status</th><th></th></tr></thead>
+      <tbody v-baris><tr v-for="s in f.santri" :key="s.id"><td><div class="santri-sel"><FotoSantri :s="s"/><span><strong>{{ s.nama }}</strong><div class="redup">{{ s.nis }}</div></span></div></td><td>{{ s.jenis_kelamin }}</td><td>{{ s.kelas }}</td><td>{{ s.kamar }}</td><td><span class="lencana" :class="{hijau: s.status==='aktif'}">{{ s.status }}</span></td><td><button v-if="moderator" class="kedua kecil" @click="bukaSantri(s)">Ubah</button></td></tr></tbody></table>
+      <p v-if="f.memuat && !f.santri.length" class="redup" style="padding:14px">Memuat…</p>
+      <p v-else-if="!f.santri.length" class="redup" style="padding:14px">{{ f.q ? 'Tidak ada santri yang cocok.' : 'Belum ada data. Gunakan tab Impor Santri.' }}</p></div>
   </template>
 
   <template v-if="tab==='kelas'">
@@ -450,11 +554,13 @@ const DataMaster = {
         <li>Buka spreadsheet data santri → pilih sheet <strong>data</strong> → File → Download → <strong>CSV</strong>.</li>
         <li>Pilih file di bawah. File dibaca <strong>di browser ini</strong>; hanya kolom NIS, nama, L/P, tempat & tanggal lahir, status, kelas, kamar, kabupaten, provinsi, nama & WA ayah/ibu yang dikirim.</li>
         <li><strong>NIK, No KK, penghasilan, NISN, pekerjaan, alamat rinci tidak pernah dikirim ke server.</strong></li>
+        <li><strong>Foto santri:</strong> unduh tab <strong>santriphoto</strong> sebagai CSV lalu pilih di sini. Hanya NIS (induk) dan link <em>Uk Besar (h_2048)</em> yang dikirim; impor data santri dulu agar NIS-nya dikenali.</li>
       </ol>
       <input type="file" accept=".csv,text/csv" @change="bacaFile">
-      <div v-if="f.impor" class="pesan info">{{ f.impor.nama }}: <strong>{{ f.impor.rows.length }}</strong> baris santri terbaca · {{ f.impor.kolomDibuang }} kolom lain dibuang.
+      <div v-if="f.impor" class="pesan info">{{ f.impor.nama }}: <strong>{{ f.impor.rows.length }}</strong> {{ f.impor.jenis === 'foto' ? 'link foto' : 'baris santri' }} terbaca · {{ f.impor.kolomDibuang }} kolom lain dibuang.
         <div style="margin-top:8px"><button :disabled="f.sibuk" @click="jalankanImpor">{{ f.sibuk ? 'Mengimpor…' : 'Impor sekarang' }}</button></div></div>
-      <div v-if="f.imporHasil" class="pesan ok">Diproses {{ f.imporHasil.proses || '' }} · baru {{ f.imporHasil.baru }} · diperbarui {{ f.imporHasil.diperbarui }} · ditolak {{ f.imporHasil.ditolak.length }}</div>
+      <div v-if="f.imporHasil && f.imporHasil.jenis === 'foto'" class="pesan ok">Diproses {{ f.imporHasil.proses || '' }} · foto diperbarui {{ f.imporHasil.diperbarui }} · NIS belum ada di HISADA {{ f.imporHasil.tidak_dikenal }} · ditolak {{ f.imporHasil.ditolak.length }}</div>
+      <div v-else-if="f.imporHasil" class="pesan ok">Diproses {{ f.imporHasil.proses || '' }} · baru {{ f.imporHasil.baru }} · diperbarui {{ f.imporHasil.diperbarui }} · ditolak {{ f.imporHasil.ditolak.length }}</div>
       <div v-if="f.imporHasil && f.imporHasil.ditolak.length" class="tabel"><table><thead><tr><th>Baris</th><th>NIS</th><th>Alasan</th></tr></thead><tbody><tr v-for="d in f.imporHasil.ditolak"><td>{{ d.baris }}</td><td>{{ d.nis }}</td><td>{{ d.alasan }}</td></tr></tbody></table></div>
     </div>
   </template>
@@ -546,20 +652,39 @@ const App = {
       ].map(([g, items]) => [g, items.filter((i) => i[2])]).filter(([, i]) => i.length);
     });
     async function keluar() { await api("/logout", {}); negara.me = null; pergi("/masuk"); }
-    return { negara, jalur, halaman, menu, keluar, LABEL_ROLE };
+    // menu laci (HP/tablet): tertutup saat pindah halaman atau tekan Esc
+    const laci = ref(false);
+    watch(jalur, () => { laci.value = false; });
+    window.addEventListener("keydown", (e) => { if (e.key === "Escape") { laci.value = false; negara.fotoBesar = null; } });
+    // animasi isi halaman setiap pindah halaman
+    const isi = ref(null);
+    watch(() => [jalur.value, !!negara.me], () => nextTick(() => gerak.masuk(isi.value)), { immediate: true });
+    const ling = computed(() => negara.me && (negara.me.lingkungan === "semua" ? "Putra & Putri" : negara.me.lingkungan === "putra" ? "Putra" : "Putri"));
+    return { negara, jalur, halaman, menu, keluar, LABEL_ROLE, laci, isi, ling, IKON, inisial };
   },
   template: `
   <Masuk v-if="jalur === '/masuk' || !negara.me"/>
   <div v-else-if="jalur.startsWith('/gatepass/')" class="isi"><GatePass/></div>
   <div v-else class="tata">
-    <nav class="samping" aria-label="Menu utama">
-      <a class="merek" href="#/"><span class="logo">H</span><span><strong>HISADA</strong><div class="redup">{{ negara.me.lingkungan === 'semua' ? 'Putra & Putri' : (negara.me.lingkungan === 'putra' ? 'Putra' : 'Putri') }}</div></span></a>
-      <div class="grup-menu" v-for="[g, items] in menu" :key="g"><span class="judul">{{ g }}</span><a v-for="i in items" :key="i[0]" :href="'#' + i[0]" :class="{aktif: jalur === i[0]}">{{ i[1] }}</a></div>
-      <div class="akun"><strong>{{ negara.me.nama }}</strong><span class="redup">{{ negara.me.role ? LABEL_ROLE[negara.me.role] : 'Menunggu role' }}</span>
-        <a href="#/ganti-password">Ganti password</a><a href="#" @click.prevent="keluar">Keluar</a></div>
+    <header class="bar-atas">
+      <img src="/img/logo-hisada-64.png" alt="" width="34" height="34"><strong>HISADA</strong>
+      <button class="tombol-menu" :aria-expanded="laci" aria-controls="menu-utama" aria-label="Buka menu" @click="laci = !laci"><span></span><span></span><span></span></button>
+    </header>
+    <div class="tirai" :class="{terbuka: laci}" @click="laci = false"></div>
+    <nav id="menu-utama" class="samping" :class="{terbuka: laci}" aria-label="Menu utama">
+      <a class="merek" href="#/"><img src="/img/logo-hisada-64.png" alt="" width="46" height="46"><span><strong>HISADA</strong><small>{{ ling }}</small></span></a>
+      <div class="grup-menu" v-for="[g, items] in menu" :key="g"><span class="judul">{{ g }}</span>
+        <a v-for="i in items" :key="i[0]" :href="'#' + i[0]" :class="{aktif: jalur === i[0]}" :aria-current="jalur === i[0] ? 'page' : null">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" v-html="IKON[i[0]]"></svg>{{ i[1] }}</a></div>
+      <div class="akun"><span class="inisial" aria-hidden="true">{{ inisial(negara.me.nama) }}</span>
+        <div style="min-width:0"><strong>{{ negara.me.nama }}</strong><span>{{ negara.me.role ? LABEL_ROLE[negara.me.role] : 'Menunggu role' }}</span>
+        <div><a href="#/ganti-password">Ganti password</a><a href="#" @click.prevent="keluar">Keluar</a></div></div></div>
     </nav>
-    <main class="isi"><component :is="halaman" :key="jalur"/></main>
-  </div>`,
+    <main class="isi" ref="isi"><component :is="halaman" :key="jalur"/></main>
+  </div>
+  <figure v-if="negara.fotoBesar" class="foto-lihat" @click="negara.fotoBesar = null" role="dialog" aria-label="Foto santri">
+    <div><img :src="negara.fotoBesar.url" :alt="'Foto ' + negara.fotoBesar.nama" referrerpolicy="no-referrer"><figcaption>{{ negara.fotoBesar.nama }}</figcaption></div>
+  </figure>`,
 };
 
 async function mulai() {
