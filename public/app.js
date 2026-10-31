@@ -78,8 +78,96 @@ const IKON = {
   "/riwayat": '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
 };
 
+// ---------------------------------------------------------------- berkas: CSV & Excel (dibuat di browser)
+function parseCsv(t) {
+  const R = []; let r = [], v = "", q = false;
+  for (let i = 0; i < t.length; i++) { const c = t[i];
+    if (q) { if (c === '"') { if (t[i + 1] === '"') { v += '"'; i++; } else q = false; } else v += c; }
+    else if (c === '"') q = true; else if (c === ",") { r.push(v); v = ""; } else if (c === "\n") { r.push(v.replace(/\r$/, "")); R.push(r); r = []; v = ""; } else v += c; }
+  if (v || r.length) { r.push(v); R.push(r); } return R;
+}
+// Baca CSV → { kolom: [...HURUF BESAR], baris: [{KOLOM: nilai, _baris: n}] } dengan baris judul = baris pertama yang memuat semua `wajib`.
+async function bacaCsv(file, wajib = []) {
+  const rows = parseCsv((await file.text()).replace(/^﻿/, ""));
+  const h = rows.findIndex((r) => wajib.every((w) => r.map((x) => x.trim().toUpperCase()).includes(w.toUpperCase())));
+  if (h < 0) throw new Error("Kolom " + wajib.join(", ") + " tidak ditemukan di file.");
+  const kolom = rows[h].map((x) => x.trim().toUpperCase());
+  const baris = rows.slice(h + 1).filter((r) => r.some((x) => x.trim())).map((r, i) => {
+    const o = { _baris: h + i + 2 };
+    kolom.forEach((k, j) => { if (k) o[k] = (r[j] || "").trim(); });
+    return o;
+  });
+  return { kolom, baris };
+}
+function unduhBerkas(nama, isi, tipe) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(isi instanceof Blob ? isi : new Blob([isi], { type: tipe }));
+  a.download = nama; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+const selCsv = (v) => { const s = v == null ? "" : String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+const unduhCsv = (nama, baris) => unduhBerkas(nama, "﻿" + baris.map((r) => r.map(selCsv).join(",")).join("\r\n"), "text/csv;charset=utf-8");
+
+// .xlsx asli tanpa pustaka (README Export Excel): zip "stored" + CRC32, sel teks inline, angka sebagai angka.
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = (b) => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function zip(berkas) {
+  const te = new TextEncoder(), bagian = [], pusat = []; let ofs = 0;
+  for (const [nama, teks] of berkas) {
+    const n = te.encode(nama), d = te.encode(teks), c = crc32(d);
+    const h = new DataView(new ArrayBuffer(30));
+    [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [8, 0, 2], [10, 0, 2], [12, 0x21, 2], [14, c, 4], [18, d.length, 4], [22, d.length, 4], [26, n.length, 2], [28, 0, 2]]
+      .forEach(([o, v, l]) => l === 4 ? h.setUint32(o, v, true) : h.setUint16(o, v, true));
+    const p = new DataView(new ArrayBuffer(46));
+    [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [10, 0, 2], [12, 0, 2], [14, 0x21, 2], [16, c, 4], [20, d.length, 4], [24, d.length, 4], [28, n.length, 2], [30, 0, 2], [32, 0, 2], [34, 0, 2], [36, 0, 2], [38, 0, 4], [42, ofs, 4]]
+      .forEach(([o, v, l]) => l === 4 ? p.setUint32(o, v, true) : p.setUint16(o, v, true));
+    bagian.push(h, n, d); pusat.push(p, n); ofs += 30 + n.length + d.length;
+  }
+  const ukPusat = pusat.reduce((s, x) => s + x.byteLength, 0);
+  const e = new DataView(new ArrayBuffer(22));
+  [[0, 0x06054b50, 4], [8, berkas.length, 2], [10, berkas.length, 2], [12, ukPusat, 4], [16, ofs, 4]].forEach(([o, v, l]) => l === 4 ? e.setUint32(o, v, true) : e.setUint16(o, v, true));
+  return new Blob([...bagian, ...pusat, e], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+// lembar: [{ nama: "Prestasi", baris: [[judul...], [nilai...], ...] }]
+function unduhXlsx(namaFile, lembar) {
+  const x = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+  const kol = (i) => { let s = ""; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+  const sheet = (baris) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${
+    baris.map((r, i) => `<row r="${i + 1}">${r.map((v, j) => v == null || v === "" ? "" : typeof v === "number" && isFinite(v)
+      ? `<c r="${kol(j)}${i + 1}"${i === 0 ? ' s="1"' : ""}><v>${v}</v></c>`
+      : `<c r="${kol(j)}${i + 1}" t="inlineStr"${i === 0 ? ' s="1"' : ""}><is><t xml:space="preserve">${x(v)}</t></is></c>`).join("")}</row>`).join("")}</sheetData></worksheet>`;
+  const ns = 'xmlns="http://schemas.openxmlformats.org/package/2006/relationships"';
+  unduhBerkas(namaFile, zip([
+    ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${lembar.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}</Types>`],
+    ["_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships ${ns}><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ["xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${lembar.map((l, i) => `<sheet name="${x(String(l.nama).replace(/[\\/?*[\]:]/g, " ").slice(0, 31))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("")}</sheets></workbook>`],
+    ["xl/_rels/workbook.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships ${ns}>${lembar.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("")}<Relationship Id="rId${lembar.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ["xl/styles.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" applyFont="1"/></cellXfs></styleSheet>`],
+    ...lembar.map((l, i) => [`xl/worksheets/sheet${i + 1}.xml`, sheet(l.baris)]),
+  ]));
+}
+
 // ---------------------------------------------------------------- komponen kecil
-const Pesan = { props: ["galat", "ok"], template: `<div v-if="galat" class="pesan galat">{{ galat }}</div><div v-if="ok" class="pesan ok">{{ ok }}</div>` };
+// Konfirmasi proses besar: peringatan + password pengguna yang sedang login (Update Kelas Tahunan, Serah Terima, PAW, …).
+// Pakai: <KonfirmasiSandi v-if="tanya" :pesan="'…'" @ok="(pw) => jalankan(pw)" @batal="tanya=false"/>
+const KonfirmasiSandi = {
+  props: { pesan: String, judul: { type: String, default: "Konfirmasi" }, tombol: { type: String, default: "Yakin, jalankan" } },
+  emits: ["ok", "batal"],
+  setup(_, { emit }) {
+    const pw = ref(""), el = ref(null);
+    onMounted(() => el.value && el.value.focus());
+    return { pw, el, kirim: () => { if (pw.value) emit("ok", pw.value); } };
+  },
+  template: `<div class="foto-lihat" style="cursor:default" role="dialog" aria-modal="true" :aria-label="judul" @click.self="$emit('batal')">
+    <form class="kartu" style="max-width:460px;width:100%;display:flex;flex-direction:column;gap:12px" @submit.prevent="kirim">
+      <h2>{{ judul }}</h2>
+      <div class="pesan galat" style="white-space:pre-line">{{ pesan }}</div>
+      <label class="isian">Password Anda (yang sedang login)<input ref="el" type="password" v-model="pw" autocomplete="current-password"></label>
+      <div class="baris"><button :disabled="!pw" class="bahaya" style="background:var(--merah);color:#fff">{{ tombol }}</button><button type="button" class="kedua" @click="$emit('batal')">Batal</button></div>
+    </form></div>`,
+};
+
+const Pesan ={ props: ["galat", "ok"], template: `<div v-if="galat" class="pesan galat">{{ galat }}</div><div v-if="ok" class="pesan ok">{{ ok }}</div>` };
 
 // ---------------------------------------------------------------- Masuk / setup
 const Masuk = {
@@ -184,8 +272,16 @@ const Beranda = {
     <a class="kartu stat" href="#/perizinan"><div class="redup">Izin berjalan</div><div class="angka" style="color:var(--biru)" v-hitung="d.izin_berjalan"></div><div class="redup">{{ d.izin_terlambat }} terlambat</div></a>
     <a class="kartu stat" href="#/perizinan"><div class="redup">Overdue</div><div class="angka" style="color:var(--merah)" v-hitung="d.izin_overdue"></div></a>
     <a class="kartu stat" href="#/absensi"><div class="redup">Absensi kamar hari ini</div><div class="angka"><span v-hitung="d.absensi_terisi"></span><span class="redup" style="font-size:16px"> / {{ d.kamar_aktif }}</span></div></a>
+    <div class="kartu stat"><div class="redup">Sakit (30 hari)</div><div class="angka" style="color:var(--kuning)" v-hitung="d.sakit_30_hari"></div><div class="redup">{{ d.dirawat }} sedang dirawat</div></div>
+    <div class="kartu stat"><div class="redup">Pulang hari ini</div><div class="angka" v-hitung="d.pulang_hari_ini"></div></div>
+    <div class="kartu stat"><div class="redup">Alpha hari ini</div><div class="angka" style="color:var(--merah)" v-hitung="d.alpha_hari_ini"></div></div>
   </div>
-  <div class="pesan info">Tahap 1 aktif: Data Master, Daftar Pilihan, Akun & Manajemen Akses, Absensi harian, Perizinan + Gate Pass, Riwayat. Modul lain menyusul (Kesehatan, Kedisiplinan, Update Data, dst.).</div>`,
+  <section class="kartu" v-if="d" style="display:flex;flex-direction:column;gap:10px">
+    <div class="baris" style="justify-content:space-between;align-items:center"><h2>Agenda mendatang</h2><a href="#/tata-warkat">Kalender</a></div>
+    <p v-if="!d.agenda.length" class="redup" style="margin:0">Belum ada agenda.</p>
+    <div v-for="a in d.agenda" :key="a.id" style="display:flex;gap:12px;align-items:baseline;border-top:1px solid var(--garis-tipis);padding-top:8px">
+      <span class="lencana hijau">{{ a.mulai === a.selesai ? a.mulai : a.mulai + ' s.d. ' + a.selesai }}</span><strong>{{ a.judul }}</strong><span class="redup">{{ a.lingkungan }}</span></div>
+  </section>`,
 };
 
 // ---------------------------------------------------------------- Absensi
@@ -287,6 +383,12 @@ const Perizinan = {
       } catch (e) { f.galat = e.message; }
     }
     async function kembali(z) { try { await api(`/izin/${z.id}/kembali`, {}); await muat(); } catch (e) { f.galat = e.message; } }
+    // Overdue yang keliru (santri sebenarnya sudah kembali): pelanggaran & Alpha dibatalkan, wali menerima ralat.
+    async function koreksi(z) {
+      const alasan = prompt("Koreksi overdue " + z.nama + ": santri sebenarnya kembali tepat waktu. Alasan?");
+      if (!alasan) return;
+      try { await api(`/izin/${z.id}/koreksi-overdue`, { alasan }); f.ok = "Overdue dikoreksi; wali menerima ralat."; await muat(); } catch (e) { f.galat = e.message; }
+    }
     async function batal(z) {
       const alasan = prompt("Alasan membatalkan izin " + z.nama + "?");
       if (!alasan) return;
@@ -295,9 +397,9 @@ const Perizinan = {
     onMounted(async () => { await muatMaster(); if (jenis.value[0]) f.jenis_izin_id = jenis.value[0].id; muat(); });
     watch(() => f.riwayat, muat);
     const lencana = (k) => ({ berjalan: "biru", terlambat: "kuning", overdue: "merah", kembali: "hijau", dibatalkan: "" }[k]);
-    return { f, jenis, ji, terbit, kembali, batal, lencana };
+    return { f, jenis, ji, terbit, kembali, batal, koreksi, lencana };
   },
-  template: `<div><span class="jejak">Administrasi › Kesantrian</span><h1>Perizinan & Gate Pass</h1></div>
+  template: `<div class="judul-hal"><div><span class="jejak">Administrasi › Kesantrian</span><h1>Perizinan & Gate Pass</h1></div><a class="tombol kedua" href="#/libur-pondok">Libur Pondok & kembali massal</a></div>
   <div class="kartu" style="display:flex;flex-direction:column;gap:12px;max-width:720px">
     <h2>Terbitkan izin</h2>
     <label class="isian">Santri<CariSantri v-model="f.santri"/></label>
@@ -320,7 +422,8 @@ const Perizinan = {
       <td>{{ z.kembali_at || z.rencana_kembali }}</td>
       <td><span class="lencana" :class="lencana(z.keadaan)">{{ z.keadaan }}</span></td>
       <td style="white-space:nowrap"><a class="tombol kedua kecil" style="height:34px" :href="'#/gatepass/' + z.id" target="_blank">Gate Pass</a>
-        <template v-if="z.keadaan !== 'kembali' && z.keadaan !== 'dibatalkan'"> <button class="kecil" @click="kembali(z)">Kembali</button> <button class="bahaya kecil" @click="batal(z)">Batal</button></template></td>
+        <template v-if="z.keadaan !== 'kembali' && z.keadaan !== 'dibatalkan'"> <button class="kecil" @click="kembali(z)">Kembali</button> <button class="bahaya kecil" @click="batal(z)">Batal</button></template>
+        <button v-if="z.overdue_at && !z.overdue_dikoreksi_at" class="kedua kecil" title="Santri sebenarnya sudah kembali tepat waktu" @click="koreksi(z)">Koreksi overdue</button></td>
     </tr></tbody></table>
     <p v-if="!f.daftar.length" class="redup" style="padding:14px">Tidak ada data.</p></div>`,
 };
@@ -635,7 +738,24 @@ const Riwayat = {
 };
 
 // ---------------------------------------------------------------- kerangka & router
+// Halaman & menu. Modul Tahap 2/3 (public/modul/*.js) menambah lewat daftarHalaman() sebelum aplikasi dipasang.
+// Alamat halaman tanpa parameter path; parameter memakai query, mis. #/rapor?santri=12 (baca dari negara.rute).
 const HALAMAN = { "/": Beranda, "/absensi": Absensi, "/perizinan": Perizinan, "/data-master": DataMaster, "/pengguna": Pengguna, "/riwayat": Riwayat, "/ganti-password": GantiPassword };
+const GRUP_MENU = ["Beranda", "Administrasi", "Fungsi"];
+const MENU = [
+  { jalur: "/", label: "Dashboard", grup: "Beranda", urutan: 1, syarat: () => true },
+  { jalur: "/data-master", label: "Data Master", grup: "Administrasi", urutan: 10, syarat: () => true },
+  { jalur: "/absensi", label: "Absensi", grup: "Administrasi", urutan: 20, syarat: (me) => me.bisa.absensi || me.bisa.lihat_absensi },
+  { jalur: "/perizinan", label: "Perizinan", grup: "Administrasi", urutan: 30, syarat: (me) => me.bisa.perizinan },
+  { jalur: "/pengguna", label: "Pengguna & Akses", grup: "Fungsi", urutan: 70, syarat: (me) => me.role === "moderator" },
+  { jalur: "/riwayat", label: "Riwayat Perubahan", grup: "Fungsi", urutan: 90, syarat: (me) => me.bisa.riwayat },
+];
+// komponen: objek Vue; menu: { label, grup, urutan, syarat(me) → boolean, ikon: isi <svg> 24×24 garis } atau null (tanpa menu)
+function daftarHalaman(jalur, komponen, menu) {
+  HALAMAN[jalur] = komponen;
+  if (menu) { MENU.push({ jalur, ...menu }); if (menu.ikon) IKON[jalur] = menu.ikon; }
+}
+window.daftarHalaman = daftarHalaman;
 
 const App = {
   components: { Masuk, GatePass },
@@ -644,13 +764,14 @@ const App = {
     const halaman = computed(() => HALAMAN[jalur.value] || Beranda);
     const menu = computed(() => {
       const me = negara.me; if (!me) return [];
-      const mod = me.role === "moderator";
-      return [
-        ["Beranda", [["/", "Dashboard", true]]],
-        ["Administrasi", [["/data-master", "Data Master", true], ["/absensi", "Absensi", me.bisa.absensi], ["/perizinan", "Perizinan", me.bisa.perizinan]]],
-        ["Fungsi", [["/pengguna", "Pengguna & Akses", mod], ["/riwayat", "Riwayat Perubahan", mod || me.role === "sekretaris"]]],
-      ].map(([g, items]) => [g, items.filter((i) => i[2])]).filter(([, i]) => i.length);
+      return GRUP_MENU.map((g) => [g, MENU.filter((m) => m.grup === g && m.syarat(me)).sort((a, b) => a.urutan - b.urutan).map((m) => [m.jalur, m.label])])
+        .filter(([, i]) => i.length);
     });
+    // badge sidebar: dimuat ulang saat pindah halaman dan tiap menit
+    const lencana = ref({});
+    const muatLencana = async () => { if (negara.me && !negara.me.wajib_ganti_password) lencana.value = await api("/lencana").catch(() => ({})); };
+    watch(() => [negara.rute, !!negara.me], muatLencana, { immediate: true });
+    setInterval(muatLencana, 60e3);
     async function keluar() { await api("/logout", {}); negara.me = null; pergi("/masuk"); }
     // menu laci (HP/tablet): tertutup saat pindah halaman atau tekan Esc
     const laci = ref(false);
@@ -660,7 +781,7 @@ const App = {
     const isi = ref(null);
     watch(() => [jalur.value, !!negara.me], () => nextTick(() => gerak.masuk(isi.value)), { immediate: true });
     const ling = computed(() => negara.me && (negara.me.lingkungan === "semua" ? "Putra & Putri" : negara.me.lingkungan === "putra" ? "Putra" : "Putri"));
-    return { negara, jalur, halaman, menu, keluar, LABEL_ROLE, laci, isi, ling, IKON, inisial };
+    return { negara, jalur, halaman, menu, keluar, LABEL_ROLE, laci, isi, ling, IKON, inisial, lencana };
   },
   template: `
   <Masuk v-if="jalur === '/masuk' || !negara.me"/>
@@ -675,7 +796,8 @@ const App = {
       <a class="merek" href="#/"><img src="/img/logo-hisada-64.png" alt="" width="46" height="46"><span><strong>HISADA</strong><small>{{ ling }}</small></span></a>
       <div class="grup-menu" v-for="[g, items] in menu" :key="g"><span class="judul">{{ g }}</span>
         <a v-for="i in items" :key="i[0]" :href="'#' + i[0]" :class="{aktif: jalur === i[0]}" :aria-current="jalur === i[0] ? 'page' : null">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" v-html="IKON[i[0]]"></svg>{{ i[1] }}</a></div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" v-html="IKON[i[0]] || IKON['/']"></svg><span style="flex:1">{{ i[1] }}</span>
+          <span v-if="lencana[i[0]]" class="badge" :aria-label="lencana[i[0]] + ' perlu tindakan'">{{ lencana[i[0]] }}</span></a></div>
       <div class="akun"><span class="inisial" aria-hidden="true">{{ inisial(negara.me.nama) }}</span>
         <div style="min-width:0"><strong>{{ negara.me.nama }}</strong><span>{{ negara.me.role ? LABEL_ROLE[negara.me.role] : 'Menunggu role' }}</span>
         <div><a href="#/ganti-password">Ganti password</a><a href="#" @click.prevent="keluar">Keluar</a></div></div></div>
@@ -693,9 +815,10 @@ async function mulai() {
 }
 
 window.addEventListener("hashchange", () => { negara.rute = location.hash.slice(1) || "/"; });
-(async () => {
+// Dipasang setelah semua skrip modul (public/modul/*.js) selesai mendaftarkan halamannya.
+document.addEventListener("DOMContentLoaded", async () => {
   negara.rute = location.hash.slice(1) || "/";
   await mulai();
   if (negara.me && negara.me.wajib_ganti_password) pergi("/ganti-password");
   createApp(App).mount("#app");
-})();
+});

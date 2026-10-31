@@ -56,11 +56,13 @@ const passwordSementara = (nis, tgl) => (tgl ? nis + tgl.slice(8, 10) + tgl.slic
 
 // ---------------------------------------------------------------- migrasi otomatis
 let sudahMigrasi = false;
+// Migrasi tambahan milik modul (src/modul/*.js) didaftarkan lewat H.migrasi(); id: lihat src/modul/README.
+const MIGRASI_MODUL = [];
 async function migrate(db) {
   if (sudahMigrasi) return;
   await db.prepare("CREATE TABLE IF NOT EXISTS _migrasi (id INTEGER PRIMARY KEY, nama TEXT, waktu TEXT DEFAULT (datetime('now')))").run();
   const done = new Set((await db.prepare("SELECT id FROM _migrasi").all()).results.map((r) => r.id));
-  for (const m of MIGRATIONS) {
+  for (const m of [...MIGRATIONS, ...MIGRASI_MODUL].sort((a, b) => a.id - b.id)) {
     if (done.has(m.id)) continue;
     const stmts = m.sql.map((s) => db.prepare(s));
     stmts.push(db.prepare("INSERT INTO _migrasi (id, nama) VALUES (?, ?)").bind(m.id, m.nama));
@@ -109,27 +111,170 @@ async function penggunaDariSesi(db, req) {
   return u;
 }
 
-// Akses bawaan role (K-55, K-63, K-75, K-86): sisanya lewat Manajemen Akses.
-const AKSES_ROLE = { piket: ["absensi"], sekretaris: ["absensi"] };
-const boleh = (u, kode) => u.role === "moderator" || u.akses.includes(kode) || (AKSES_ROLE[u.role] || []).includes(kode);
+// Akses bawaan role (Peta Akses README, K-55, K-63, K-75, K-86): sisanya lewat Manajemen Akses.
+// "lihat_X" otomatis dimiliki siapa pun yang punya X.
+const AKSES_ROLE = {
+  piket: ["absensi"],
+  sekretaris: ["absensi", "kegiatan", "prestasi", "rapor", "tata_warkat", "pengumuman", "isi_pengurus", "riwayat"],
+  asatidz: ["lihat_absensi", "lihat_perizinan", "lihat_vonis", "lihat_prestasi", "lihat_rapor"],
+};
+const KEMAMPUAN = ["absensi", "lihat_absensi", "perizinan", "lihat_perizinan", "kesehatan", "pemeriksaan", "profil_kesehatan",
+  "input_pelanggaran", "putusan_kedisiplinan", "lihat_vonis", "kegiatan", "prestasi", "lihat_prestasi", "rapor", "lihat_rapor",
+  "tata_warkat", "pengumuman", "isi_pengurus", "update_kamar", "paw", "riwayat"];
+const boleh = (u, kode) => u.role === "moderator" || u.akses.includes(kode) || (AKSES_ROLE[u.role] || []).includes(kode)
+  || (kode.startsWith("lihat_") && boleh(u, kode.slice(6)));
 const wajib = (u, kode) => { if (!boleh(u, kode)) gagal(403, "Anda tidak punya akses untuk tindakan ini."); };
 const wajibModerator = (u) => { if (u.role !== "moderator") gagal(403, "Hanya Moderator."); };
 const lingIn = (u, kolom = "lingkungan") => ({ sql: `${kolom} IN (${u.ling.map(() => "?").join(",")})`, args: u.ling });
 const cekLing = (u, ling) => { if (!u.ling.includes(ling)) gagal(403, "Data di luar lingkungan Anda."); };
 
+// Riwayat Perubahan: hanya tambah. Isi medis/vonis tidak boleh masuk ringkasan (K-06).
+const stmtCatat = (db, u, kategori, aksi, tabel, dataId, ringkasan, lingkungan = "semua") =>
+  db.prepare("INSERT INTO riwayat_perubahan (user_id, kategori, aksi, tabel, data_id, ringkasan, lingkungan, masa_khidmat_id) VALUES (?,?,?,?,?,?,?,(SELECT id FROM masa_khidmat WHERE status = 'aktif'))")
+    .bind(u ? u.id : null, kategori, aksi, tabel, dataId, ringkasan, lingkungan);
 async function catat(db, u, kategori, aksi, tabel, dataId, ringkasan, lingkungan = "semua") {
-  await db.prepare("INSERT INTO riwayat_perubahan (user_id, kategori, aksi, tabel, data_id, ringkasan, lingkungan) VALUES (?,?,?,?,?,?,?)")
-    .bind(u ? u.id : null, kategori, aksi, tabel, dataId, ringkasan, lingkungan).run();
+  await stmtCatat(db, u, kategori, aksi, tabel, dataId, ringkasan, lingkungan).run();
+}
+
+// Konfirmasi password pengguna yang sedang login untuk proses besar (Update Kelas Tahunan, Serah Terima, dst.).
+async function cekSandi(u, pw) {
+  if (!u.password_hash) gagal(400, "Akun Anda belum punya password. Buat dulu lewat menu Ganti password.");
+  if (!(await cekPassword(String(pw || ""), u.password_hash))) gagal(403, "Password konfirmasi salah. Tidak ada perubahan.");
+}
+const taAktif = async (db) => (await db.prepare("SELECT * FROM tahun_ajaran WHERE status = 'aktif'").first()) || null;
+const masaKhidmatAktif = async (db) => (await db.prepare("SELECT * FROM masa_khidmat WHERE status = 'aktif'").first()) || null;
+
+// Akhir masa santri (alumni / mutasi keluar / meninggal) menutup semuanya (K-112):
+// riwayat kelas & kamar, keanggotaan grup, jabatan, akun login, tautan Portal Wali. Riwayat tetap tersimpan.
+const TUTUP_STATUS = ["alumni", "mutasi_keluar", "meninggal"];
+function stmtUbahStatus(db, u, s, statusBaru, alasan = null, imporBatchId = null) {
+  const t = hariIni(), st = [];
+  if (s.status === statusBaru) return st;
+  st.push(db.prepare("UPDATE santri SET status = ?, diubah_at = datetime('now') WHERE id = ?").bind(statusBaru, s.id));
+  st.push(db.prepare("INSERT INTO riwayat_status_santri (santri_id, lingkungan, status_lama, status_baru, alasan, impor_batch_id, oleh) VALUES (?,?,?,?,?,?,?)")
+    .bind(s.id, s.lingkungan, s.status, statusBaru, alasan, imporBatchId, u ? u.id : null));
+  if (TUTUP_STATUS.includes(statusBaru)) {
+    st.push(db.prepare("UPDATE riwayat_kelas SET selesai = ? WHERE santri_id = ? AND selesai IS NULL").bind(t, s.id));
+    st.push(db.prepare("UPDATE riwayat_kamar SET selesai = ? WHERE santri_id = ? AND selesai IS NULL").bind(t, s.id));
+    st.push(db.prepare("UPDATE santri SET kamar_id = NULL, menunggu_penempatan = 0 WHERE id = ?").bind(s.id));
+    st.push(db.prepare("UPDATE anggota_grup SET selesai = ? WHERE santri_id = ? AND selesai IS NULL").bind(t, s.id));
+    st.push(db.prepare("UPDATE pengurus SET selesai = ?, sebab_selesai = 'status_santri' WHERE santri_id = ? AND selesai IS NULL").bind(t, s.id));
+    st.push(db.prepare("UPDATE users SET status = 'nonaktif' WHERE santri_id = ?").bind(s.id));
+    st.push(db.prepare("DELETE FROM sesi_login WHERE user_id IN (SELECT id FROM users WHERE santri_id = ?)").bind(s.id));
+    st.push(db.prepare("UPDATE tautan_wali SET dicabut_at = ? WHERE santri_id = ? AND dicabut_at IS NULL").bind(wib(), s.id));
+  }
+  return st;
+}
+
+// ---------------------------------------------------------------- email & kabar wali
+// Semua email lewat antrean (email_antrean) lalu dikirim berkala (cron) lewat Gmail API akun pondok.
+// Isi email singkat, TANPA data sensitif (diagnosa, isi vonis); rincian dibaca setelah login.
+const APP = (env) => (env && env.APP_URL) || "https://hisada.216326.workers.dev";
+let ENV = null; // diisi tiap permintaan/cron, dipakai untuk tautan di email
+const stmtEmail = (db, e) => db.prepare(
+  "INSERT INTO email_antrean (penerima, subjek, isi, jenis, tabel_terkait, id_terkait, akun_wali_id, koreksi_dari_id, lingkungan) VALUES (?,?,?,?,?,?,?,?,?)")
+  .bind(e.penerima, e.subjek.slice(0, 200), e.isi, e.jenis, e.tabel || null, e.id || null, e.akun_wali_id || null, e.koreksi_dari_id || null, e.lingkungan || "semua");
+async function antreEmail(db, e) { await stmtEmail(db, e).run(); }
+
+// Kabar per kejadian ke semua wali yang tertaut aktif ke santri (K-76). Mengembalikan jumlah email.
+async function kabarWali(db, santriId, { subjek, isi, tabel, id }) {
+  const s = await db.prepare("SELECT id, nama, lingkungan FROM santri WHERE id = ?").bind(santriId).first();
+  if (!s) return 0;
+  const wali = (await db.prepare(
+    `SELECT a.id, a.email, a.nama FROM tautan_wali t JOIN akun_wali a ON a.id = t.akun_wali_id
+     WHERE t.santri_id = ? AND t.dicabut_at IS NULL AND a.status = 'aktif'`).bind(santriId).all()).results;
+  if (!wali.length) return 0;
+  const kaki = `\n\nRincian dapat dilihat setelah masuk ke Portal Wali: ${APP(ENV)}/wali.html\n\n— HISADA, Pesantren Modern Daarul 'Uluum Lido`;
+  await db.batch(wali.map((w) => stmtEmail(db, {
+    penerima: w.email, subjek: `[HISADA] ${subjek} — ${s.nama}`, isi: `Assalamu'alaikum ${w.nama},\n\n${isi}${kaki}`,
+    jenis: "wali", tabel, id, akun_wali_id: w.id, lingkungan: s.lingkungan,
+  })));
+  return wali.length;
+}
+// Ralat untuk kabar yang ternyata salah input: dikirim ke penerima yang sama, menunjuk email aslinya.
+async function kabarKoreksi(db, tabel, id, isi) {
+  const lama = (await db.prepare("SELECT * FROM email_antrean WHERE tabel_terkait = ? AND id_terkait = ? AND koreksi_dari_id IS NULL AND jenis = 'wali'").bind(tabel, id).all()).results;
+  if (!lama.length) return 0;
+  await db.batch(lama.map((e) => stmtEmail(db, {
+    penerima: e.penerima, subjek: "[HISADA] Ralat: " + e.subjek.replace(/^\[HISADA\] /, ""), isi: `Assalamu'alaikum,\n\nRalat atas kabar sebelumnya: ${isi}\n\nMohon maaf atas kekeliruan ini.\n\n— HISADA`,
+    jenis: "wali", tabel, id, akun_wali_id: e.akun_wali_id, koreksi_dari_id: e.id, lingkungan: e.lingkungan,
+  })));
+  return lama.length;
+}
+
+const b64 = (s) => btoa(String.fromCharCode(...enc.encode(s)));
+const b64url = (s) => b64(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+async function tokenGmail(env) {
+  const r = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, refresh_token: env.GMAIL_REFRESH_TOKEN, grant_type: "refresh_token" }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!j.access_token) throw new Error("Token Gmail ditolak: " + (j.error || r.status));
+  return j.access_token;
+}
+// Kirim maks. `batas` email antre. Tanpa GMAIL_REFRESH_TOKEN/GMAIL_PENGIRIM email tetap antre (tidak hilang).
+async function kirimAntrean(env, db, batas = 25) {
+  const daftar = (await db.prepare("SELECT * FROM email_antrean WHERE status = 'antre' ORDER BY id LIMIT ?").bind(batas).all()).results;
+  if (!daftar.length) return { terkirim: 0, gagal: 0, sisa: 0 };
+  if (!env.GMAIL_REFRESH_TOKEN || !env.GMAIL_PENGIRIM || !env.GOOGLE_CLIENT_SECRET) {
+    await db.prepare("UPDATE email_antrean SET galat = 'Pengirim email belum diatur (GMAIL_REFRESH_TOKEN / GMAIL_PENGIRIM)' WHERE status = 'antre' AND galat IS NULL").run();
+    return { terkirim: 0, gagal: 0, sisa: daftar.length, belum_diatur: true };
+  }
+  const ujiAktif = (await pengaturan(db, "email.mode_uji", "1")) === "1";
+  const alamatUji = (await pengaturan(db, "email.alamat_uji", "")).trim();
+  const namaPengirim = await pengaturan(db, "email.nama_pengirim", "HISADA");
+  if (ujiAktif && !alamatUji) {
+    await db.prepare("UPDATE email_antrean SET galat = 'Mode Uji aktif tetapi email.alamat_uji kosong' WHERE status = 'antre'").run();
+    return { terkirim: 0, gagal: 0, sisa: daftar.length };
+  }
+  const token = await tokenGmail(env);
+  let terkirim = 0, gagalN = 0;
+  for (const e of daftar) {
+    const ke = ujiAktif ? alamatUji : e.penerima;
+    const isi = ujiAktif ? `[MODE UJI — seharusnya untuk: ${e.penerima}]\n\n${e.isi}` : e.isi;
+    const mime = [`From: =?UTF-8?B?${b64(namaPengirim)}?= <${env.GMAIL_PENGIRIM}>`, `To: ${ke}`, `Subject: =?UTF-8?B?${b64(e.subjek)}?=`,
+      "MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "", b64(isi)].join("\r\n");
+    try {
+      const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+        method: "POST", headers: { authorization: "Bearer " + token, "content-type": "application/json" }, body: JSON.stringify({ raw: b64url(mime) }),
+      });
+      if (!r.ok) throw new Error("Gmail " + r.status + " " + (await r.text()).slice(0, 160));
+      await db.prepare("UPDATE email_antrean SET status = 'terkirim', dikirim_at = ?, percobaan = percobaan + 1, galat = NULL WHERE id = ?").bind(wib(), e.id).run();
+      terkirim++;
+    } catch (err) {
+      await db.prepare("UPDATE email_antrean SET percobaan = percobaan + 1, galat = ?, status = CASE WHEN percobaan + 1 >= 5 THEN 'gagal' ELSE 'antre' END WHERE id = ?").bind(String(err.message).slice(0, 300), e.id).run();
+      gagalN++;
+    }
+  }
+  return { terkirim, gagal: gagalN };
 }
 
 // ---------------------------------------------------------------- router
 const rute = [];
 const on = (method, pola, fn, opsi = {}) => rute.push({ method, re: new RegExp("^" + pola.replace(/:(\w+)/g, "(?<$1>[^/]+)") + "$"), fn, publik: !!opsi.publik });
 
+// Tugas berkala (cron tiap 5 menit, lihat wrangler.jsonc): overdue, tugas modul (mis. akhir skorsing), kirim email.
+const TUGAS_BERKALA = [];
+async function tugasBerkala(env) {
+  ENV = env;
+  await migrate(env.DB);
+  const hasil = { overdue: await perbaruiOverdue(env.DB) };
+  for (const t of TUGAS_BERKALA) {
+    try { hasil[t.nama] = await t.fn(env.DB, env); } catch (e) { console.error("tugas " + t.nama, e); hasil[t.nama] = "galat: " + e.message; }
+  }
+  try { hasil.email = await kirimAntrean(env, env.DB); } catch (e) { console.error("email", e); hasil.email = "galat: " + e.message; }
+  return hasil;
+}
+
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(tugasBerkala(env));
+  },
   async fetch(req, env) {
     const url = new URL(req.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(req);
+    ENV = env;
     try {
       await migrate(env.DB);
       if (req.method !== "GET") {
@@ -270,9 +415,24 @@ on("GET", "/api/auth/callback", async ({ env, db, url, req }) => {
 // ---------------------------------------------------------------- akun saya
 on("GET", "/api/me", async ({ u }) => json({
   id: u.id, nama: u.nama, email: u.email, role: u.role, lingkungan: u.lingkungan, akses: u.akses,
-  bisa: Object.fromEntries(["absensi", "perizinan", "kesehatan", "input_pelanggaran", "putusan_kedisiplinan"].map((k) => [k, boleh(u, k)])),
+  bisa: Object.fromEntries(KEMAMPUAN.map((k) => [k, boleh(u, k)])),
+  punya_password: !!u.password_hash,
   wajib_ganti_password: !!(u.wajib_ganti_password && u.password_hash),
 }));
+
+// Badge sidebar (README Notifikasi): dihitung langsung dari tabel, sesuai akses pengguna.
+on("GET", "/api/lencana", async ({ db, u }) => {
+  const l = lingIn(u), h = {};
+  if (boleh(u, "perizinan")) h["/perizinan"] = (await db.prepare(`SELECT COUNT(*) n FROM izin WHERE status = 'overdue' AND ${l.sql}`).bind(...l.args).first()).n;
+  if (boleh(u, "putusan_kedisiplinan")) h["/kedisiplinan"] = (await db.prepare(`SELECT COUNT(*) n FROM pelanggaran WHERE status = 'menunggu' AND ${l.sql}`).bind(...l.args).first()).n;
+  if (boleh(u, "pemeriksaan")) h["/kesehatan"] = (await db.prepare(
+    `SELECT COUNT(*) n FROM kunjungan_kesehatan k WHERE k.status = 'aktif' AND ${lingIn(u, "k.lingkungan").sql} AND NOT EXISTS (SELECT 1 FROM pemeriksaan p WHERE p.kunjungan_id = k.id)`).bind(...l.args).first()).n;
+  if (u.role === "moderator") {
+    h["/pengguna"] = (await db.prepare("SELECT COUNT(*) n FROM users WHERE role IS NULL AND status = 'aktif'").first()).n;
+    h["/komunikasi"] = (await db.prepare("SELECT COUNT(*) n FROM email_antrean WHERE status = 'gagal'").first()).n;
+  }
+  return json(h);
+});
 
 on("POST", "/api/ganti-password", async ({ db, u, body }) => {
   const baru = String(body.baru || "");
@@ -294,10 +454,17 @@ on("GET", "/api/ringkasan", async ({ db, u }) => {
   const kamar = await db.prepare(`SELECT COUNT(*) n FROM kamar WHERE aktif = 1 AND ${l.sql}`).bind(...l.args).first();
   const s = Object.fromEntries(santri.results.map((r) => [r.lingkungan, r.n]));
   const z = Object.fromEntries(izin.results.map((r) => [r.status, r.n]));
+  const t = hariIni(), l2 = (k) => lingIn(u, k);
+  const sakit = await db.prepare(`SELECT COUNT(*) n FROM kunjungan_kesehatan WHERE status = 'aktif' AND waktu >= ? AND ${l.sql}`).bind(wib(Date.now() - 30 * 864e5), ...l.args).first();
+  const dirawat = await db.prepare(`SELECT COUNT(*) n FROM kunjungan_kesehatan k JOIN jenis_kunjungan jk ON jk.id = k.jenis_kunjungan_id WHERE k.status = 'aktif' AND jk.status_kehadiran_id IS NOT NULL AND k.selesai_rawat_at IS NULL AND ${l2("k.lingkungan").sql}`).bind(...l.args).first();
+  const pulang = await db.prepare(`SELECT COUNT(*) n FROM izin z JOIN jenis_izin ji ON ji.id = z.jenis_izin_id WHERE ji.basis_waktu = 'tanggal' AND z.status IN ('berjalan','overdue') AND substr(z.berangkat,1,10) <= ? AND ${l2("z.lingkungan").sql}`).bind(t, ...l.args).first();
+  const alpha = await db.prepare(`SELECT COUNT(DISTINCT a.santri_id) n FROM absensi a JOIN absensi_sesi s ON s.id = a.sesi_id JOIN status_kehadiran sk ON sk.id = a.status_kehadiran_id WHERE s.tanggal = ? AND sk.kode = 'A' AND ${l2("a.lingkungan").sql}`).bind(t, ...l.args).first();
+  const agenda = await db.prepare(`SELECT id, judul, mulai, selesai, lingkungan FROM agenda WHERE selesai >= ? AND ${l.sql} ORDER BY mulai LIMIT 5`).bind(t, ...l.args).all();
   return json({
     waktu: wib(), santri_putra: s.putra || 0, santri_putri: s.putri || 0,
     izin_berjalan: z.berjalan || 0, izin_terlambat: terlambat.n, izin_overdue: z.overdue || 0,
     absensi_terisi: absen.n, kamar_aktif: kamar.n,
+    sakit_30_hari: sakit.n, dirawat: dirawat.n, pulang_hari_ini: pulang.n, alpha_hari_ini: alpha.n, agenda: agenda.results,
   });
 });
 
@@ -434,18 +601,20 @@ on("POST", "/api/santri", async ({ db, u, body }) => {
   if (kelasId) { const k = await db.prepare("SELECT lingkungan FROM kelas WHERE id = ?").bind(kelasId).first(); if (!k || k.lingkungan !== ling) gagal(400, "Kelas tidak sesuai lingkungan santri."); }
   const ta = (await db.prepare("SELECT id FROM tahun_ajaran WHERE status = 'aktif'").first())?.id || null;
   let id = body.id;
+  let akhir = [];
   if (id) {
-    const lama = await db.prepare("SELECT status FROM santri WHERE id = ?").bind(id).first();
-    await db.prepare(`UPDATE santri SET nis=?, nama=?, jenis_kelamin=?, tempat_lahir=?, tanggal_lahir=?, status=?, kabupaten=?, provinsi=?, kelas_id=?, kamar_id=?, diubah_at=datetime('now') WHERE id=?`)
-      .bind(d.nis, d.nama, d.jenis_kelamin, d.tempat_lahir, d.tanggal_lahir, d.status, d.kabupaten, d.provinsi, kelasId, kamarId, id).run();
-    if (lama && lama.status !== d.status && ["alumni", "mutasi_keluar", "meninggal"].includes(d.status))
-      await db.prepare("UPDATE users SET status = 'nonaktif' WHERE santri_id = ?").bind(id).run();
+    const lama = await db.prepare("SELECT id, status, lingkungan FROM santri WHERE id = ?").bind(id).first();
+    if (!lama) gagal(404, "Santri tidak ditemukan.");
+    await db.prepare(`UPDATE santri SET nis=?, nama=?, jenis_kelamin=?, tempat_lahir=?, tanggal_lahir=?, kabupaten=?, provinsi=?, kelas_id=?, kamar_id=?, diubah_at=datetime('now') WHERE id=?`)
+      .bind(d.nis, d.nama, d.jenis_kelamin, d.tempat_lahir, d.tanggal_lahir, d.kabupaten, d.provinsi, kelasId, kamarId, id).run();
+    // status diubah paling akhir: alumni/mutasi/meninggal menutup kelas, kamar, grup, jabatan, akun (K-112)
+    akhir = stmtUbahStatus(db, u, { ...lama, lingkungan: ling }, d.status, bersih(body.alasan_status, 200));
   } else {
     const r = await db.prepare("INSERT INTO santri (nis, nama, jenis_kelamin, tempat_lahir, tanggal_lahir, status, kabupaten, provinsi, kelas_id, kamar_id) VALUES (?,?,?,?,?,?,?,?,?,?)")
       .bind(d.nis, d.nama, d.jenis_kelamin, d.tempat_lahir, d.tanggal_lahir, d.status, d.kabupaten, d.provinsi, kelasId, kamarId).run();
     id = r.meta.last_row_id;
   }
-  const st = [...await pindahRiwayat(db, "riwayat_kelas", "kelas_id", id, kelasId, "pindah", ta), ...await pindahRiwayat(db, "riwayat_kamar", "kamar_id", id, kamarId, "pindah", ta)];
+  const st = [...await pindahRiwayat(db, "riwayat_kelas", "kelas_id", id, kelasId, "pindah", ta), ...await pindahRiwayat(db, "riwayat_kamar", "kamar_id", id, kamarId, "pindah", ta), ...akhir];
   if (st.length) await db.batch(st);
   await catat(db, u, "data", body.id ? "ubah" : "tambah", "santri", id, `${d.nis} ${d.nama}`, ling);
   return json({ ok: true, id });
@@ -468,7 +637,6 @@ const STATUS_IMPOR = { aktif: "aktif", "mutasi keluar": "mutasi_keluar", skorsin
 
 // Hemat query: data acuan dibaca sekali, tulisan dikirim dalam db.batch (satu transaksi per kelompok).
 // Batas Worker ±1000 query per permintaan; versi per-baris lama melewatinya pada kelompok 100 baris.
-const TUTUP_STATUS = ["alumni", "mutasi_keluar", "meninggal"];
 const tanda = (n) => Array(n).fill("?").join(",");
 
 on("POST", "/api/impor/santri", async ({ db, u, body }) => {
@@ -570,11 +738,10 @@ on("POST", "/api/impor/santri", async ({ db, u, body }) => {
         db.prepare("INSERT INTO wali (nama, hubungan, no_hp, no_hp_normal) VALUES (?,?,?,?)").bind(nm, hub, bersih(hp, 20), normalHp(hp)),
         db.prepare("INSERT INTO santri_wali (santri_id, wali_id) VALUES (?, last_insert_rowid())").bind(d.id));
     }
-    if (d.lama && d.lama.status !== d.v[4] && TUTUP_STATUS.includes(d.v[4]))
-      st.push(db.prepare("UPDATE users SET status = 'nonaktif' WHERE santri_id = ?").bind(d.id));
+    if (d.lama && d.lama.status !== d.v[4])
+      st.push(...stmtUbahStatus(db, u, { id: d.id, status: d.lama.status, lingkungan: d.v[1] === "L" ? "putra" : "putri" }, d.v[4], "Impor data santri"));
   }
-  st.push(db.prepare("INSERT INTO riwayat_perubahan (user_id, kategori, aksi, tabel, data_id, ringkasan, lingkungan) VALUES (?,?,?,?,?,?,?)")
-    .bind(u.id, "data", "impor", "santri", null, `Impor santri: ${hasil.baru} baru, ${hasil.diperbarui} diperbarui, ${hasil.ditolak.length} ditolak`, "semua"));
+  st.push(stmtCatat(db, u, "data", "impor", "santri", null, `Impor santri: ${hasil.baru} baru, ${hasil.diperbarui} diperbarui, ${hasil.ditolak.length} ditolak`));
   await db.batch(st);
   return json(hasil);
 });
@@ -693,10 +860,29 @@ on("POST", "/api/users/:id/reset-password", async ({ db, u, p }) => {
 });
 
 // ---------------------------------------------------------------- perizinan
+// Lewat masa tenggang → overdue: pelanggaran otomatis kategori Keamanan + kabar ke wali (README Perizinan).
 async function perbaruiOverdue(db) {
   const tenggang = +(await pengaturan(db, "overdue.masa_tenggang_menit", "60"));
   const batas = wib(Date.now() - tenggang * 60e3);
-  await db.prepare("UPDATE izin SET status = 'overdue', overdue_at = ? WHERE status = 'berjalan' AND rencana_kembali < ?").bind(wib(), batas).run();
+  const baru = (await db.prepare(
+    `SELECT z.id, z.santri_id, z.lingkungan, z.rencana_kembali, ji.nama jenis FROM izin z JOIN jenis_izin ji ON ji.id = z.jenis_izin_id
+     WHERE z.status = 'berjalan' AND z.rencana_kembali < ? LIMIT 200`).bind(batas).all()).results;
+  if (!baru.length) return 0;
+  const katNama = await pengaturan(db, "overdue.kategori_pelanggaran", "Keamanan");
+  const kat = await db.prepare("SELECT id FROM pilihan WHERE kelompok = 'kategori_pelanggaran' AND nama = ? ORDER BY lingkungan = 'semua' DESC LIMIT 1").bind(katNama).first();
+  const st = [];
+  for (const z of baru) {
+    st.push(db.prepare("UPDATE izin SET status = 'overdue', overdue_at = ? WHERE id = ? AND status = 'berjalan'").bind(wib(), z.id));
+    if (kat) st.push(db.prepare(`INSERT INTO pelanggaran (santri_id, lingkungan, kategori_id, keterangan, tanggal, sumber, izin_id)
+      VALUES (?,?,?,?,?, 'overdue', ?) ON CONFLICT (izin_id) DO NOTHING`).bind(z.santri_id, z.lingkungan, kat.id, `Terlambat kembali (overdue) dari ${z.jenis}; batas kembali ${z.rencana_kembali}`, z.rencana_kembali.slice(0, 10), z.id));
+    st.push(stmtCatat(db, null, "kesantrian", "izin_overdue", "izin", z.id, "Izin overdue otomatis", z.lingkungan));
+  }
+  await db.batch(st);
+  for (const z of baru) await kabarWali(db, z.santri_id, {
+    subjek: "Belum kembali ke pondok", tabel: "izin", id: z.id,
+    isi: `Ananda belum kembali ke pondok setelah batas waktu izin (${z.jenis}, batas kembali ${z.rencana_kembali} WIB). Mohon segera menghubungi wali kamar / Bagian Keamanan.`,
+  });
+  return baru.length;
 }
 const keadaanIzin = (z) => {
   if (z.status !== "berjalan") return z.status;
@@ -753,6 +939,10 @@ on("POST", "/api/izin", async ({ db, u, body }) => {
   const r = await db.prepare("INSERT INTO izin (santri_id, jenis_izin_id, keterangan, berangkat, rencana_kembali, pendamping, lingkungan, diterbitkan_oleh) VALUES (?,?,?,?,?,?,?,?)")
     .bind(s.id, ji.id, ket, berangkat, kembali, pendamping, s.lingkungan, u.id).run();
   await catat(db, u, "kesantrian", "izin_terbit", "izin", r.meta.last_row_id, `${ji.nama}: ${s.nis} ${s.nama}`, s.lingkungan);
+  await kabarWali(db, s.id, {
+    subjek: `${ji.nama} diterbitkan`, tabel: "izin", id: r.meta.last_row_id,
+    isi: `Ananda mendapat izin ${ji.nama} dari pondok: berangkat ${berangkat} WIB, kembali paling lambat ${kembali} WIB.`,
+  });
   return json({ ok: true, id: r.meta.last_row_id });
 });
 
@@ -802,7 +992,16 @@ async function statusOtomatis(db, santriIds, tanggal) {
     if (z.status === "overdue" && !kembaliHariIni) hasil[z.santri_id] = { status_kehadiran_id: sk[kodeOverdue], sumber: "overdue", izin_id: z.id, keterangan: "Overdue: " + z.jenis };
     else if (!kembaliHariIni) hasil[z.santri_id] = { status_kehadiran_id: z.status_kehadiran_id, sumber: "perizinan", izin_id: z.id, keterangan: z.jenis };
   }
-  const skors = await db.prepare(`SELECT id FROM santri WHERE id IN (${ph}) AND status = 'skorsing'`).bind(...santriIds).all();
+  // Perawatan kesehatan → Sakit selama belum ditandai selesai dirawat (prioritas di bawah perizinan).
+  const rawat = await db.prepare(
+    `SELECT k.id, k.santri_id, jk.status_kehadiran_id, jk.nama FROM kunjungan_kesehatan k JOIN jenis_kunjungan jk ON jk.id = k.jenis_kunjungan_id
+     WHERE k.santri_id IN (${ph}) AND k.status = 'aktif' AND jk.status_kehadiran_id IS NOT NULL
+       AND substr(k.waktu,1,10) <= ? AND (k.selesai_rawat_at IS NULL OR substr(k.selesai_rawat_at,1,10) >= ?)`).bind(...santriIds, tanggal, tanggal).all();
+  for (const k of rawat.results) if (!hasil[k.santri_id]) hasil[k.santri_id] = { status_kehadiran_id: k.status_kehadiran_id, sumber: "kesehatan", izin_id: null, kunjungan_id: k.id, keterangan: k.nama };
+  // Skorsing (status santri, atau skorsing bertanggal yang mencakup tanggal ini) mengalahkan semuanya.
+  const skors = await db.prepare(
+    `SELECT id FROM santri WHERE id IN (${ph}) AND status = 'skorsing'
+     UNION SELECT santri_id FROM skorsing WHERE santri_id IN (${ph}) AND status <> 'dibatalkan' AND mulai <= ? AND selesai >= ?`).bind(...santriIds, ...santriIds, tanggal, tanggal).all();
   for (const s of skors.results) hasil[s.id] = { status_kehadiran_id: sk[kodeSkors], sumber: "skorsing", izin_id: null, keterangan: "Skorsing" };
   return hasil;
 }
@@ -851,9 +1050,9 @@ on("POST", "/api/absensi", async ({ db, u, body }) => {
   const st = items.map((i) => {
     const o = oto[+i.santri_id];
     const v = o || { status_kehadiran_id: +i.status_kehadiran_id, sumber: "manual", izin_id: null, keterangan: bersih(i.keterangan, 120) };
-    return db.prepare(`INSERT INTO absensi (sesi_id, santri_id, status_kehadiran_id, sumber, izin_id, keterangan, lingkungan) VALUES (?,?,?,?,?,?,?)
-      ON CONFLICT (sesi_id, santri_id) DO UPDATE SET status_kehadiran_id = excluded.status_kehadiran_id, sumber = excluded.sumber, izin_id = excluded.izin_id, keterangan = excluded.keterangan`)
-      .bind(sesi.id, +i.santri_id, v.status_kehadiran_id, v.sumber, v.izin_id, v.keterangan, km.lingkungan);
+    return db.prepare(`INSERT INTO absensi (sesi_id, santri_id, status_kehadiran_id, sumber, izin_id, kunjungan_id, keterangan, lingkungan) VALUES (?,?,?,?,?,?,?,?)
+      ON CONFLICT (sesi_id, santri_id) DO UPDATE SET status_kehadiran_id = excluded.status_kehadiran_id, sumber = excluded.sumber, izin_id = excluded.izin_id, kunjungan_id = excluded.kunjungan_id, keterangan = excluded.keterangan`)
+      .bind(sesi.id, +i.santri_id, v.status_kehadiran_id, v.sumber, v.izin_id, v.kunjungan_id || null, v.keterangan, km.lingkungan);
   });
   await db.batch(st);
   await catat(db, u, "kesantrian", "absensi", "absensi_sesi", sesi.id, `${km.nama} ${tanggal}: ${items.length} santri`, km.lingkungan);
@@ -874,11 +1073,29 @@ on("GET", "/api/absensi/rekap", async ({ db, u, url }) => {
 
 // ---------------------------------------------------------------- riwayat perubahan
 on("GET", "/api/riwayat", async ({ db, u, url }) => {
-  if (!["moderator", "sekretaris"].includes(u.role)) gagal(403, "Hanya Moderator dan Sekretaris.");
+  wajib(u, "riwayat");
   const kat = url.searchParams.get("kategori");
   const w = [], a = [];
-  if (u.role !== "moderator") { w.push(`(r.lingkungan = 'semua' OR r.lingkungan IN (${u.ling.map(() => "?").join(",")}))`); a.push(...u.ling); w.push("r.kategori NOT IN ('akun','akses','pengaturan')"); }
+  if (u.role !== "moderator") {
+    w.push(`(r.lingkungan = 'semua' OR r.lingkungan IN (${u.ling.map(() => "?").join(",")}))`); a.push(...u.ling); w.push("r.kategori NOT IN ('akun','akses','pengaturan')");
+    // Sekretaris hanya melihat riwayat masa jabatannya sendiri (README Riwayat Perubahan)
+    w.push("r.masa_khidmat_id = (SELECT id FROM masa_khidmat WHERE status = 'aktif')");
+  }
+  if (url.searchParams.get("masa_khidmat_id")) { w.push("r.masa_khidmat_id = ?"); a.push(+url.searchParams.get("masa_khidmat_id")); }
   if (kat) { w.push("r.kategori = ?"); a.push(kat); }
   const r = await db.prepare(`SELECT r.*, u.nama oleh FROM riwayat_perubahan r LEFT JOIN users u ON u.id = r.user_id ${w.length ? "WHERE " + w.join(" AND ") : ""} ORDER BY r.id DESC LIMIT 300`).bind(...a).all();
   return json(r.results);
 });
+
+// ---------------------------------------------------------------- modul Tahap 2 & 3 (src/modul/*.js)
+// Setiap modul: export default function (H) { H.on(...); H.migrasi([...]); H.berkala(nama, fn); }
+import modul from "./modul/index.js";
+const H = {
+  on, json, gagal, Galat, wib, hariIni, keMs, bersih, normalHp, randomHex, sha256, hashPassword, cekPassword, passwordSementara,
+  pengaturan, boleh, wajib, wajibModerator, lingIn, cekLing, catat, stmtCatat, tanda, cekSandi, taAktif, masaKhidmatAktif,
+  TUTUP_STATUS, stmtUbahStatus, pindahRiwayat, bacaKelas, statusOtomatis, perbaruiOverdue, keadaanIzin, buatSesi,
+  antreEmail, stmtEmail, kabarWali, kabarKoreksi, kirimAntrean, tugasBerkala, APP: () => APP(ENV), env: () => ENV,
+  migrasi: (list) => MIGRASI_MODUL.push(...list),
+  berkala: (nama, fn) => TUGAS_BERKALA.push({ nama, fn }),
+};
+for (const m of modul) m(H);

@@ -3,6 +3,8 @@
 // Rahasia diatur di dashboard Cloudflare (Settings → Variables and Secrets), BUKAN di file ini:
 //   SETUP_KEY            — kunci sekali pakai untuk membuat Moderator pertama
 //   GOOGLE_CLIENT_SECRET — Client Secret OAuth Google
+//   GMAIL_REFRESH_TOKEN  — (opsional) refresh token akun pengirim (scope gmail.send); tanpa ini email tetap antre
+// Variabel biasa GMAIL_PENGIRIM (alamat pengirim, mis. hisada@daarululuumlido.com) boleh diisi di "vars" atau dashboard.
 {
   "name": "hisada",
   "main": "src/worker.js",
@@ -17,8 +19,11 @@
   ],
   "vars": {
     "GOOGLE_CLIENT_ID": "710546920311-lvlipfed7s6er003bmv6qq7ebmd7qfke.apps.googleusercontent.com",
-    "GOOGLE_HD": "daarululuumlido.com"
+    "GOOGLE_HD": "daarululuumlido.com",
+    "APP_URL": "https://hisada.216326.workers.dev"
   },
+  // Tiap 5 menit: overdue + pelanggaran otomatis, akhir skorsing, kirim antrean email.
+  "triggers": { "crons": ["*/5 * * * *"] },
   "keep_vars": true,
   "observability": { "enabled": true }
 }

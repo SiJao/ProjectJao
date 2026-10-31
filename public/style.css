@@ -36,6 +36,7 @@ img{max-width:100%}
 .grup-menu a.aktif{background:rgba(255,255,255,.12);color:#fff;font-weight:600}
 .grup-menu a.aktif::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:3px;background:var(--emas)}
 .grup-menu svg{width:18px;height:18px;flex:none;opacity:.85}
+.grup-menu .badge{min-width:22px;height:20px;padding:0 6px;border-radius:999px;background:var(--emas);color:var(--hijau-gelap);font-size:11px;font-weight:700;display:grid;place-items:center}
 .akun{margin-top:auto;border-top:1px solid rgba(255,255,255,.12);padding:12px 8px 0;font-size:13px;display:flex;align-items:center;gap:10px}
 .akun .inisial{width:36px;height:36px;border-radius:999px;background:var(--emas);color:var(--hijau-gelap);display:grid;place-items:center;font-weight:700;flex:none}
 .akun strong{display:block;color:#fff}
