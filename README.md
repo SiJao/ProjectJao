@@ -9,7 +9,7 @@ Abaikan jabatan, fokus kepada objek (sistem yang abadi tetap berjalan dan diperl
 
 Rencana teknologi: PHP native + MySQL/MariaDB, tanpa framework, tanpa build-tool JavaScript; aset front-end di-vendor lokal (tanpa dependensi CDN).
 
-> **Status dokumen (4 Oktober 2026):** dokumen ini berisi **hasil desain sistem** (Mindmap, Analisis, Flowchart) yang sudah disepakati. **Belum ada kode** yang mengikuti desain ini; kode PHP lama sudah dihapus dari repo pada 27 Oktober 2026 (lihat [Status Implementasi](#status-implementasi)). Tampilan bisa dicoba lewat [Prototipe Tampilan](#prototipe-tampilan). Hal yang belum diputuskan dikumpulkan di [Belum Diputuskan](#belum-diputuskan).
+> **Status dokumen (31 Oktober 2026):** dokumen ini berisi **hasil desain sistem** (Mindmap, Analisis, Flowchart) yang sudah disepakati. **Belum ada kode** yang mengikuti desain ini; kode PHP lama sudah dihapus dari repo pada 27 Oktober 2026 (lihat [Status Implementasi](#status-implementasi)). Tampilan bisa dicoba lewat [Prototipe Tampilan](#prototipe-tampilan). Hal yang belum diputuskan dikumpulkan di [Belum Diputuskan](#belum-diputuskan).
 
 ---
 
@@ -40,7 +40,8 @@ Administrasi HISADA
 │   ├── Perizinan
 │   │   ├── Keluar Sementara · Izin Dinas · Pulang
 │   │   ├── Gate Pass
-│   │   └── Overdue
+│   │   ├── Overdue (setelah masa tenggang 60 menit)
+│   │   └── Libur Pondok (izin pulang massal)
 │   ├── Kesehatan
 │   │   ├── Kunjungan: Rawat Jalan · Perawatan
 │   │   ├── Pemeriksaan: diagnosa, resep, tindak lanjut
@@ -124,7 +125,7 @@ Fungsi Sistem HISADA
 | Mindmap | ✅ Selesai |
 | Analisis | ✅ Sebagian besar selesai (sisa: lihat [Belum Diputuskan](#belum-diputuskan)) |
 | Flowchart | ✅ Selesai untuk alur utama |
-| Desain Database | ⏳ Berikutnya |
+| Desain Database | ⏳ Sedang disusun (draf) |
 | Coding · Testing · Deployment | ⬜ Belum dimulai |
 
 ---
@@ -203,7 +204,7 @@ Seluruh lingkungan **dipisah putra dan putri**.
 
 - **Bagian Keamanan** memegang seluruh perizinan: menerima pengajuan, mengizinkan, mencetak dan menandatangani Gate Pass, serta mencatat jam keluar dan jam kembali. Guru pengasuhan dan pihak terkait **hanya menerima notifikasi**.
 - **Izin keluar** (beberapa jam) dan **izin pulang** (beberapa hari). Izin pulang **wajib didampingi wali santri**. Libur pondok bersifat massal, mengikuti kalender HISADA.
-- **Terlambat kembali:** tanpa masa tenggang; kegiatan yang terlewat dicatat tidak hadir; keterlambatan **masuk mahkamah**; wali santri **segera diberi tahu**.
+- **Terlambat kembali:** tanpa masa tenggang; kegiatan yang terlewat dicatat tidak hadir; keterlambatan **masuk mahkamah**; wali santri **segera diberi tahu**. *(Di sistem diberi masa tenggang 60 menit sebelum overdue, untuk mencegah kabar salah ke wali bila petugas terlambat mencatat kembali — lihat [Perizinan](#perizinan-1).)*
 
 ### Wali santri
 
@@ -264,7 +265,7 @@ flowchart TD
 
     C -- "Piket jika dicentang" --> M2["Perizinan & Gate Pass"]
     C -- "Kesehatan jika dicentang" --> M3["Kesehatan"]
-    C -- "Kedisiplinan" --> M4["Kedisiplinan Santri"]
+    C -- "Kedisiplinan jika diberi akses<br/>input / putusan" --> M4["Kedisiplinan Santri"]
     C -- "Sekretaris" --> M5["Korespondensi, Prestasi, Inventaris,<br/>Rapor, Kalender, Kegiatan & Ekstrakurikuler,<br/>bagian pengurus, pengumuman"]
     C -- "Asatidz" --> M6["Lihat data santri<br/>di lingkungannya"]
     C -- "Moderator" --> M7["Semua modul"]
@@ -295,8 +296,8 @@ flowchart TD
 |---|---|---|
 | **Piket** | Pengurus santri | Absensi (otomatis) · Perizinan & Gate Pass (jika dicentang Moderator) |
 | **Kesehatan** | Pengurus santri | Kesehatan (jika dicentang Moderator) · Absensi (jika dicentang) |
-| **Kedisiplinan** | Pengurus santri | Kedisiplinan Santri · Absensi (jika dicentang) |
-| **Sekretaris** | Pengurus santri | Korespondensi, Prestasi, Inventaris, Rapor, Kalender (edit), Absensi, Kegiatan & Ekstrakurikuler, Riwayat Perubahan (masa jabatannya), isi bagian pengurus, kontak wali, pengumuman email |
+| **Kedisiplinan** | Pengurus santri | Kedisiplinan Santri (input dan/atau putusan, jika diberi akses) · Absensi (jika dicentang) |
+| **Sekretaris** | Pengurus santri | Korespondensi, Prestasi, Inventaris, Rapor, Kalender (edit), Absensi, Kegiatan & Ekstrakurikuler, Riwayat Perubahan (masa jabatannya), isi bagian pengurus, pengumuman email |
 | **Asatidz** | Guru | Lihat data santri di lingkungannya (tanpa data Kesehatan) |
 | **Moderator** | Pihak pondok / tim IT (**bukan santri**) | Semua modul |
 
@@ -316,6 +317,9 @@ Akses yang sudah ditetapkan untuk role pengurus:
 | Absensi | Kesehatan, Kedisiplinan |
 | Kesehatan | Kesehatan (role saja belum cukup — wajib diberi akses) |
 | Perizinan | Piket |
+| Input pelanggaran · Putusan kedisiplinan | Dipilih manual per orang (pengurus atau guru, mis. guru hakim) |
+| Profil kesehatan (alergi, penyakit kronis) | Dipilih manual per orang |
+| Edit daftar pilihan tertentu (mis. obat, diagnosa) | Dipilih manual per orang, per daftar |
 
 ### Cakupan data Putra / Putri
 - Pengurus santri **otomatis** hanya melihat dan mengelola data santri sesuai **jenis kelaminnya** (putra → putra, putri → putri).
@@ -332,14 +336,15 @@ Keterangan: ✔ otomatis · ☑ jika diberi lewat Manajemen Akses · 👁 lihat 
 | Absensi harian & kegiatan | ✔ | ☑ | ☑ | ✔ | 👁 | ✔ |
 | Perizinan & Gate Pass | ☑ | ✖ | ✖ | ✖ | 👁 | ✔ |
 | Kesehatan | ✖ | ☑ | ✖ | ✖ | ✖ | ✔ |
-| Kedisiplinan: input pelanggaran | ✖ | ✖ | ✔ | ✖ | ✖ | ✔ |
-| Kedisiplinan: vonis & pemutihan | ✖ | ✖ | ✔ (bukan kasus yang ia catat) | ✖ | 👁 (hasil vonis) | ✔ |
+| Kedisiplinan: input pelanggaran | ✖ | ✖ | ☑ | ✖ | ☑ | ✔ |
+| Kedisiplinan: vonis & pemutihan | ✖ | ✖ | ☑ (bukan kasus yang ia catat) | ✖ | 👁 hasil vonis · ☑ guru hakim | ✔ |
 | Korespondensi, Inventaris | ✖ | ✖ | ✖ | ✔ | ✖ | ✔ |
 | Prestasi, Rapor | ✖ | ✖ | ✖ | ✔ | 👁 | ✔ |
 | Kegiatan & Ekstrakurikuler (kelola) | ✖ | ✖ | ✖ | ✔ | ✖ | ✔ |
 | Riwayat Perubahan | ✖ | ✖ | ✖ | ✔ (masa jabatannya) | ✖ | ✔ (semua) |
-| Isi bagian pengurus, kontak wali, pengumuman email | ✖ | ✖ | ✖ | ✔ | ✖ | ✔ |
-| Data Master, profil kesehatan | ✖ | ⏳ | ✖ | ⏳ | ✖ | ✔ |
+| Isi bagian pengurus, pengumuman email | ✖ | ✖ | ✖ | ✔ | ✖ | ✔ |
+| Data Master (termasuk no. HP wali) | ✖ | ✖ | ✖ | ✖ | ✖ | ✔ |
+| Profil kesehatan | ✖ | ☑ | ✖ | ✖ | ✖ | ✔ |
 | Update Kamar, PAW | ⏳ | ⏳ | ⏳ | ⏳ | ✖ | ✔ |
 | Update Kelas Tahunan, Serah Terima, role & akses, backup, email ke wali tertentu, tautkan wali manual | ✖ | ✖ | ✖ | ✖ | ✖ | ✔ |
 
@@ -364,16 +369,17 @@ flowchart LR
 
 ## Data Master
 
-*(akses: Moderator; bagian tertentu oleh Sekretaris — lihat di bawah)*
+*(akses: Moderator; profil kesehatan & daftar pilihan tertentu lewat Manajemen Akses)*
 
 | Data | Isi utama |
 |---|---|
-| **Santri** | NIS, nama, jenis kelamin, tempat/tanggal lahir, kelas, kamar, keluarga, status (aktif / alumni / keluar / skorsing / meninggal) |
-| **Guru / Asatidz** | NIP, nama, jenis kelamin, no. HP, wali kamar |
-| **Kelas** | **Tingkat (1–6) + rombel (A, B, C, …)**, mis. 5B. Label **MIA/IIS** hanya tampilan di layar, tanpa logika. Rombel yang tidak dibuka dinonaktifkan |
+| **Santri** | NIS, nama, jenis kelamin, tempat/tanggal lahir, kelas, kamar, keluarga, status (aktif / alumni / mutasi keluar / skorsing / meninggal). Hanya santri program **TMI**. **NIK, No KK, penghasilan, dan NISN tidak disimpan** |
+| **Guru / Asatidz** | NIP, nama, jenis kelamin, no. HP, lingkungan (putra / putri / semua) |
+| **Kelas** | **Tingkat (1–6) + rombel (A, B, C, Intensif, …) + jenjang** (1–3: MTs/SMP, 4–6: MA), mis. 5B. Rombel **statis**; yang berganti tiap tahun hanya penempatan santri. Label **MIA/IIS** hanya tampilan di layar, tanpa logika. Rombel yang tidak dibuka dinonaktifkan |
 | **Wali kelas** | Ditetapkan **per tahun ajaran** |
-| **Kamar** | Nama kamar, gedung, gender kamar |
-| **Keluarga & kontak wali** | Nama ayah/ibu, no. HP. **No. HP wali dikelola Sekretaris & Moderator**. Nomor WA ayah/ibu dari data 2026-2027 menjadi bahan pencocokan Portal Wali |
+| **Asrama & kamar** | Asrama (rayon, dengan jenis kelamin) → kamar. Wali asuh + asisten ditetapkan **per tahun ajaran** |
+| **Keluarga & kontak wali** | Nama ayah/ibu, no. HP. **No. HP wali hanya diubah Moderator** (no. HP adalah kunci penautan Portal Wali). Nomor WA ayah/ibu dari data 2026-2027 menjadi bahan pencocokan |
+| **Daftar pilihan** | Isi dropdown di modul lain disimpan sebagai data, bukan kode: jenis izin, status kehadiran, sesi absensi, jenis kunjungan, tindak lanjut, obat, diagnosa, kategori pelanggaran, tingkat vonis, ekstrakurikuler, tingkat & hasil lomba. Pilihan > 2 tampil sebagai dropdown, 2 pilihan sebagai tombol. Pilihan yang sudah dipakai **dinonaktifkan, tidak dihapus** |
 
 **Riwayat yang tidak pernah ditimpa:**
 - **Riwayat kelas** — setiap masa tinggal di sebuah kelas, termasuk **pindah rombel** di tengah tahun (dicatat setiap kali + masuk Riwayat Perubahan).
@@ -394,11 +400,13 @@ flowchart LR
 
 *(akses: Piket otomatis · Sekretaris & Moderator otomatis · Kesehatan & Kedisiplinan jika dicentang)*
 
-- **Absensi Harian** berbasis **kamar**: pilih kamar + tanggal, isi status semua penghuni sekaligus.
-- **Absensi Kegiatan**: Pramuka, Muhadhoroh, Halaqah Qur'an, Olahraga, Kesenian — berbasis anggota grup dari modul [Kegiatan & Ekstrakurikuler](#kegiatan--ekstrakurikuler).
-- Status **terisi otomatis** dari modul lain:
-  - Kesehatan (Perawatan) → **Sakit**
+- **Absensi Harian** berbasis **kamar**: pilih kamar + tanggal (+ **sesi**, opsional; umumnya sekali sehari), isi status semua penghuni sekaligus.
+- **Absensi Kegiatan**: Pramuka, Muhadhoroh, Halaqah Qur'an, Olahraga, Kesenian — berbasis anggota **grup** dari modul [Kegiatan & Ekstrakurikuler](#kegiatan--ekstrakurikuler). Santri boleh ikut **dua ekskul atau lebih**; tiap grup diabsen sendiri.
+- Status **terisi otomatis** dari modul lain dan **terkunci** di form absensi:
+  - Kesehatan (Perawatan) → **Sakit**, selama santri masih dirawat (bisa beberapa hari)
   - Perizinan → **Izin / Pulang**, overdue → **Alpha**
+  - Santri berstatus **skorsing** → **Pulang** (keterangan: skorsing)
+  - Bila bertemu: skorsing > perizinan/overdue > kesehatan > isian manual
 - Tidak ada peringatan "lupa isi absensi".
 
 ### Perizinan
@@ -417,9 +425,17 @@ flowchart LR
 - Tanda tangan: *Security Department* & *Dormitory Guardian*.
 - Format waktu: Keluar Sementara = jam saja · Izin Dinas = tanggal + jam · Pulang = tanggal saja.
 
-**Overdue** (tidak kembali tepat waktu):
-- Status izin → **Overdue**, absensi → **Alpha**, pelanggaran otomatis masuk **Kedisiplinan** (kategori Keamanan).
-- **Email segera ke wali**, notifikasi ke Piket berakses Perizinan & Kedisiplinan.
+**Terlambat & Overdue** (tidak kembali tepat waktu):
+- Lewat jam kembali → tampil **"terlambat"** di layar Piket (belum ada akibat apa pun).
+- Setelah **masa tenggang 60 menit** tanpa konfirmasi kembali → status izin **Overdue**, absensi → **Alpha**, pelanggaran otomatis masuk **Kedisiplinan** (kategori Keamanan).
+- Saat itu juga **email ke wali**, notifikasi ke Piket berakses Perizinan & Kedisiplinan.
+- Jika ternyata salah catat (santri sudah kembali), overdue dibatalkan dan wali menerima **email koreksi**.
+
+**Libur Pondok** (izin pulang massal, putra & putri bersamaan):
+- Petugas membuat Libur Pondok (tanggal pulang & kembali) → pratinjau semua santri aktif → centang santri yang **tidak pulang** (dikecualikan, tetap diabsen biasa).
+- Eksekusi membuat izin Pulang untuk setiap santri; **Gate Pass dicetak per santri**.
+- Wali menerima **satu pengumuman** libur, bukan email per santri.
+- Hari kembali: **absen kembali massal** (pilih banyak / per kamar). Aturan terlambat & overdue tetap berlaku.
 
 ```mermaid
 flowchart TD
@@ -433,7 +449,10 @@ flowchart TD
     F --> R["Email ke wali<br/>(per kejadian)"]
     F --> G{"Kembali tepat waktu?"}
     G -- "ya" --> H(["Konfirmasi kembali<br/>izin selesai"])
-    G -- "tidak" --> I["Status OVERDUE"]
+    G -- "tidak" --> T["Tampil TERLAMBAT<br/>(masa tenggang 60 menit)"]
+    T --> U{"Dikonfirmasi kembali<br/>sebelum 60 menit?"}
+    U -- "ya" --> H
+    U -- "tidak" --> I["Status OVERDUE"]
     I --> J["Absensi: Alpha"]
     I --> K["Pelanggaran otomatis<br/>kategori Keamanan"]
     I --> L["Email segera ke wali<br/>+ notifikasi Piket & Kedisiplinan"]
@@ -444,18 +463,21 @@ flowchart TD
 *(sebelumnya "Poskestren" · akses: role Kesehatan **dan** dicentang Moderator · Moderator)*
 
 - **Satu halaman** (tidak lagi dipisah Input Kunjungan / Rekam Medis):
-  - **Kunjungan**: Rawat Jalan (tidak mengubah absensi) atau **Perawatan** (absensi hari itu → Sakit).
+  - **Kunjungan**: Rawat Jalan (tidak mengubah absensi) atau **Perawatan** (absensi → Sakit **sampai petugas menandai selesai dirawat**).
+  - **Profil kesehatan** (alergi, penyakit kronis) diedit pemegang akses profil kesehatan.
+  - Daftar **obat & diagnosa** dipilih dari dropdown, dengan pilihan **"Lainnya"** + isian bebas.
   - **Pemeriksaan**: diagnosa, resep, tindak lanjut.
   - **Analisis musim sakit**: tren kunjungan 6 bulan + keluhan terbanyak.
 - Wali hanya menerima kabar **"sedang sakit / dirawat"** per kejadian — **tanpa diagnosa**.
 
 ### Kedisiplinan
 
-*(sebelumnya "Mahkamah Santri" · akses: role Kedisiplinan · Moderator)*
+*(sebelumnya "Mahkamah Santri" · akses: **penginput** dan **pemutus** dipilih manual per orang lewat Manajemen Akses — pengurus atau guru · Moderator)*
 
-- **Input Pelanggaran**: santri, kategori, keterangan, tanggal → masuk antrean sidang.
-- **Sidang & Vonis**: **Ringan / Sedang / Berat**, atau **pemutihan** (dibatalkan dengan alasan, data tidak dihapus).
-- **Pencatat tidak boleh memvonis atau memutihkan kasus yang ia catat sendiri.** Pelanggaran otomatis dari overdue boleh divonis siapa pun yang ber-role Kedisiplinan.
+- **Input Pelanggaran**: santri, kategori, keterangan, tanggal → masuk antrean sidang. Penginput dapat **membatalkan** inputnya dalam **1 jam** (alasan wajib).
+- **Sidang & Vonis**: **Ringan / Sedang / Berat**.
+- **Pemutihan** (termasuk setelah santri dihukum) dicatat sebagai **putusan baru** yang menggantikan vonis lama; vonis lama tetap tersimpan di riwayat.
+- **Pencatat tidak boleh memvonis atau memutihkan kasus yang ia catat sendiri.** Pelanggaran otomatis dari overdue boleh divonis siapa pun yang memegang akses putusan.
 - Vonis **Berat** diberitahukan ke wali per kejadian (tanpa isi vonis). Ringan/Sedang tidak dikirim.
 
 ### Prestasi Santri
@@ -514,7 +536,8 @@ flowchart TD
 ### Login & Akun
 
 - **Login:** email + password. Pengurus santri memakai `(NIS)@daarululuumlido.com` (kotak surat aktif di Google Workspace pondok).
-- **Password sementara** akun baru = **NIS + tanggal lahir** (contoh format: `12345` + `01022010`), **wajib diganti saat login pertama**.
+- **Password sementara** akun baru = **NIS + tanggal lahir** (contoh format: `12345` + `01022010`), **wajib diganti saat login pertama**. Kotak surat Google `NIS@` memakai pola password awal yang sama dan juga **wajib diganti saat login pertama**.
+- Kotak surat `NIS@` dibuat (santri baru) dan ditangguhkan (alumni/keluar) oleh **Moderator**.
 - **Tautan aktivasi via email** tersedia sebagai **opsi kedua**.
 - **Akun tertahan:** jika tanggal lahir santri kosong, akun tidak dibuat sampai data dilengkapi. Sekretaris & Moderator melihat daftar akun tertahan.
 - **Reset password mandiri** lewat tautan ke email.
@@ -674,7 +697,9 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
 | **Kesantrian** | Pelanggaran menunggu sidang, izin overdue | Kedisiplinan, Piket berakses Perizinan |
 
 **Kabar ke wali — per kejadian** (tidak ada rekap harian). Email dikirim **segera** saat kejadian:
-- izin, izin pulang diterbitkan, izin overdue (terlambat kembali), sakit/dirawat, vonis **berat**.
+- izin, izin pulang diterbitkan, izin overdue (setelah masa tenggang 60 menit), sakit/dirawat, vonis **berat**.
+- Libur Pondok: **satu pengumuman**, bukan email per santri.
+- Kabar yang ternyata salah input diikuti **email koreksi**.
 
 **Email manual:**
 - **Pengumuman ke kelompok** (semua wali, wali per kelas/kamar, semua pengurus, dll.) — dengan pratinjau & konfirmasi.
@@ -693,7 +718,7 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
   3. Moderator dapat mencabut tautan kapan saja.
   4. No. HP diseragamkan sebelum dicocokkan (`08…` = `628…` = `+628…`).
   5. Nomor WA ayah/ibu dari data 2026-2027 dipakai sebagai bahan pencocokan.
-- **Jika tidak cocok:** Moderator menautkan manual setelah memeriksa, **atau** no. HP diperbarui lewat Sekretaris/Moderator lalu wali mencoba lagi.
+- **Jika tidak cocok:** Moderator menautkan manual setelah memeriksa, **atau** no. HP diperbarui oleh **Moderator** lalu wali mencoba lagi.
 - Wali melihat data anak (read-only) dan menerima **kabar per kejadian**.
 
 ```mermaid
@@ -731,17 +756,13 @@ flowchart TD
 
 | Topik | Pertanyaan |
 |---|---|
-| Profil kesehatan (alergi, penyakit kronis) | Diedit pemegang akses Kesehatan, atau tetap Moderator lewat Data Master? |
 | Update Kamar & PAW | Siapa pemiliknya selain Moderator? |
 | Inventaris | Untuk barang pondok atau barang titipan santri? |
-| Sekretaris per lingkungan | Wajib minimal 1 Sekretaris putra & 1 putri saat Serah Terima? |
-| Asatidz | Lingkungan guru diatur Moderator (Putra/Putri/Semua)? Data apa saja yang boleh dilihat? Format akun guru? |
-| Pemisahan putra/putri | Korespondensi, Inventaris, Kalender ikut dipisah atau tidak? |
+| Asatidz | Data apa saja yang boleh dilihat? Format akun guru? |
 | Export Excel | Role mana yang boleh mengekspor data? |
 | Backup | Berapa banyak backup yang disimpan? |
 | Server produksi | Server pesantren sendiri atau hosting yang lebih layak (hosting saat ini hanya untuk testing) |
-| Alur Kedisiplinan | Lingkungan: pengurus menuntut → guru hakim memutus; pelanggaran pengurus dicatat guru pengasuhan; pembatalan ≤ 1 jam. Bagaimana menyesuaikan role Kedisiplinan yang saat ini dipegang pengurus? |
-| Dokter | Diagnosa & resep diinput dokter sendiri atau oleh pengurus jaga? Bagaimana perlindungan data medis santri? |
+| Dokter | Diagnosa & resep diinput dokter sendiri atau oleh pengurus jaga? |
 | Serah Terima & kelompok kegiatan | Penempatan pengurus di kelompok (tahsin, muhadhoroh, pramuka) ikut berganti saat Serah Terima? |
 | Kegiatan baru | Kelas & pengajar, tahsin, syakia, muhadhoroh, belajar malam, menu makan: masuk sistem sekaligus atau bertahap? |
 
@@ -762,7 +783,7 @@ flowchart TD
 | Portal Wali dengan akun mandiri | Akun wali dibuat admin per keluarga |
 | Cakupan data putra/putri, role Asatidz | Belum ada |
 
-Urutan berikutnya: **Desain Database** → Coding bertahap → Testing → Deployment.
+Urutan berikutnya: **Desain Database** → **Spesifikasi Final per modul** → Coding → Testing → Deployment. Sistem baru diluncurkan **sekaligus**, didahului rencana pindah: gladi migrasi di salinan data, waktu peluncuran di minggu tenang, backup, dan langkah kembali bila gagal.
 
 ---
 
