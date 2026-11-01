@@ -727,5 +727,21 @@ export const MIGRATIONS = [
       `UPDATE users SET preset_id = (SELECT id FROM preset WHERE lower(nama) = users.role) WHERE role IS NOT NULL AND role <> 'moderator'`,
       `UPDATE users SET role = NULL WHERE role IS NOT NULL AND role <> 'moderator'`
     ]
+  },
+  {
+    id: 5,
+    nama: "batas-ip",
+    sql: [
+      // Penghitung percobaan per IP (login, portal wali). kunci = jenis:hash(IP):jendela waktu — IP tidak disimpan mentah.
+      `CREATE TABLE batas_ip (
+        kunci TEXT PRIMARY KEY,
+        n INTEGER NOT NULL DEFAULT 0,
+        dibuat_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      // Kuota email harian per penerima (portal wali)
+      `CREATE INDEX email_penerima ON email_antrean (penerima, dibuat_at)`,
+      // Izin unduh backup per sesi (setelah konfirmasi password), berlaku singkat
+      `ALTER TABLE sesi_login ADD COLUMN backup_sampai TEXT`
+    ]
   }
 ];

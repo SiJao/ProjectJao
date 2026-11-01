@@ -4,6 +4,7 @@
 //   SETUP_KEY            — kunci sekali pakai untuk membuat Moderator pertama
 //   GOOGLE_CLIENT_SECRET — Client Secret OAuth Google
 //   GMAIL_REFRESH_TOKEN  — (opsional) refresh token akun pengirim (scope gmail.send); tanpa ini email tetap antre
+//   TURNSTILE_SECRET     — (opsional) secret Cloudflare Turnstile; bersama variabel TURNSTILE_SITEKEY mengaktifkan anti-robot Portal Wali
 // Variabel biasa GMAIL_PENGIRIM (alamat pengirim, mis. hisada@daarululuumlido.com) boleh diisi di "vars" atau dashboard.
 {
   "name": "hisada",

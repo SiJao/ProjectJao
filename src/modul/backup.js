@@ -1,10 +1,11 @@
 // Modul Backup & Ekspor — README "Backup Database" dan "Export Excel" (rekap Absensi Kamar).
 // Server hanya menyerahkan skema + data per halaman; browser menyusun berkas .sql (dan mengenkripsinya).
 export default function (H) {
-  const { on, json, gagal, bersih, wajib, wajibModerator, lingIn, cekLing, catat } = H;
+  const { on, json, gagal, bersih, wajib, wajibModerator, lingIn, cekLing, catat, cekSandi } = H;
 
   // Tabel sesi/token tidak ikut data backup (skemanya tetap ikut): setelah pemulihan semua orang cukup login ulang.
-  const TANPA_DATA = ["sesi_login", "sesi_wali", "token_akun"];
+  const TANPA_DATA = ["sesi_login", "sesi_wali", "token_akun", "batas_ip"];
+  const MENIT_IZIN = 15;
   // Objek internal SQLite / Cloudflare tidak ikut. `_` di LIKE = wildcard, jadi dibandingkan dengan substr.
   const BUKAN_INTERNAL = "sql IS NOT NULL AND substr(name,1,7) <> 'sqlite_' AND substr(name,1,4) <> '_cf_' AND substr(name,1,3) <> 'd1_'";
   const kutip = (nama) => '"' + String(nama).replace(/"/g, '""') + '"';
@@ -42,8 +43,18 @@ export default function (H) {
     });
   });
 
+  // Unduh data (backup .sql / CSV) wajib konfirmasi password; izin berlaku MENIT_IZIN menit untuk sesi ini saja.
+  on("POST", "/api/backup/izin", async ({ db, u, body }) => {
+    wajibModerator(u);
+    await cekSandi(u, body.password);
+    const sampai = new Date(Date.now() + MENIT_IZIN * 60e3).toISOString();
+    await db.prepare("UPDATE sesi_login SET backup_sampai = ? WHERE token_hash = ?").bind(sampai, u.sesi_token).run();
+    return json({ ok: true, menit: MENIT_IZIN });
+  });
+
   on("GET", "/api/backup/data", async ({ db, u, url }) => {
     wajibModerator(u);
+    if (!u.sesi_backup_sampai || u.sesi_backup_sampai < new Date().toISOString()) gagal(403, "Konfirmasi password dulu untuk mengunduh data.");
     const nama = url.searchParams.get("tabel") || "";
     const t = (await daftarTabel(db)).find((x) => x.name === nama); // nama tabel hanya dari sqlite_master (anti-injeksi)
     if (!t) gagal(404, "Tabel tidak dikenal.");
@@ -56,6 +67,9 @@ export default function (H) {
     // BLOB → {hex} agar selamat lewat JSON; browser menuliskannya sebagai X'..'
     const hexOf = (b) => [...new Uint8Array(b.buffer || b, b.byteOffset || 0, b.byteLength)].map((x) => x.toString(16).padStart(2, "0")).join("");
     const baris = r.map((row) => row.map((v) => (v instanceof ArrayBuffer || ArrayBuffer.isView(v) ? { hex: hexOf(v) } : v)));
+    // Tautan verifikasi/reset yang belum terkirim tidak boleh ikut keluar lewat backup.
+    const iIsi = nama === "email_antrean" ? kolom.indexOf("isi") : -1;
+    if (iIsi >= 0) for (const b of baris) if (typeof b[iIsi] === "string") b[iIsi] = b[iIsi].replace(/token=[0-9a-f]+/gi, "token=••••••");
     return json({ tabel: nama, kolom, offset, baris, selesai: baris.length < batas });
   });
 

@@ -109,8 +109,10 @@ export default function (H) {
     const alasan = bersih(body.alasan, 200);
     if (!alasan) gagal(400, "Alasan pembatalan wajib diisi.");
     if (kj.status !== "aktif") gagal(400, "Kunjungan ini sudah dibatalkan.");
+    // Klaim dulu: dua pembatalan bersamaan → hanya satu yang diproses (ralat ke wali tidak terkirim dua kali).
+    const klaim = await db.prepare("UPDATE kunjungan_kesehatan SET status = 'dibatalkan', dibatalkan_oleh = ?, alasan_batal = ? WHERE id = ? AND status = 'aktif'").bind(u.id, alasan, kj.id).run();
+    if (!klaim.meta.changes) gagal(409, "Kunjungan ini sudah dibatalkan.");
     await db.batch([
-      db.prepare("UPDATE kunjungan_kesehatan SET status = 'dibatalkan', dibatalkan_oleh = ?, alasan_batal = ? WHERE id = ?").bind(u.id, alasan, kj.id),
       db.prepare("DELETE FROM absensi WHERE kunjungan_id = ? AND sumber = 'kesehatan'").bind(kj.id),
       stmtCatat(db, u, "kesantrian", "kunjungan_batal", "kunjungan_kesehatan", kj.id, `Kunjungan kesehatan dibatalkan: ${kj.nis} ${kj.nama}`, kj.lingkungan),
     ]);

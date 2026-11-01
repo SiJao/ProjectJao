@@ -81,10 +81,16 @@ const bkStempel = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0,
 
 // ---------------------------------------------------------------- Backup .sql & Ekspor CSV (Moderator)
 const BkBackup = {
-  components: { Pesan },
+  components: { Pesan, KonfirmasiSandi },
   setup() {
     const f = reactive({ enkripsi: true, sandi: "", sandi2: "", d1: false, jalan: false, kemajuan: "", log: [], galat: "", ok: "",
-      dek: { berkas: null, sandi: "" }, skema: null, tabelCsv: "" });
+      dek: { berkas: null, sandi: "" }, skema: null, tabelCsv: "", izinSampai: 0, tanya: null });
+    // Unduh data wajib konfirmasi password (izin berlaku singkat di server); ditanya sekali per beberapa menit.
+    const denganIzin = (fn) => { if (Date.now() < f.izinSampai) fn(); else { f.galat = ""; f.tanya = fn; } };
+    async function izinOk(pw) {
+      const fn = f.tanya; f.tanya = null;
+      try { const r = await api("/backup/izin", { password: pw }); f.izinSampai = Date.now() + (r.menit - 1) * 60e3; fn(); } catch (e) { f.galat = e.message; }
+    }
     const ambil = (tabel, offset, batas) => api(`/backup/data?tabel=${encodeURIComponent(tabel)}&offset=${offset}&batas=${batas}`);
     const muatLog = async () => { try { f.log = await api("/backup/log"); } catch (e) { f.galat = e.message; } };
     const muatSkema = async () => { try { f.skema = await api("/backup/skema"); } catch (e) { f.galat = e.message; } };
@@ -148,7 +154,7 @@ const BkBackup = {
       } catch (e) { f.galat = e.message; await catatLog({ jenis: "csv", tabel: t.nama, status: "gagal" }); }
       f.jalan = false; f.kemajuan = "";
     }
-    return { f, buatBackup, dekripsi, eksporCsv, bkUkuran };
+    return { f, buatBackup: () => denganIzin(buatBackup), dekripsi, eksporCsv: () => denganIzin(eksporCsv), izinOk, bkUkuran };
   },
   template: `<div class="pesan info">Simpan berkas backup di <strong>repositori GitHub PRIVAT terpisah</strong> (bukan repo aplikasi); untuk sementara diunggah manual.
     Kata sandi enkripsi dipegang <strong>lebih dari 2 orang</strong> dari pihak pondok / tim IT — tanpa kata sandi, backup terenkripsi tidak bisa dibuka sama sekali.
@@ -186,7 +192,8 @@ const BkBackup = {
     <tbody><tr v-for="l in f.log" :key="l.id"><td class="redup" style="white-space:nowrap">{{ l.waktu }}</td><td><span class="lencana">{{ l.jenis }}</span></td>
       <td>{{ l.jenis === 'csv' ? (l.ukuran ?? '—') + ' baris' : bkUkuran(l.ukuran) }}</td>
       <td><span class="lencana" :class="/^berhasil/.test(l.status) ? 'hijau' : 'merah'">{{ l.status }}</span></td><td>{{ l.oleh_nama }}</td></tr></tbody></table></div>
-  <p v-if="!f.log.length" class="redup">Belum ada backup.</p>`,
+  <p v-if="!f.log.length" class="redup">Belum ada backup.</p>
+  <KonfirmasiSandi v-if="f.tanya" judul="Unduh data database" tombol="Lanjutkan" pesan="Berkas berisi seluruh data santri. Masukkan password Anda untuk melanjutkan." @ok="izinOk" @batal="f.tanya=null"/>`,
 };
 
 // ---------------------------------------------------------------- Rekap Absensi Kamar (.xlsx) — pemegang akses absensi

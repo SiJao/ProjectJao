@@ -100,10 +100,11 @@ export default function (H) {
     const wali = body.target !== "pengurus";
     const ling = lingTeks(u);
     const ringkas = `Pengumuman "${subjek}" ke ${LABEL_TARGET[body.target]}: ${daftar.length} penerima`;
-    const ganda = await db.prepare("SELECT 1 FROM riwayat_perubahan WHERE user_id = ? AND aksi = 'pengumuman' AND ringkasan = ? AND waktu > datetime('now', '-2 minutes')").bind(u.id, ringkas).first();
-    if (ganda) gagal(409, "Pengumuman yang sama baru saja dikirim.");
+    // Cegah ganda: catat dulu, lalu periksa catatan SEBELUMNYA yang sama (2 menit) — dua klik bersamaan → hanya yang pertama lanjut.
     const rw = await stmtCatat(db, u, "komunikasi", "pengumuman", "email_antrean", null, ringkas, ling).run();
     const rid = rw.meta.last_row_id;
+    const ganda = await db.prepare("SELECT 1 FROM riwayat_perubahan WHERE user_id = ? AND aksi = 'pengumuman' AND ringkasan = ? AND waktu > datetime('now', '-2 minutes') AND id < ?").bind(u.id, ringkas, rid).first();
+    if (ganda) { await db.prepare("DELETE FROM riwayat_perubahan WHERE id = ?").bind(rid).run(); gagal(409, "Pengumuman yang sama baru saja dikirim."); }
     // satu pernyataan per 100 penerima (json_each), jauh di bawah batas query per permintaan
     const st = [];
     for (let i = 0; i < daftar.length; i += 100) {
@@ -184,9 +185,14 @@ export default function (H) {
     const a = await db.prepare("SELECT * FROM akun_wali WHERE id = ?").bind(p.id).first();
     if (!a) gagal(404, "Akun wali tidak ditemukan.");
     const aksi = String(body.aksi || ""), t = wib(), st = [];
+    let sandi = null;
     if (aksi === "verifikasi") {
+      // Password dibuat lewat tautan verifikasi; verifikasi manual memberi password sementara acak (tampil sekali ke Moderator).
       if (a.status !== "belum_verifikasi") gagal(400, "Akun ini sudah terverifikasi.");
-      st.push(db.prepare("UPDATE akun_wali SET status = 'aktif', email_terverifikasi_at = ? WHERE id = ?").bind(t, a.id));
+      sandi = H.passwordSementara();
+      st.push(db.prepare("UPDATE akun_wali SET status = 'aktif', email_terverifikasi_at = ?, password_hash = ?, gagal_login = 0, terkunci_sampai = NULL WHERE id = ?").bind(t, await H.hashPassword(sandi), a.id),
+        db.prepare("UPDATE token_akun SET dipakai_at = ? WHERE akun_wali_id = ? AND jenis = 'verifikasi_email' AND dipakai_at IS NULL").bind(t, a.id),
+        db.prepare("DELETE FROM sesi_wali WHERE akun_wali_id = ?").bind(a.id));
     } else if (aksi === "nonaktifkan") {
       st.push(db.prepare("UPDATE akun_wali SET status = 'nonaktif' WHERE id = ?").bind(a.id), db.prepare("DELETE FROM sesi_wali WHERE akun_wali_id = ?").bind(a.id));
     } else if (aksi === "aktifkan") {
@@ -198,7 +204,7 @@ export default function (H) {
     } else gagal(400, "Aksi tidak dikenal.");
     st.push(stmtCatat(db, u, "akun", "wali_" + aksi, "akun_wali", a.id, `Akun wali ${a.email}: ${aksi}`));
     await db.batch(st);
-    return json({ ok: true });
+    return json({ ok: true, ...(sandi ? { password_sementara: sandi } : {}) });
   });
 
   on("GET", "/api/komunikasi/tautan", async ({ db, u, url }) => {

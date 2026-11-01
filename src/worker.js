@@ -21,7 +21,7 @@ class Galat extends Error {
 }
 const gagal = (status, pesan) => { throw new Galat(status, pesan); };
 const json = (data, status = 200, headers = {}) =>
-  new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers } });
+  new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", ...headers } });
 
 const normalHp = (s) => {
   if (!s) return null;
@@ -52,7 +52,12 @@ async function cekPassword(pw, stored) {
   for (let i = 0; i < bits.length; i++) diff |= bits.charCodeAt(i) ^ hashHex.charCodeAt(i);
   return diff === 0;
 }
-const passwordSementara = (nis, tgl) => (tgl ? nis + tgl.slice(8, 10) + tgl.slice(5, 7) + tgl.slice(0, 4) : null);
+// Password sementara ACAK (bukan dari NIS/tanggal lahir yang bisa ditebak): ditampilkan sekali ke pembuat akun, wajib diganti saat masuk.
+const HURUF_SANDI = "abcdefghijkmnpqrstuvwxyz23456789"; // 32 huruf, tanpa l/o/0/1 yang mirip
+const passwordSementara = () => {
+  const h = Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) => HURUF_SANDI[b & 31]).join("");
+  return h.slice(0, 5) + "-" + h.slice(5);
+};
 
 // ---------------------------------------------------------------- migrasi otomatis
 let sudahMigrasi = false;
@@ -85,6 +90,42 @@ async function pengaturan(db, kunci, bawaan) {
   return r ? r.nilai : bawaan;
 }
 
+// ---------------------------------------------------------------- batas percobaan per IP
+// "jumlah/menit"; bisa diubah lewat pengaturan "batas_ip.<jenis>". Login & tautkan: hanya percobaan GAGAL yang dihitung
+// (satu jaringan pondok dipakai banyak orang); permintaan yang mengirim email: setiap permintaan dihitung.
+const BATAS_IP = { login: "20/15", wali_masuk: "20/15", wali_email: "10/60", wali_tautkan: "10/60" };
+async function kunciIp(db, req, jenis) {
+  const [n, menit] = String(await pengaturan(db, "batas_ip." + jenis, BATAS_IP[jenis])).split("/").map(Number);
+  const ip = req.headers.get("cf-connecting-ip") || "lokal";
+  const jendela = Math.floor(Date.now() / ((menit || 15) * 60e3));
+  return { kunci: `${jenis}:${(await sha256(ip)).slice(0, 32)}:${jendela}`, batas: n || 20 };
+}
+// hitung = true: permintaan ini ikut dihitung lalu diperiksa; false: hanya diperiksa (yang gagal dicatat lewat catatGagalIp).
+async function batasIp(db, req, jenis, hitung = false) {
+  const k = await kunciIp(db, req, jenis);
+  const r = hitung
+    ? await db.prepare("INSERT INTO batas_ip (kunci, n) VALUES (?, 1) ON CONFLICT(kunci) DO UPDATE SET n = n + 1 RETURNING n").bind(k.kunci).first()
+    : await db.prepare("SELECT n FROM batas_ip WHERE kunci = ?").bind(k.kunci).first();
+  if (r && (hitung ? r.n > k.batas : r.n >= k.batas)) gagal(429, "Terlalu banyak percobaan dari jaringan ini. Coba lagi nanti.");
+}
+async function catatGagalIp(db, req, jenis) {
+  const k = await kunciIp(db, req, jenis);
+  await db.prepare("INSERT INTO batas_ip (kunci, n) VALUES (?, 1) ON CONFLICT(kunci) DO UPDATE SET n = n + 1").bind(k.kunci).run();
+}
+
+// Cloudflare Turnstile (anti-robot) untuk formulir publik Portal Wali. Aktif hanya bila TURNSTILE_SECRET (secret) diatur;
+// site key (bukan rahasia) di variabel TURNSTILE_SITEKEY.
+async function cekTurnstile(env, req, token) {
+  if (!env.TURNSTILE_SECRET) return;
+  if (!token) gagal(400, "Selesaikan verifikasi anti-robot terlebih dahulu.");
+  const f = new FormData();
+  f.append("secret", env.TURNSTILE_SECRET); f.append("response", String(token).slice(0, 2048));
+  const ip = req.headers.get("cf-connecting-ip");
+  if (ip) f.append("remoteip", ip);
+  const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: f }).then((x) => x.json()).catch(() => null);
+  if (!r || !r.success) gagal(400, "Verifikasi anti-robot gagal. Muat ulang halaman lalu coba lagi.");
+}
+
 async function buatSesi(db, userId) {
   const token = randomHex(32);
   const jam = +(await pengaturan(db, "sesi.lama_jam", "12")) || 12;
@@ -101,7 +142,7 @@ async function penggunaDariSesi(db, req) {
   const token = ambilCookie(req, COOKIE);
   if (!token) return null;
   const u = await db.prepare(
-    `SELECT u.* FROM sesi_login s JOIN users u ON u.id = s.user_id
+    `SELECT u.*, s.token_hash sesi_token, s.backup_sampai sesi_backup_sampai FROM sesi_login s JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = ? AND s.kedaluwarsa > ? AND u.status = 'aktif'`
   ).bind(await sha256(token), new Date().toISOString()).first();
   if (!u) return null;
@@ -122,6 +163,11 @@ const boleh = (u, kode) => u.role === "moderator" || u.akses.includes(kode)
   || (kode.startsWith("lihat_") && boleh(u, LIHAT_DARI[kode] || kode.slice(6)));
 const wajib = (u, kode) => { if (!boleh(u, kode)) gagal(403, "Anda tidak punya akses untuk tindakan ini."); };
 const wajibModerator = (u) => { if (u.role !== "moderator") gagal(403, "Hanya Moderator."); };
+// Akun tanpa akses apa pun (baru dibuat / menunggu Moderator) tidak melihat data santri maupun kontak (HP/email guru, HP wali).
+const adaAkses = (u) => u.role === "moderator" || u.akses.length > 0;
+const wajibAdaAkses = (u) => { if (!adaAkses(u)) gagal(403, "Akun Anda belum diberi akses oleh Moderator."); };
+// Email berpola akun santri (NIS@domain) tidak boleh dipakai untuk akun Moderator/guru (K-11).
+const emailSantri = (email) => /^\d+@/.test(email);
 // Preset dari {preset_id} atau {preset: "nama"}; null bila tidak diminta, galat bila tidak ditemukan.
 async function cariPreset(db, body) {
   if (!body.preset_id && !body.preset) return null;
@@ -313,6 +359,7 @@ async function tugasBerkala(env) {
   ENV = env;
   await migrate(env.DB);
   const hasil = {};
+  try { await env.DB.prepare("DELETE FROM batas_ip WHERE dibuat_at < datetime('now', '-1 day')").run(); } catch (e) { console.error("batas_ip", e); }
   try { hasil.overdue = await perbaruiOverdue(env.DB); } catch (e) { console.error("overdue", e); hasil.overdue = "galat: " + e.message; }
   for (const t of TUGAS_BERKALA) {
     try { hasil[t.nama] = await t.fn(env.DB, env); } catch (e) { console.error("tugas " + t.nama, e); hasil[t.nama] = "galat: " + e.message; }
@@ -343,9 +390,9 @@ async function layani(req, env, url) {
     await migrate(env.DB);
     if (req.method !== "GET") {
       // Lapisan CSRF: permintaan pengubah wajib JSON dari halaman sendiri.
-      const ct = req.headers.get("content-type") || "";
+      const ct = (req.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
       const origin = req.headers.get("origin");
-      if (!ct.includes("application/json")) gagal(415, "Format permintaan tidak dikenal.");
+      if (ct !== "application/json") gagal(415, "Format permintaan tidak dikenal.");
       if (origin && origin !== url.origin) gagal(403, "Asal permintaan tidak diizinkan.");
     }
     for (const r of rute) {
@@ -403,16 +450,16 @@ on("POST", "/api/setup", async ({ env, db, body }) => {
   return json({ ok: true });
 }, { publik: true });
 
-on("POST", "/api/login", async ({ db, body }) => {
+on("POST", "/api/login", async ({ db, req, body }) => {
   if ((await pengaturan(db, "login.password_aktif", "1")) !== "1") gagal(403, "Login password dinonaktifkan. Gunakan akun Google.");
+  await batasIp(db, req, "login");
   const email = String(body.email || "").trim().toLowerCase();
   const u = await db.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
   const salah = () => gagal(401, "Email atau password salah.");
-  if (!u) { await cekPassword("x", "pbkdf2$100000$00$00"); salah(); }
+  if (!u) { await catatGagalIp(db, req, "login"); await cekPassword("x", "pbkdf2$100000$00$00"); salah(); }
   if (u.terkunci_sampai && u.terkunci_sampai > wib()) gagal(429, "Terlalu banyak percobaan. Coba lagi nanti.");
-  if (u.status === "tertahan") gagal(403, "Akun tertahan: tanggal lahir santri belum diisi.");
-  if (u.status !== "aktif") gagal(403, "Akun nonaktif.");
   if (!(await cekPassword(String(body.password || ""), u.password_hash))) {
+    await catatGagalIp(db, req, "login");
     const batas = +(await pengaturan(db, "login.batas_gagal", "5")) || 5;
     const menit = +(await pengaturan(db, "login.lama_kunci_menit", "15"));
     const gagalBaru = u.gagal_login + 1;
@@ -420,6 +467,7 @@ on("POST", "/api/login", async ({ db, body }) => {
       .bind(gagalBaru >= batas ? 0 : gagalBaru, gagalBaru >= batas ? wib(Date.now() + menit * 60e3) : null, u.id).run();
     salah();
   }
+  if (u.status !== "aktif") gagal(403, "Akun nonaktif.");
   const s = await buatSesi(db, u.id);
   return json({ ok: true, wajib_ganti_password: !!u.wajib_ganti_password }, 200, { "set-cookie": cookieSesi(s.token, s.maxAge) });
 }, { publik: true });
@@ -550,7 +598,7 @@ on("GET", "/api/master", async ({ db, u }) => {
     asrama: await q(`SELECT * FROM asrama WHERE ${l.sql} ORDER BY nama`, ...l.args),
     kamar: await q(`SELECT k.*, (SELECT COUNT(*) FROM santri s WHERE s.kamar_id = k.id AND s.status='aktif') jumlah
                     FROM kamar k WHERE ${l.sql.replace("lingkungan", "k.lingkungan")} ORDER BY k.nama`, ...l.args),
-    guru: await q("SELECT * FROM guru ORDER BY nama"),
+    guru: await q(`SELECT ${u.role === "moderator" ? "*" : "id, nip, nama, jenis_kelamin, lingkungan, aktif"} FROM guru ORDER BY nama`),
     // wali kelas & wali asuh tahun ajaran aktif (penetapan di Data Master)
     wali_kelas: await q(`SELECT wk.id, wk.kelas_id, wk.guru_id, wk.peran, g.nama FROM wali_kelas wk JOIN guru g ON g.id = wk.guru_id
                         JOIN tahun_ajaran ta ON ta.id = wk.tahun_ajaran_id AND ta.status = 'aktif' ORDER BY wk.peran = 'wali' DESC, g.nama`),
@@ -673,6 +721,7 @@ on("POST", "/api/pilihan", async ({ db, u, body }) => {
 
 // ---------------------------------------------------------------- santri
 on("GET", "/api/santri", async ({ db, u, url }) => {
+  wajibAdaAkses(u);
   const l = lingIn(u, "s.lingkungan");
   const w = [l.sql], a = [...l.args];
   const q = (url.searchParams.get("q") || "").trim();
@@ -686,7 +735,7 @@ on("GET", "/api/santri", async ({ db, u, url }) => {
   if (st !== "semua") { w.push("s.status IN (SELECT value FROM json_each(?))"); a.push(JSON.stringify(st.split(",").slice(0, 6))); }
   const lim = Math.max(1, Math.min(+url.searchParams.get("limit") || 50, 2000));
   const r = await db.prepare(
-    `SELECT s.id, s.nis, s.nama, s.jenis_kelamin, s.lingkungan, s.status, s.tanggal_lahir, s.tempat_lahir, s.kabupaten, s.provinsi,
+    `SELECT s.id, s.nis, s.nama, s.jenis_kelamin, s.lingkungan, s.status, s.tempat_lahir, s.kabupaten, s.provinsi,
             s.kelas_id, s.kamar_id, s.foto_url, km.nama kamar, (k.tingkat || ' ' || k.rombel || ' ' || j.nama || COALESCE(' ' || k.label, '')) kelas
      FROM santri s LEFT JOIN kamar km ON km.id = s.kamar_id LEFT JOIN kelas k ON k.id = s.kelas_id LEFT JOIN jenjang j ON j.id = k.jenjang_id
      WHERE ${w.join(" AND ")} ORDER BY s.nama LIMIT ?`).bind(...a, lim).all();
@@ -694,6 +743,7 @@ on("GET", "/api/santri", async ({ db, u, url }) => {
 });
 
 on("GET", "/api/santri/:id", async ({ db, u, p }) => {
+  wajibAdaAkses(u);
   const s = await db.prepare("SELECT * FROM santri WHERE id = ?").bind(p.id).first();
   if (!s) gagal(404, "Santri tidak ditemukan.");
   cekLing(u, s.lingkungan);
@@ -975,12 +1025,12 @@ on("POST", "/api/users/dari-santri", async ({ db, u, body }) => {
   const s = await db.prepare("SELECT * FROM santri WHERE id = ?").bind(body.santri_id).first();
   if (!s || s.status !== "aktif") gagal(400, "Santri tidak ditemukan atau tidak aktif.");
   const preset = await cariPreset(db, body);
-  const pw = passwordSementara(s.nis, s.tanggal_lahir);
-  const r = await db.prepare("INSERT INTO users (email, password_hash, nama, santri_id, lingkungan, status, wajib_ganti_password) VALUES (?,?,?,?,?,?,1)")
-    .bind(`${s.nis}@daarululuumlido.com`, pw ? await hashPassword(pw) : null, s.nama, s.id, s.lingkungan, pw ? "aktif" : "tertahan").run();
+  const pw = passwordSementara();
+  const r = await db.prepare("INSERT INTO users (email, password_hash, nama, santri_id, lingkungan, status, wajib_ganti_password) VALUES (?,?,?,?,?,'aktif',1)")
+    .bind(`${s.nis}@daarululuumlido.com`, await hashPassword(pw), s.nama, s.id, s.lingkungan).run();
   if (preset) await db.batch(stmtTerapkanPreset(db, "?", [r.meta.last_row_id], "?", [preset.id], u.id));
-  await catat(db, u, "akun", "buat", "users", r.meta.last_row_id, `Akun pengurus ${s.nis}${preset ? " · preset " + preset.nama : ""}${pw ? "" : " (tertahan: tanggal lahir kosong)"}`, s.lingkungan);
-  return json({ ok: true, id: r.meta.last_row_id, tertahan: !pw });
+  await catat(db, u, "akun", "buat", "users", r.meta.last_row_id, `Akun pengurus ${s.nis}${preset ? " · preset " + preset.nama : ""}`, s.lingkungan);
+  return json({ ok: true, id: r.meta.last_row_id, password_sementara: pw });
 });
 
 on("POST", "/api/users/guru", async ({ db, u, body }) => {
@@ -989,6 +1039,7 @@ on("POST", "/api/users/guru", async ({ db, u, body }) => {
   if (!g) gagal(400, "Guru tidak ditemukan.");
   const email = bersih(body.email || g.email, 120)?.toLowerCase();
   if (!email) gagal(400, "Email guru wajib diisi.");
+  if (emailSantri(email)) gagal(400, "Email berpola akun santri (NIS@…) tidak boleh dipakai untuk akun guru.");
   const preset = await cariPreset(db, body);
   const r = await db.prepare("INSERT INTO users (email, nama, guru_id, lingkungan, wajib_ganti_password) VALUES (?,?,?,?,0)")
     .bind(email, g.nama, g.id, g.lingkungan).run();
@@ -1001,6 +1052,7 @@ on("POST", "/api/users/moderator", async ({ db, u, body }) => {
   wajibModerator(u);
   const email = bersih(body.email, 120)?.toLowerCase();
   if (!email || !body.nama) gagal(400, "Nama dan email wajib diisi.");
+  if (emailSantri(email)) gagal(400, "Akun santri tidak boleh menjadi Moderator (K-11).");
   const r = await db.prepare("INSERT INTO users (email, nama, role, lingkungan, wajib_ganti_password) VALUES (?,?, 'moderator', 'semua', 0)").bind(email, bersih(body.nama, 120)).run();
   await catat(db, u, "akun", "buat", "users", r.meta.last_row_id, `Moderator baru ${email} (login dengan Google)`);
   return json({ ok: true, id: r.meta.last_row_id });
@@ -1012,10 +1064,13 @@ on("POST", "/api/users/:id", async ({ db, u, p, body }) => {
   if (!t) gagal(404, "Akun tidak ditemukan.");
   // Moderator = status khusus (bukan role/preset); akun santri tidak boleh menjadi Moderator (K-11).
   const role = "moderator" in body ? (body.moderator ? "moderator" : null) : t.role;
-  if (role === "moderator" && t.santri_id) gagal(400, "Akun santri tidak boleh menjadi Moderator (K-11).");
+  if (role === "moderator" && (t.santri_id || emailSantri(t.email))) gagal(400, "Akun santri tidak boleh menjadi Moderator (K-11).");
   const status = body.status && ["aktif", "nonaktif"].includes(body.status) ? body.status : t.status;
   if (t.id === u.id && (status !== "aktif" || role !== "moderator")) gagal(400, "Anda tidak bisa menonaktifkan atau menurunkan akun sendiri.");
-  const ling = t.guru_id && ["putra", "putri", "semua"].includes(body.lingkungan) ? body.lingkungan : role === "moderator" ? "semua" : t.lingkungan;
+  // Lingkungan: diatur untuk akun non-santri. Moderator yang diturunkan WAJIB diberi lingkungan (tidak otomatis tetap 'semua').
+  const lingBaru = !t.santri_id && ["putra", "putri", "semua"].includes(body.lingkungan) ? body.lingkungan : null;
+  if (t.role === "moderator" && role !== "moderator" && !lingBaru) gagal(400, "Pilih lingkungan akun ini setelah status Moderator dicabut.");
+  const ling = role === "moderator" ? "semua" : lingBaru || t.lingkungan;
   const st = [db.prepare("UPDATE users SET role = ?, status = ?, lingkungan = ? WHERE id = ?").bind(role, status, ling, t.id)];
   if (role !== t.role) st.push(stmtNotif(db, t.id, { jenis: "akun", judul: role ? "Anda sekarang Moderator" : "Status Moderator Anda dicabut",
     isi: role ? "Semua menu dan akses tersedia. Muat ulang halaman bila menu belum berubah." : "Akses Anda kini mengikuti akses yang diberikan Moderator.", tautan: "/akun" }));
@@ -1104,17 +1159,16 @@ on("POST", "/api/preset/:id/hapus", async ({ db, u, p }) => {
 
 on("POST", "/api/users/:id/reset-password", async ({ db, u, p }) => {
   wajibModerator(u);
-  const t = await db.prepare("SELECT u.*, s.nis, s.tanggal_lahir FROM users u LEFT JOIN santri s ON s.id = u.santri_id WHERE u.id = ?").bind(p.id).first();
+  const t = await db.prepare("SELECT * FROM users WHERE id = ?").bind(p.id).first();
   if (!t) gagal(404, "Akun tidak ditemukan.");
-  const pw = t.nis ? passwordSementara(t.nis, t.tanggal_lahir) : randomHex(5);
-  if (!pw) gagal(400, "Tanggal lahir santri belum diisi.");
+  const pw = passwordSementara();
   await db.batch([
     db.prepare("UPDATE users SET password_hash = ?, wajib_ganti_password = 1, gagal_login = 0, terkunci_sampai = NULL, status = CASE WHEN status = 'tertahan' THEN 'aktif' ELSE status END WHERE id = ?").bind(await hashPassword(pw), t.id),
     db.prepare("DELETE FROM sesi_login WHERE user_id = ?").bind(t.id),
     stmtNotif(db, t.id, { jenis: "akun", judul: "Password Anda direset oleh Moderator", isi: "Bila Anda tidak memintanya, segera hubungi Moderator.", tautan: "/akun" }),
   ]);
   await catat(db, u, "akun", "reset_password", "users", t.id, t.email);
-  return json({ ok: true, password_sementara: t.nis ? "NIS + tanggal lahir (ddmmyyyy)" : pw });
+  return json({ ok: true, password_sementara: pw });
 });
 
 // ---------------------------------------------------------------- perizinan
@@ -1372,8 +1426,8 @@ on("GET", "/api/riwayat", async ({ db, u, url }) => {
 // Setiap modul: export default function (H) { H.on(...); H.migrasi([...]); H.berkala(nama, fn); }
 import modul from "./modul/index.js";
 const H = {
-  on, json, gagal, Galat, wib, hariIni, keMs, bersih, normalHp, randomHex, sha256, hashPassword, cekPassword, passwordSementara,
-  pengaturan, boleh, wajib, wajibModerator, lingIn, cekLing, catat, stmtCatat, tanda, cekSandi, taAktif, masaKhidmatAktif,
+  on, json, gagal, Galat, wib, hariIni, keMs, bersih, normalHp, randomHex, sha256, hashPassword, cekPassword, passwordSementara, batasIp, catatGagalIp, cekTurnstile,
+  pengaturan, boleh, wajib, wajibModerator, adaAkses, wajibAdaAkses, lingIn, cekLing, catat, stmtCatat, tanda, cekSandi, taAktif, masaKhidmatAktif,
   TUTUP_STATUS, stmtUbahStatus, pindahRiwayat, bacaKelas, statusOtomatis, perbaruiOverdue, keadaanIzin, buatSesi,
   stmtNotif, stmtNotifGuru, GURU_BINAAN, stmtTerapkanPreset, cariPreset,
   antreEmail, stmtEmail, kabarWali, kabarKoreksi, kirimAntrean, tugasBerkala, APP: () => APP(ENV), env: () => ENV,

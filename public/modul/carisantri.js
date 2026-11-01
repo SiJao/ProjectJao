@@ -112,6 +112,6 @@ const CariSantriGuru = {
   </template>`,
 };
 daftarHalaman("/cari", CariSantriGuru, {
-  label: "Cari Santri & Guru", grup: "Beranda", urutan: 5, syarat: () => true,
+  label: "Cari Santri & Guru", grup: "Beranda", urutan: 5, syarat: (me) => me.moderator || me.akses.length > 0, // akun tanpa akses: tidak melihat data santri
   ikon: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
 });

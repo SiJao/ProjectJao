@@ -1,6 +1,6 @@
 // Modul tampilan komunikasi — pengumuman ke kelompok, email ke wali tertentu, antrean email, kelola Portal Wali.
 const Komunikasi = {
-  components: { Pesan, CariSantri, FotoSantri },
+  components: { Pesan, CariSantri, FotoSantri, SandiSementara },
   directives: { baris: vBaris },
   setup() {
     const moderator = computed(() => negara.me && negara.me.role === "moderator");
@@ -8,7 +8,7 @@ const Komunikasi = {
     const TAB = [["pengumuman", "Pengumuman"], ["wali", "Email ke wali"], ["antrean", "Antrean email"], ["portal", "Portal Wali"]];
     const tab = ref("pengumuman");
     const tabTampil = computed(() => TAB.filter((t) => moderator.value || t[0] === "pengumuman"));
-    const f = reactive({ galat: "", ok: "" });
+    const f = reactive({ galat: "", ok: "", sandi: null });
     const jalan = async (fn) => { f.galat = ""; f.ok = ""; try { await fn(); } catch (e) { f.galat = e.message; } };
 
     // ---- pengumuman
@@ -56,7 +56,11 @@ const Komunikasi = {
     const muatTautan = async () => { pw.tautan = await api(`/komunikasi/tautan?q=${encodeURIComponent(pw.tq)}&cara=${pw.cara}`); };
     watch(() => [pw.q, pw.status], () => { clearTimeout(tAk); tAk = setTimeout(() => jalan(muatAkun), 250); });
     watch(() => [pw.tq, pw.cara], () => { clearTimeout(tTt); tTt = setTimeout(() => jalan(muatTautan), 250); });
-    const aksiAkun = (a, aksi) => jalan(async () => { await api(`/komunikasi/akun-wali/${a.id}`, { aksi }); f.ok = "Akun wali diperbarui."; await muatAkun(); });
+    const aksiAkun = (a, aksi) => jalan(async () => {
+      const r = await api(`/komunikasi/akun-wali/${a.id}`, { aksi }); f.ok = "Akun wali diperbarui.";
+      if (r.password_sementara) f.sandi = [{ nama: a.nama, email: a.email, password: r.password_sementara }];
+      await muatAkun();
+    });
     const cabut = (t) => jalan(async () => {
       if (!confirm(`Cabut tautan ${t.wali} ↔ ${t.santri}?`)) return;
       await api(`/komunikasi/tautan/${t.id}/cabut`, {}); f.ok = "Tautan dicabut."; await muatTautan(); await muatAkun();
@@ -87,6 +91,7 @@ const Komunikasi = {
   template: `<div><span class="jejak">Fungsi › Komunikasi</span><h1>Komunikasi</h1></div>
   <div class="tab"><button v-for="t in tabTampil" :key="t[0]" :class="{aktif: tab===t[0]}" @click="tab=t[0]; f.ok=''; f.galat=''">{{ t[1] }}<span v-if="t[0]==='antrean' && an.hitung.gagal" class="lencana merah" style="margin-left:6px">{{ an.hitung.gagal }}</span></button></div>
   <Pesan :galat="f.galat" :ok="f.ok"/>
+  <SandiSementara v-if="f.sandi" :daftar="f.sandi" @tutup="f.sandi = null"/>
 
   <template v-if="tab==='pengumuman'">
     <div class="kartu" style="display:flex;flex-direction:column;gap:12px;max-width:820px">

@@ -1,5 +1,5 @@
 // HISADA — Portal Wali Santri (Vue 3 tanpa build tool). Berbicara dengan /api/wali/* (sesi sendiri, terpisah dari akun pengurus).
-const { createApp, reactive, ref, computed, onMounted, watch, nextTick } = Vue;
+const { createApp, reactive, ref, computed, onMounted, onBeforeUnmount, watch, nextTick } = Vue;
 
 const negara = reactive({ rute: "", saya: null, siap: false });
 const pergi = (h) => { if (location.hash !== "#" + h) location.hash = h; };
@@ -41,6 +41,34 @@ const Bingkai = {
     <div class="masuk-form"><div class="kartu" ref="kartu"><h2>{{ judul }}</h2><slot></slot></div></div></div>`,
 };
 
+// Cloudflare Turnstile (anti-robot) — tampil hanya bila pondok sudah memasang kuncinya (GET /api/wali/konfig).
+// Pakai: <Robot v-model="f.robot" ref="robot"/>; token sekali pakai → panggil robot.ulang() sesudah setiap kiriman.
+const ROBOT = { kunci: null, siap: null };
+const muatRobot = () => ROBOT.siap || (ROBOT.siap = api("/konfig").then((k) => {
+  ROBOT.kunci = k.turnstile;
+  if (ROBOT.kunci) return new Promise((ok) => {
+    const s = document.createElement("script");
+    s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; s.async = true; s.onload = ok; s.onerror = ok;
+    document.head.appendChild(s);
+  });
+}).catch(() => {}));
+const Robot = {
+  props: ["modelValue"], emits: ["update:modelValue"],
+  setup(_, { emit, expose }) {
+    const el = ref(null), aktif = ref(false); let id = null;
+    onMounted(async () => {
+      await muatRobot();
+      aktif.value = !!ROBOT.kunci;
+      if (ROBOT.kunci && window.turnstile && el.value) id = window.turnstile.render(el.value, { sitekey: ROBOT.kunci, language: "id",
+        callback: (t) => emit("update:modelValue", t), "expired-callback": () => emit("update:modelValue", ""), "error-callback": () => emit("update:modelValue", "") });
+    });
+    onBeforeUnmount(() => { if (id != null && window.turnstile) window.turnstile.remove(id); });
+    expose({ ulang: () => { emit("update:modelValue", ""); if (id != null && window.turnstile) window.turnstile.reset(id); } });
+    return { el, aktif };
+  },
+  template: `<div ref="el" v-show="aktif"></div>`,
+};
+
 const Masuk = {
   components: { Bingkai, Pesan },
   setup() {
@@ -48,7 +76,7 @@ const Masuk = {
     async function kirim() {
       f.sibuk = true; f.galat = ""; f.ok = ""; f.belum = false;
       try { await api("/masuk", { email: f.email, password: f.password }); await muatSaya(); pergi("/anak"); }
-      catch (e) { f.galat = e.message; f.belum = /belum diverifikasi/i.test(e.message); } finally { f.sibuk = false; }
+      catch (e) { f.galat = e.message; f.belum = /belum diverifikasi|password salah/i.test(e.message); } finally { f.sibuk = false; } // baru daftar: password dibuat lewat tautan verifikasi
     }
     async function kirimUlang() { try { const r = await api("/kirim-verifikasi", { email: f.email }); f.ok = r.pesan; f.galat = ""; } catch (e) { f.galat = e.message; } }
     return { f, kirim, kirimUlang };
@@ -66,17 +94,16 @@ const Masuk = {
 };
 
 const Daftar = {
-  components: { Bingkai, Pesan },
+  components: { Bingkai, Pesan, Robot },
   setup() {
-    const f = reactive({ nama: "", email: "", no_hp: "", password: "", ulang: "", setuju: false, galat: "", ok: "", sibuk: false, selesai: false });
+    const f = reactive({ nama: "", email: "", no_hp: "", setuju: false, galat: "", ok: "", sibuk: false, selesai: false, robot: "" });
+    const robot = ref(null);
     async function kirim() {
-      f.galat = "";
-      if (f.password !== f.ulang) { f.galat = "Password dan ulangannya tidak sama."; return; }
-      f.sibuk = true;
-      try { const r = await api("/daftar", { nama: f.nama, email: f.email, no_hp: f.no_hp, password: f.password, setuju: f.setuju }); f.ok = r.pesan; f.selesai = true; }
-      catch (e) { f.galat = e.message; } finally { f.sibuk = false; }
+      f.galat = ""; f.sibuk = true;
+      try { const r = await api("/daftar", { nama: f.nama, email: f.email, no_hp: f.no_hp, setuju: f.setuju, turnstile: f.robot }); f.ok = r.pesan; f.selesai = true; }
+      catch (e) { f.galat = e.message; } finally { f.sibuk = false; robot.value && robot.value.ulang(); }
     }
-    return { f, kirim };
+    return { f, kirim, robot };
   },
   template: `<Bingkai judul="Daftar akun wali">
     <template v-if="!f.selesai">
@@ -85,17 +112,16 @@ const Daftar = {
         <label class="isian">Email<input type="email" v-model="f.email" autocomplete="email" required></label>
         <label class="isian">No. HP / WhatsApp<input v-model="f.no_hp" inputmode="tel" autocomplete="tel" placeholder="08…" required>
           <span class="redup" style="font-weight:400">Gunakan nomor yang terdaftar di sekretariat pondok — nomor ini dipakai untuk menautkan anak Anda.</span></label>
-        <label class="isian">Password (min. 8 karakter)<input type="password" v-model="f.password" autocomplete="new-password" minlength="8" required></label>
-        <label class="isian">Ulangi password<input type="password" v-model="f.ulang" autocomplete="new-password" required></label>
         <label style="display:flex;gap:10px;align-items:flex-start;font-size:13px"><input type="checkbox" v-model="f.setuju" style="flex:none;margin-top:2px">
           <span>Saya menyetujui Pesantren Modern Daarul 'Uluum Lido menyimpan dan menggunakan nama, email, dan No. HP saya untuk mencocokkan akun ini dengan data santri,
           menampilkan data anak saya di portal ini, dan mengirim kabar tentang anak saya lewat email. Data tidak dibagikan kepada pihak lain;
           saya dapat meminta penghapusan akun kepada pondok.</span></label>
+        <Robot v-model="f.robot" ref="robot"/>
         <button :disabled="f.sibuk || !f.setuju">{{ f.sibuk ? 'Mengirim…' : 'Daftar' }}</button>
       </form>
       <Pesan :galat="f.galat"/>
     </template>
-    <template v-else><Pesan :ok="f.ok"/><p class="redup" style="margin:0">Buka tautan verifikasi di email Anda (berlaku 24 jam), lalu masuk.</p></template>
+    <template v-else><Pesan :ok="f.ok"/><p class="redup" style="margin:0">Buka tautan verifikasi di email Anda (berlaku 24 jam) untuk membuat password, lalu masuk.</p></template>
     <p class="redup" style="margin:0">Sudah punya akun? <a href="#/masuk">Masuk</a></p>
   </Bingkai>`,
 };
@@ -103,34 +129,47 @@ const Daftar = {
 const Verifikasi = {
   components: { Bingkai, Pesan },
   setup() {
-    const f = reactive({ galat: "", ok: "", email: "", ulangOk: "" });
-    onMounted(async () => {
-      const t = param("token");
-      if (!t) { f.galat = "Tautan verifikasi tidak lengkap."; return; }
-      try { await api("/verifikasi", { token: t }); f.ok = "Email terverifikasi. Silakan masuk."; } catch (e) { f.galat = e.message; }
-    });
+    const f = reactive({ galat: "", ok: "", email: "", ulangOk: "", password: "", ulang: "", sibuk: false, token: param("token") });
+    if (!f.token) f.galat = "Tautan verifikasi tidak lengkap.";
+    async function kirim() {
+      f.galat = "";
+      if (f.password !== f.ulang) { f.galat = "Password dan ulangannya tidak sama."; return; }
+      f.sibuk = true;
+      try { await api("/verifikasi", { token: f.token, password: f.password }); f.ok = "Email terverifikasi dan password dibuat. Silakan masuk."; f.password = f.ulang = ""; }
+      catch (e) { f.galat = e.message; if (/tidak valid|kedaluwarsa|dipakai/i.test(e.message)) f.token = null; } finally { f.sibuk = false; }
+    }
     async function kirimUlang() { try { f.ulangOk = (await api("/kirim-verifikasi", { email: f.email })).pesan; } catch (e) { f.galat = e.message; } }
-    return { f, kirimUlang };
+    return { f, kirim, kirimUlang };
   },
   template: `<Bingkai judul="Verifikasi email">
+    <form v-if="f.token && !f.ok" @submit.prevent="kirim" style="display:flex;flex-direction:column;gap:12px">
+      <p class="redup" style="margin:0">Buat password untuk akun Portal Wali Anda.</p>
+      <label class="isian">Password (min. 8 karakter)<input type="password" v-model="f.password" autocomplete="new-password" minlength="8" required></label>
+      <label class="isian">Ulangi password<input type="password" v-model="f.ulang" autocomplete="new-password" required></label>
+      <button :disabled="f.sibuk">Verifikasi & buat password</button></form>
     <Pesan :galat="f.galat" :ok="f.ok"/>
     <a v-if="f.ok" class="tombol" href="#/masuk">Masuk</a>
-    <form v-if="f.galat" @submit.prevent="kirimUlang" style="display:flex;flex-direction:column;gap:10px">
+    <form v-if="!f.token && !f.ok" @submit.prevent="kirimUlang" style="display:flex;flex-direction:column;gap:10px">
       <label class="isian">Kirim tautan baru ke email<input type="email" v-model="f.email" required></label><button class="kedua">Kirim ulang</button>
       <Pesan :ok="f.ulangOk"/></form>
   </Bingkai>`,
 };
 
 const Lupa = {
-  components: { Bingkai, Pesan },
+  components: { Bingkai, Pesan, Robot },
   setup() {
-    const f = reactive({ email: "", galat: "", ok: "", sibuk: false });
-    async function kirim() { f.sibuk = true; f.galat = ""; try { f.ok = (await api("/lupa", { email: f.email })).pesan; } catch (e) { f.galat = e.message; } finally { f.sibuk = false; } }
-    return { f, kirim };
+    const f = reactive({ email: "", galat: "", ok: "", sibuk: false, robot: "" });
+    const robot = ref(null);
+    async function kirim() {
+      f.sibuk = true; f.galat = "";
+      try { f.ok = (await api("/lupa", { email: f.email, turnstile: f.robot })).pesan; } catch (e) { f.galat = e.message; } finally { f.sibuk = false; robot.value && robot.value.ulang(); }
+    }
+    return { f, kirim, robot };
   },
   template: `<Bingkai judul="Lupa password">
     <form @submit.prevent="kirim" style="display:flex;flex-direction:column;gap:12px">
       <label class="isian">Email akun wali<input type="email" v-model="f.email" autocomplete="email" required></label>
+      <Robot v-model="f.robot" ref="robot"/>
       <button :disabled="f.sibuk">Kirim tautan atur ulang</button></form>
     <Pesan :galat="f.galat" :ok="f.ok"/>
     <p class="redup" style="margin:0">Tautan berlaku 1 jam. <a href="#/masuk">Kembali ke Masuk</a></p>
@@ -161,17 +200,17 @@ const Reset = {
 
 // ---------------------------------------------------------------- setelah masuk: daftar anak + tautkan, detail anak
 const Anak = {
-  components: { Pesan, Foto },
+  components: { Pesan, Foto, Robot },
   setup() {
-    const f = reactive({ nis: "", tanggal_lahir: "", galat: "", ok: "", sibuk: false, kabar: [], buka: null });
-    const isi = ref(null);
+    const f = reactive({ nis: "", tanggal_lahir: "", galat: "", ok: "", sibuk: false, kabar: [], buka: null, robot: "" });
+    const isi = ref(null), robot = ref(null);
     async function tautkan() {
       f.sibuk = true; f.galat = ""; f.ok = "";
-      try { const r = await api("/tautkan", { nis: f.nis, tanggal_lahir: f.tanggal_lahir }); f.ok = r.sudah ? "Anak ini sudah tertaut ke akun Anda." : `${r.santri} berhasil ditautkan.`; f.nis = ""; f.tanggal_lahir = ""; await muatSaya(); }
-      catch (e) { f.galat = e.message; await muatSaya(); } finally { f.sibuk = false; }
+      try { const r = await api("/tautkan", { nis: f.nis, tanggal_lahir: f.tanggal_lahir, turnstile: f.robot }); f.ok = r.sudah ? "Anak ini sudah tertaut ke akun Anda." : `${r.santri} berhasil ditautkan.`; f.nis = ""; f.tanggal_lahir = ""; await muatSaya(); }
+      catch (e) { f.galat = e.message; await muatSaya(); } finally { f.sibuk = false; robot.value && robot.value.ulang(); }
     }
     onMounted(async () => { nextTick(() => masuk(isi.value)); try { f.kabar = await api("/kabar"); } catch {} });
-    return { f, negara, tautkan, isi };
+    return { f, negara, tautkan, isi, robot };
   },
   template: `<div ref="isi" style="display:flex;flex-direction:column;gap:16px">
     <div><span class="jejak">Portal Wali Santri</span><h1>Assalamu'alaikum, {{ negara.saya.nama }}</h1></div>
@@ -184,6 +223,7 @@ const Anak = {
       <form v-else @submit.prevent="tautkan" class="baris">
         <label class="isian" style="flex:1 1 140px">NIS<input v-model="f.nis" inputmode="numeric" required></label>
         <label class="isian" style="flex:1 1 160px">Tanggal lahir anak<input type="date" v-model="f.tanggal_lahir" required></label>
+        <Robot v-model="f.robot" ref="robot" style="flex-basis:100%"/>
         <button :disabled="f.sibuk">Tautkan</button></form>
       <Pesan :galat="f.galat" :ok="f.ok"/>
     </div>

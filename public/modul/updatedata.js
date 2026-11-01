@@ -253,10 +253,10 @@
 
   // ------------------------------------------------------------ Masa Khidmat & Serah Terima
   const UDSerah = {
-    components: { Pesan, CariSantri, KonfirmasiSandi },
+    components: { Pesan, CariSantri, KonfirmasiSandi, SandiSementara },
     props: ["info"], emits: ["ubah"],
     setup(props, { emit }) {
-      const f = reactive({ nama: "", s1: null, s2: null, tanya: false, galat: "", ok: "", sibuk: false });
+      const f = reactive({ nama: "", s1: null, s2: null, tanya: false, galat: "", ok: "", sibuk: false, sandi: null });
       const sek = computed(() => [f.s1, f.s2].filter(Boolean));
       const pesan = computed(() => `Serah Terima Jabatan (putra & putri sekaligus).\n\n• Masa khidmat "${props.info.masa_khidmat ? props.info.masa_khidmat.nama : '—'}" dan ${props.info.jumlah_pengurus} jabatan diarsipkan; akun pengurus lama dinonaktifkan (santrinya tetap aktif).\n`
         + `• Serah Terima terakhir: ${props.info.serah_terima_terakhir || '—'} (${bulanLalu(props.info.serah_terima_terakhir)}).\n• Masa khidmat baru: ${f.nama}\n• Sekretaris baru: ${sek.value.map((s) => s.nama).join(", ")}\n\nYakin?`);
@@ -267,7 +267,8 @@
         f.tanya = false;
         await coba(f, async () => {
           const r = await api("/updatedata/serah-terima", { nama: f.nama, sekretaris: sek.value.map((s) => s.id), password: pw });
-          f.ok = `Serah Terima selesai: ${r.pengurus_lama} jabatan lama diarsipkan. Sekretaris baru: ${r.sekretaris.map((s) => s.nama + (s.status === 'tertahan' ? ' (akun TERTAHAN: tanggal lahir kosong)' : '')).join(", ")}. Password sementara: NIS + tanggal lahir.`;
+          f.ok = `Serah Terima selesai: ${r.pengurus_lama} jabatan lama diarsipkan. Sekretaris baru: ${r.sekretaris.map((s) => s.nama).join(", ")}.`;
+          const sandi = r.sekretaris.filter((s) => s.password); if (sandi.length) f.sandi = sandi;
           f.nama = ""; f.s1 = null; f.s2 = null; emit("ubah");
         });
       }
@@ -298,6 +299,7 @@
           <div><button class="bahaya" :disabled="!f.nama || !sek.length || f.sibuk" @click="f.tanya=true">Serah Terima Jabatan…</button></div>
         </template>
         <Pesan :galat="f.galat" :ok="f.ok"/>
+        <SandiSementara v-if="f.sandi" :daftar="f.sandi" @tutup="f.sandi = null"/>
       </div>
     </div>
     <KonfirmasiSandi v-if="f.tanya" judul="Serah Terima Jabatan" :pesan="pesan" @ok="jalankan" @batal="f.tanya=false"/>`,
@@ -305,11 +307,11 @@
 
   // ------------------------------------------------------------ Isi Bagian Pengurus (+ master jabatan untuk Moderator)
   const UDPengurus = {
-    components: { Pesan, FotoSantri },
+    components: { Pesan, FotoSantri, SandiSementara },
     directives: { baris: vBaris },
     props: ["info"], emits: ["ubah"],
     setup(props, { emit }) {
-      const f = reactive({ cara: "pilih", pengurus: [], jabatan: [], santri: [], kelas_id: "", q: "", qp: "", centang: {}, jab: "", rows: [], p: null, baru: "", ling: "semua", galat: "", ok: "", sibuk: false });
+      const f = reactive({ cara: "pilih", pengurus: [], jabatan: [], santri: [], kelas_id: "", q: "", qp: "", centang: {}, jab: "", rows: [], p: null, baru: "", ling: "semua", galat: "", ok: "", sibuk: false, sandi: null });
       const moderator = computed(() => negara.me.role === "moderator");
       const kelas5 = computed(() => ((negara.master || {}).kelas || []).filter((k) => k.tingkat === 5));
       const muat = () => coba(f, async () => { const r = await api("/updatedata/pengurus"); f.pengurus = r.pengurus; f.jabatan = r.jabatan; });
@@ -334,7 +336,7 @@
         if (f.rows.length) pratinjau();
       }
       async function simpan() {
-        await coba(f, async () => { const r = await api("/updatedata/pengurus", { rows: f.rows }); f.ok = `${r.jumlah} pengurus diisi; akun dibuat/diaktifkan (menunggu akses dari Moderator)${r.tertahan ? `, ${r.tertahan} akun tertahan (tanggal lahir kosong)` : ""}.`; f.p = null; f.rows = []; await muat(); muatSantri(); emit("ubah"); });
+        await coba(f, async () => { const r = await api("/updatedata/pengurus", { rows: f.rows }); f.ok = `${r.jumlah} pengurus diisi; akun dibuat/diaktifkan (menunggu akses dari Moderator).`; if (r.sandi.length) f.sandi = r.sandi; f.p = null; f.rows = []; await muat(); muatSantri(); emit("ubah"); });
       }
       const tambahJabatan = () => coba(f, async () => { await api("/updatedata/jabatan", { nama: f.baru, lingkungan: f.ling }); f.baru = ""; await muat(); });
       const ubahJabatan = (j) => coba(f, async () => { await api("/updatedata/jabatan", { id: j.id, aktif: j.aktif ? 0 : 1 }); await muat(); });
@@ -346,7 +348,7 @@
     template: `<div v-if="!info.masa_khidmat" class="pesan info">Belum ada masa khidmat aktif. Moderator membuatnya di tab Masa Khidmat & Serah Terima.</div>
     <div class="kartu" style="display:flex;flex-direction:column;gap:12px">
       <h2>Isi bagian pengurus</h2>
-      <p class="redup" style="margin:0">Hanya santri aktif Kelas 5 di lingkungan Anda. Satu baris tidak valid → seluruh kiriman ditolak. Akun NIS@daarululuumlido.com dibuat otomatis (password sementara NIS + tanggal lahir), role ditetapkan Moderator.</p>
+      <p class="redup" style="margin:0">Hanya santri aktif Kelas 5 di lingkungan Anda. Satu baris tidak valid → seluruh kiriman ditolak. Akun NIS@daarululuumlido.com dibuat / diaktifkan otomatis dengan password sementara acak (ditampilkan sekali untuk diserahkan); akses ditetapkan Moderator.</p>
       <div class="tab"><button :class="{aktif: f.cara==='pilih'}" @click="f.cara='pilih'; f.p=null">Pilih banyak</button><button :class="{aktif: f.cara==='file'}" @click="f.cara='file'; f.p=null">Upload file</button></div>
       <div v-if="f.cara==='file'" class="baris"><label class="isian">File CSV (NIS, JABATAN)<input type="file" accept=".csv,text/csv" @change="pilihFile"></label><button class="kedua" @click="templat">Unduh templat</button></div>
       <template v-else>
@@ -363,13 +365,14 @@
       </template>
     </div>
     <Pesan :galat="f.galat" :ok="f.ok"/>
+    <SandiSementara v-if="f.sandi" :daftar="f.sandi" @tutup="f.sandi = null"/>
     <template v-if="f.p">
       <div v-if="f.p.ditolak.length" class="pesan galat">{{ f.p.ditolak.length }} baris tidak valid — seluruh kiriman ditolak. Perbaiki lalu periksa ulang.</div>
       <div class="tabel"><table><thead><tr><th>Baris</th><th>Santri</th><th>Jabatan</th><th>Keterangan</th></tr></thead>
         <tbody v-baris>
           <tr v-for="s in f.p.ditolak" :key="'t' + s.baris"><td>{{ s.baris }}</td><td><strong>{{ s.nama || '—' }}</strong><div class="redup">{{ s.nis }}</div></td><td>{{ s.jabatan }}</td><td><span class="lencana merah">{{ s.alasan }}</span></td></tr>
           <tr v-for="s in f.p.siap" :key="'s' + s.baris"><td>{{ s.baris }}</td><td><div class="santri-sel"><FotoSantri :s="s"/><span><strong>{{ s.nama }}</strong><div class="redup">{{ s.nis }}</div></span></div></td><td>{{ s.jabatan }}</td>
-            <td><span class="lencana" :class="s.tertahan ? 'kuning' : 'hijau'">{{ s.tertahan ? 'Akun tertahan (tanggal lahir kosong)' : s.akun === 'baru' ? 'Akun baru' : 'Akun diaktifkan lagi' }}</span></td></tr>
+            <td><span class="lencana hijau">{{ s.akun === 'baru' ? 'Akun baru' : s.akun === 'tetap' ? 'Akun sudah aktif (password tetap)' : 'Akun diaktifkan lagi' }}</span></td></tr>
         </tbody></table></div>
       <div class="baris"><button :disabled="f.sibuk || f.p.ditolak.length > 0" @click="simpan">Simpan {{ f.p.siap.length }} pengurus</button><button class="kedua" @click="f.p=null">Batal</button></div>
     </template>
@@ -396,11 +399,11 @@
 
   // ------------------------------------------------------------ PAW
   const UDPaw = {
-    components: { Pesan, FotoSantri, CariSantri, KonfirmasiSandi },
+    components: { Pesan, FotoSantri, CariSantri, KonfirmasiSandi, SandiSementara },
     directives: { baris: vBaris },
     emits: ["ubah"],
     setup(_, { emit }) {
-      const f = reactive({ pengurus: [], q: "", sel: null, alasan: "", ganti: null, preset_id: "", preset: [], tanya: false, galat: "", ok: "", sibuk: false });
+      const f = reactive({ pengurus: [], q: "", sel: null, alasan: "", ganti: null, preset_id: "", preset: [], tanya: false, galat: "", ok: "", sibuk: false, sandi: null });
       const moderator = computed(() => negara.me.role === "moderator");
       onMounted(async () => { if (moderator.value) f.preset = await api("/preset").catch(() => []); });
       const namaPreset = () => (f.preset.find((p) => p.id == f.preset_id) || {}).nama;
@@ -412,7 +415,8 @@
         f.tanya = false;
         await coba(f, async () => {
           const r = await api("/updatedata/paw", { pengurus_id: f.sel.id, alasan: f.alasan, santri_id: f.ganti ? f.ganti.id : null, preset_id: f.preset_id || null, password: pw });
-          f.ok = "PAW selesai." + (r.pengganti ? ` Pengganti ${r.pengganti.nama}: akun ${r.pengganti.status}${r.pengganti.status === 'tertahan' ? ' (tanggal lahir kosong)' : ' — password sementara NIS + tanggal lahir'}.` : "");
+          f.ok = "PAW selesai." + (r.pengganti ? ` Pengganti ${r.pengganti.nama}: akun aktif${r.pengganti.password ? "" : " (password tetap)"}.` : "");
+          if (r.pengganti && r.pengganti.password) f.sandi = [r.pengganti];
           f.sel = null; f.alasan = ""; f.ganti = null; f.preset_id = ""; await muat(); emit("ubah");
         });
       }
@@ -441,6 +445,7 @@
           <div><button class="bahaya" :disabled="!f.alasan || f.sibuk" @click="f.tanya=true">Jalankan PAW…</button></div>
         </template>
         <Pesan :galat="f.galat" :ok="f.ok"/>
+        <SandiSementara v-if="f.sandi" :daftar="f.sandi" @tutup="f.sandi = null"/>
       </div>
     </div>
     <KonfirmasiSandi v-if="f.tanya" judul="Pergantian Antar-Waktu" :pesan="pesan" @ok="jalankan" @batal="f.tanya=false"/>`,
@@ -448,29 +453,29 @@
 
   // ------------------------------------------------------------ Akun tertahan
   const UDTertahan = {
-    components: { Pesan, FotoSantri },
+    components: { Pesan, FotoSantri, SandiSementara },
     directives: { baris: vBaris },
     emits: ["ubah"],
     setup(_, { emit }) {
-      const f = reactive({ daftar: [], q: "", galat: "", ok: "", sibuk: false });
+      const f = reactive({ daftar: [], q: "", galat: "", ok: "", sibuk: false, sandi: null });
       const muat = () => coba(f, async () => { f.daftar = await api("/updatedata/akun-tertahan"); });
       const tampil = computed(() => f.daftar.filter((s) => cocokTeks(s, f.q)));
-      const siap = computed(() => f.daftar.filter((s) => s.tanggal_lahir).length);
-      const aktifkan = () => coba(f, async () => { const r = await api("/updatedata/akun-tertahan/aktifkan", {}); f.ok = `${r.jumlah} akun diaktifkan (password sementara NIS + tanggal lahir).`; await muat(); emit("ubah"); });
+      const siap = computed(() => Math.min(f.daftar.length, 30));
+      const aktifkan = () => coba(f, async () => { const r = await api("/updatedata/akun-tertahan/aktifkan", {}); f.ok = `${r.jumlah} akun diaktifkan.`; if (r.sandi.length) f.sandi = r.sandi; await muat(); emit("ubah"); });
       onMounted(muat);
       return { f, tampil, siap, aktifkan };
     },
     template: `<div class="kartu" style="display:flex;flex-direction:column;gap:10px">
       <h2>Akun tertahan</h2>
-      <p class="redup" style="margin:0">Akun pengurus yang belum bisa dibuatkan password sementara karena tanggal lahir santri kosong. Lengkapi tanggal lahir di Data Master (Moderator), lalu aktifkan.</p>
-      <div class="baris"><input v-model="f.q" placeholder="Saring nama atau NIS (min. 2 huruf)" style="flex:1 1 240px"><button :disabled="!siap || f.sibuk" @click="aktifkan">Aktifkan {{ siap }} akun yang tanggal lahirnya sudah lengkap</button></div>
+      <p class="redup" style="margin:0">Akun pengurus dari aturan lama yang belum punya password. Saat diaktifkan, tiap akun mendapat password sementara acak yang ditampilkan sekali.</p>
+      <div class="baris"><input v-model="f.q" placeholder="Saring nama atau NIS (min. 2 huruf)" style="flex:1 1 240px"><button :disabled="!siap || f.sibuk" @click="aktifkan">Aktifkan {{ siap }} akun</button></div>
     </div>
     <Pesan :galat="f.galat" :ok="f.ok"/>
-    <div class="tabel"><table><thead><tr><th>Santri</th><th>Email</th><th>Jabatan</th><th>Tanggal lahir</th></tr></thead>
+    <SandiSementara v-if="f.sandi" :daftar="f.sandi" @tutup="f.sandi = null"/>
+    <div class="tabel"><table><thead><tr><th>Santri</th><th>Email</th><th>Jabatan</th></tr></thead>
       <tbody v-baris><tr v-for="s in tampil" :key="s.id">
         <td><div class="santri-sel"><FotoSantri :s="s"/><span><strong>{{ s.nama }}</strong><div class="redup">{{ s.nis }} · {{ s.lingkungan }}</div></span></div></td>
-        <td>{{ s.email }}</td><td>{{ s.jabatan || '—' }}</td>
-        <td><span class="lencana" :class="s.tanggal_lahir ? 'hijau' : 'merah'">{{ s.tanggal_lahir || 'Kosong' }}</span></td></tr></tbody></table>
+        <td>{{ s.email }}</td><td>{{ s.jabatan || '—' }}</td></tr></tbody></table>
       <p v-if="!tampil.length" class="redup" style="padding:14px">Tidak ada akun tertahan.</p></div>`,
   };
 

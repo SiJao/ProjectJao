@@ -70,10 +70,10 @@ Kemampuan **sistem** yang melayani seluruh administrasi di atas.
 Fungsi Sistem HISADA
 ├── Akses
 │   ├── Login & Akun
-│   │   ├── Password sementara: NIS + tanggal lahir
+│   │   ├── Password sementara: acak, ditampilkan sekali
 │   │   └── Wajib ganti saat login pertama
 │   └── Kelola User & Role
-│       ├── Role: Piket · Kesehatan · Kedisiplinan · Sekretaris · Asatidz · Moderator
+│       ├── Preset akses: Piket · Kesehatan · Kedisiplinan · Sekretaris · Asatidz (+ status Moderator)
 │       └── Manajemen Akses: akses manual per akun + preset (hanya Moderator)
 ├── Pengolahan Data
 │   ├── Update Data & Import
@@ -545,12 +545,24 @@ flowchart TD
 ### Login & Akun
 
 - **Login:** email + password. Pengurus santri memakai `(NIS)@daarululuumlido.com` (kotak surat aktif di Google Workspace pondok).
-- **Password sementara** akun baru = **NIS + tanggal lahir** (contoh format: `12345` + `01022010`), **wajib diganti saat login pertama**. Kotak surat Google `NIS@` memakai pola password awal yang sama dan juga **wajib diganti saat login pertama**.
+- **Password sementara** akun baru **acak** (mis. `k7m2p-x9qbr`), **ditampilkan sekali** kepada yang membuat/mengaktifkan akun (Moderator, Sekretaris lewat Isi Bagian Pengurus, pemegang PAW) untuk diserahkan langsung ke pemiliknya, dan **wajib diganti saat login pertama**. Pola lama NIS + tanggal lahir dihapus karena mudah ditebak (audit keamanan).
+- Akun yang **masih aktif** dan sudah punya password tidak direset saat diangkat lagi (Isi Pengurus, Serah Terima, PAW); hanya akun baru / yang diaktifkan lagi yang mendapat password sementara.
+- Kotak surat Google `NIS@` diatur di Google Workspace (di luar HISADA); password awalnya juga sebaiknya acak, bukan pola NIS + tanggal lahir.
 - Kotak surat `NIS@` dibuat (santri baru) dan ditangguhkan (alumni/keluar) oleh **Moderator**.
 - **Tautan aktivasi via email** tersedia sebagai **opsi kedua**.
-- **Akun tertahan:** jika tanggal lahir santri kosong, akun tidak dibuat sampai data dilengkapi. Sekretaris & Moderator melihat daftar akun tertahan.
+- **Akun tertahan** (aturan lama: tanggal lahir kosong) tidak lagi dibuat. Sisa akun tertahan dapat diaktifkan Sekretaris/Moderator dengan password sementara acak.
 - **Reset password mandiri** lewat tautan ke email.
-- Password disimpan dengan hash **Bcrypt**.
+- Password disimpan dengan hash **PBKDF2-SHA256** (salt acak, 100.000 iterasi).
+
+### Keamanan (hasil audit)
+- **Batas percobaan per IP** (selain kunci per akun): login gagal 20×/15 menit; formulir Portal Wali yang mengirim email 10×/jam; penautan anak gagal 10×/jam. Bisa diubah lewat pengaturan `batas_ip.<jenis>`. IP tidak disimpan mentah (hash).
+- Login: status akun baru diperiksa **setelah** password benar (tidak membocorkan akun mana yang ada/nonaktif).
+- **Akun tanpa akses** (baru dibuat / menunggu Moderator) tidak melihat daftar santri, Cari Santri & Guru, maupun kontak. **Kontak guru** (HP/email) dan **HP wali** hanya untuk Moderator dan akun yang punya akses; tanggal lahir tidak ikut di daftar santri.
+- Akun dengan email berpola santri (`NIS@`) tidak bisa dijadikan Moderator/guru (K-11). Moderator yang dicabut statusnya **wajib diberi lingkungan** (tidak otomatis tetap "semua").
+- **Backup / ekspor CSV** wajib konfirmasi password (izin 15 menit, hanya untuk sesi itu); tautan token di antrean email disamarkan di berkas backup.
+- **Portal Wali:** kuota 5 email akun per alamat per 24 jam; **password dibuat saat membuka tautan verifikasi email** (bukan saat daftar), sehingga mendaftar dengan email orang lain tidak bisa dipakai merebut akun; verifikasi manual oleh Moderator memberi password sementara acak (tampil sekali); **Cloudflare Turnstile** (anti-robot) di Daftar, Lupa password, dan Tautkan anak — aktif setelah `TURNSTILE_SITEKEY` (variabel) dan `TURNSTILE_SECRET` (secret) dipasang.
+- **Header keamanan** (`public/_headers`): CSP, `frame-ancestors 'none'` / X-Frame-Options (anti-clickjacking), nosniff, Referrer-Policy.
+- Aksi yang bisa terklik ganda (batal kunjungan kesehatan, PAW, pengumuman email) hanya diproses sekali.
 
 ### Kelola User & Role
 
@@ -637,7 +649,7 @@ flowchart TD
 2. **Peringatan** selalu muncul (jumlah pengurus lama, waktu Serah Terima terakhir), lalu **password Moderator yang sedang login**.
 3. Dalam satu proses: masa khidmat lama & semua jabatan **diarsipkan** (bukan dihapus), akun pengurus lama **dinonaktifkan** (santrinya tetap aktif), masa khidmat baru dibuat, Sekretaris baru langsung aktif.
 4. **Sekretaris baru** mengisi bagian/jabatan pengurus lain — lewat **upload file** (NIS + jabatan) **atau pilih banyak sekaligus**. Hanya santri aktif Kelas 5; baris yang tidak valid **ditolak** dan proses tidak lanjut sampai diperbaiki.
-5. Akun pengurus dibuat otomatis (`NIS@daarululuumlido.com`, password sementara NIS + tanggal lahir).
+5. Akun pengurus dibuat otomatis (`NIS@daarululuumlido.com`, password sementara acak yang ditampilkan sekali ke Sekretaris untuk diserahkan).
 6. **Moderator** menerapkan preset & Manajemen Akses tiap pengurus.
 
 Selama menunggu langkah 6, **Absensi tetap berjalan** karena Sekretaris otomatis memiliki akses Absensi. **Perizinan & Gate Pass hanya bisa dibuat Moderator** sampai akses Perizinan diberikan lewat Manajemen Akses (risiko diterima, K-96). Kesehatan & Kedisiplinan juga menunggu akses.
@@ -650,7 +662,7 @@ flowchart TD
     Peringatan -- "yakin" --> Password{"Password Moderator<br/>yang sedang login"}
     Password -- "salah" --> Batal
     Password -- "benar" --> Proses["Satu proses:<br/>1. Arsipkan masa khidmat lama + semua jabatan<br/>2. Nonaktifkan akun pengurus lama<br/>(santri tetap aktif Kelas 6)<br/>3. Buat masa khidmat baru<br/>4. Aktifkan Sekretaris baru"]
-    Proses --> Login1["Sekretaris baru login<br/>password sementara = NIS + tgl lahir<br/>wajib ganti saat login pertama"]
+    Proses --> Login1["Sekretaris baru login<br/>password sementara acak (tampil sekali)<br/>wajib ganti saat login pertama"]
     Login1 --> Absensi["Absensi tetap berjalan<br/>(Sekretaris otomatis akses Absensi)"]
     Login1 --> Bagian["SEKRETARIS isi bagian pengurus lain:<br/>upload file ATAU pilih banyak sekaligus<br/>(hanya santri aktif Kelas 5)"]
     Bagian --> Akun["Akun pengurus dibuat<br/>NIS@daarululuumlido.com"]
@@ -706,7 +718,7 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
 | Kelompok | Contoh kejadian | Penerima |
 |---|---|---|
 | **Sistem & keamanan** | Backup gagal/terlewat, login gagal berulang, domain/hosting hampir jatuh tempo | Moderator, tim IT (login gagal juga ke pemilik akun) |
-| **Proses tahunan & akun** | Serah Terima / Update Kelas Tahunan dijalankan, pengurus menunggu role, akun tertahan, akun dibuat, password/role diubah | Moderator, Sekretaris, pemilik akun |
+| **Proses tahunan & akun** | Serah Terima / Update Kelas Tahunan dijalankan, akun belum punya akses, akun dibuat, password/akses diubah | Moderator, Sekretaris, pemilik akun |
 | **Kesantrian** | Pelanggaran menunggu sidang, izin overdue | Kedisiplinan, Piket berakses Perizinan |
 
 **Kabar ke wali — per kejadian** (tidak ada rekap harian). Email dikirim **segera** saat kejadian:
@@ -723,7 +735,7 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
 
 ### Portal Wali Santri
 
-- **Wali mendaftar akun sendiri** (nama, email, no. HP, persetujuan penggunaan data), lalu memverifikasi email. Ayah dan ibu bisa punya akun masing-masing.
+- **Wali mendaftar akun sendiri** (nama, email, no. HP, persetujuan penggunaan data), lalu membuka tautan verifikasi di email dan **membuat password** di sana. Ayah dan ibu bisa punya akun masing-masing.
 - **Menautkan santri otomatis** bila **NIS + tanggal lahir anak + no. HP wali** cocok dengan data.
 - **Pengaman penautan:**
   1. Batas percobaan: 5× gagal per hari → penautan dikunci 24 jam.
@@ -736,7 +748,7 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
 
 ```mermaid
 flowchart TD
-    A(["Wali daftar di Portal Wali<br/>nama, email, no. HP, persetujuan data"]) --> B["Verifikasi email"]
+    A(["Wali daftar di Portal Wali<br/>nama, email, no. HP, persetujuan data"]) --> B["Verifikasi email<br/>+ buat password"]
     B --> C["Tautkan santri:<br/>NIS + tanggal lahir anak"]
     C --> D{"NIS + tgl lahir anak<br/>+ no. HP wali cocok?"}
     D -- "cocok" --> E["Tertaut otomatis<br/>+ email ke wali lain yang sudah tertaut"]

@@ -169,6 +169,30 @@ const KonfirmasiSandi = {
     </form></div>`,
 };
 
+// Password sementara (acak) — tampil SEKALI setelah akun dibuat / diaktifkan lagi / direset; diserahkan langsung ke pemilik akun.
+// Pakai: <SandiSementara v-if="daftar" :daftar="daftar" @tutup="daftar=null"/>   daftar: [{ nama, nis?, email?, password }]
+const SandiSementara = {
+  props: { daftar: Array },
+  emits: ["tutup"],
+  setup(p) {
+    const tersalin = ref(false);
+    const salin = async () => {
+      try { await navigator.clipboard.writeText(p.daftar.map((x) => [x.nis, x.nama, x.password].filter(Boolean).join("\t")).join("\n")); tersalin.value = true; } catch {}
+    };
+    return { tersalin, salin };
+  },
+  template: `<div class="foto-lihat" style="cursor:default" role="dialog" aria-modal="true" aria-label="Password sementara">
+    <div class="kartu" style="max-width:560px;width:100%;display:flex;flex-direction:column;gap:12px;max-height:90vh;overflow:auto">
+      <h2>Password sementara</h2>
+      <div class="pesan info">Password ini hanya ditampilkan <strong>sekali</strong>. Catat atau salin, lalu serahkan langsung ke pemilik akun.
+        Pemilik masuk dengan email akunnya (akun santri: NIS@daarululuumlido.com). Akun pengurus wajib mengganti password saat pertama masuk; wali dapat menggantinya lewat "Lupa password".</div>
+      <div class="tabel"><table><thead><tr><th>Akun</th><th>Password</th></tr></thead><tbody>
+        <tr v-for="x in daftar" :key="(x.nis || x.email || '') + x.nama"><td><strong>{{ x.nama }}</strong><div class="redup">{{ x.nis ? x.nis + '@daarululuumlido.com' : x.email }}</div></td>
+          <td><code style="font-size:16px;user-select:all;white-space:nowrap">{{ x.password }}</code></td></tr></tbody></table></div>
+      <div class="baris"><button class="kedua" @click="salin">{{ tersalin ? 'Tersalin ✓' : 'Salin semua' }}</button><button @click="$emit('tutup')">Sudah dicatat, tutup</button></div>
+    </div></div>`,
+};
+
 const Pesan ={ props: ["galat", "ok"], template: `<div v-if="galat" class="pesan galat">{{ galat }}</div><div v-if="ok" class="pesan ok">{{ ok }}</div>` };
 
 // ---------------------------------------------------------------- Masuk / setup
@@ -229,7 +253,7 @@ const Masuk = {
           <label class="isian">Password<input type="password" v-model="f.password" autocomplete="current-password"></label>
           <button :disabled="f.sibuk">Masuk</button>
         </form>
-        <p class="redup" style="margin:0">Akun pengurus baru: password sementara = NIS + tanggal lahir (ddmmyyyy), wajib diganti saat login pertama.</p>
+        <p class="redup" style="margin:0">Akun pengurus baru: password sementara diberikan oleh Sekretaris/Moderator, wajib diganti saat login pertama.</p>
         <p class="redup" style="margin:0;text-align:center">Wali santri? Masuk lewat <a href="/wali.html">Portal Wali</a>.</p>
       </template>
       <Pesan :galat="f.galat" :ok="f.ok"/>
@@ -971,10 +995,10 @@ const DataMaster = {
 
 // ---------------------------------------------------------------- Pengguna & Manajemen Akses
 const Pengguna = {
-  components: { Pesan, CariSantri },
+  components: { Pesan, CariSantri, SandiSementara },
   setup() {
     const tab = ref("akun");
-    const f = reactive({ users: [], akses: [], preset: [], galat: "", ok: "", sel: null, santri: null, presetSantri: "", guru_id: "", presetGuru: "", modNama: "", modEmail: "", presetTerapkan: "", q: "" });
+    const f = reactive({ users: [], akses: [], preset: [], galat: "", ok: "", sel: null, santri: null, presetSantri: "", guru_id: "", presetGuru: "", modNama: "", modEmail: "", presetTerapkan: "", q: "", sandi: null });
     const m = computed(() => negara.master || {});
     async function muat() {
       const r = await api("/users"); f.users = r.users; f.akses = r.akses; f.preset = r.preset;
@@ -982,19 +1006,27 @@ const Pengguna = {
       if (!f.presetGuru) f.presetGuru = (f.preset.find((p) => p.nama === "Asatidz") || {}).id || "";
     }
     const jalan = async (fn, pesan) => { f.galat = ""; f.ok = ""; try { const r = await fn(); f.ok = typeof pesan === "function" ? pesan(r) : pesan; await muat(); return true; } catch (e) { f.galat = e.message; return false; } };
-    const buatPengurus = () => jalan(() => api("/users/dari-santri", { santri_id: f.santri.id, preset_id: f.presetSantri || null }), (r) => r.tertahan ? "Akun dibuat tetapi TERTAHAN: tanggal lahir santri kosong." : "Akun pengurus dibuat. Password sementara: NIS + tanggal lahir.");
+    const buatPengurus = () => { const s = f.santri; return jalan(() => api("/users/dari-santri", { santri_id: s.id, preset_id: f.presetSantri || null }),
+      (r) => { f.sandi = [{ nama: s.nama, nis: s.nis, password: r.password_sementara }]; return "Akun pengurus dibuat."; }); };
     const buatGuru = () => jalan(() => api("/users/guru", { guru_id: f.guru_id, preset_id: f.presetGuru || null }), "Akun guru dibuat (masuk dengan Google).");
     const buatMod = () => jalan(() => api("/users/moderator", { nama: f.modNama, email: f.modEmail }), "Moderator ditambahkan (masuk dengan Google).");
     const ubah = (u, data) => jalan(() => api("/users/" + u.id, data), "Akun diperbarui.");
     const akses = (u, kode, beri) => jalan(() => api(`/users/${u.id}/akses`, { kode, beri }), beri ? "Akses diberikan." : "Akses dicabut.");
-    const reset = (u) => confirm("Reset password " + u.email + "?") && jalan(() => api(`/users/${u.id}/reset-password`, {}), (r) => "Password sementara: " + r.password_sementara);
+    const reset = (u) => confirm("Reset password " + u.email + "?") && jalan(() => api(`/users/${u.id}/reset-password`, {}),
+      (r) => { f.sandi = [{ nama: u.nama, email: u.email, password: r.password_sementara }]; return "Password direset."; });
     function terapkan(u) {
       const p = f.preset.find((x) => x.id == f.presetTerapkan);
       if (!p || !confirm(`Terapkan preset ${p.nama} ke ${u.nama}?\nAkses akun ini DIGANTI dengan isi preset (${p.akses.length} akses). Sesudahnya akses masih bisa diubah satu per satu.`)) return;
       jalan(() => api(`/users/${u.id}/preset`, { preset_id: p.id }), `Preset ${p.nama} diterapkan.`).then(() => { f.presetTerapkan = ""; });
     }
-    const jadikanMod = (u, jadi) => confirm(jadi ? `Jadikan ${u.nama} Moderator? Moderator memegang SEMUA akses, termasuk mengelola pengguna dan backup.` : `Cabut status Moderator ${u.nama}?`)
-      && ubah(u, { moderator: jadi });
+    function jadikanMod(u, jadi) {
+      if (jadi) return confirm(`Jadikan ${u.nama} Moderator? Moderator memegang SEMUA akses, termasuk mengelola pengguna dan backup.`) && ubah(u, { moderator: true });
+      // dicabut: lingkungan wajib dipilih ulang (tidak otomatis tetap "semua")
+      const l = (prompt(`Cabut status Moderator ${u.nama}?\nLingkungan akun ini sesudahnya (putra / putri / semua):`, u.guru_id ? u.lingkungan : "putra") || "").trim().toLowerCase();
+      if (!l) return;
+      if (!["putra", "putri", "semua"].includes(l)) { f.galat = "Lingkungan harus putra, putri, atau semua."; return; }
+      ubah(u, { moderator: false, lingkungan: l });
+    }
     // label akses akun: Moderator · nama preset (+ "diubah" bila aksesnya tidak lagi sama dengan preset) · akses manual · belum ada akses
     const samaPreset = (u) => { const p = f.preset.find((x) => x.id === u.preset_id); return p && p.akses.length === u.akses.length && p.akses.every((k) => u.akses.includes(k)); };
     const labelUser = (u) => u.role === "moderator" ? "Moderator" : u.preset ? u.preset + (samaPreset(u) ? "" : " (diubah)") : u.akses.length ? `Akses manual (${u.akses.length})` : "Belum ada akses";
@@ -1021,6 +1053,7 @@ const Pengguna = {
   },
   template: `<div><span class="jejak">Fungsi › Akses</span><h1>Pengguna & Manajemen Akses</h1></div>
   <Pesan :galat="f.galat" :ok="f.ok"/>
+  <SandiSementara v-if="f.sandi" :daftar="f.sandi" @tutup="f.sandi = null"/>
   <div class="tab"><button :class="{aktif: tab==='akun'}" @click="tab='akun'">Akun</button><button :class="{aktif: tab==='preset'}" @click="tab='preset'">Preset akses</button></div>
 
   <template v-if="tab==='akun'">
@@ -1058,7 +1091,7 @@ const Pengguna = {
           <details style="margin-top:6px"><summary style="cursor:pointer;font-size:13px"><strong>Edit daftar pilihan</strong> <span class="redup">({{ aksesPilihan.filter(a => f.sel.akses.includes(a.kode)).length }} dipilih)</span></summary>
             <label v-for="a in aksesPilihan" :key="a.kode" style="display:flex;gap:10px;align-items:center;padding:5px 0;font-size:14px"><input type="checkbox" :checked="f.sel.akses.includes(a.kode)" @change="akses(f.sel, a.kode, $event.target.checked)"><span>{{ a.nama }}</span></label></details></div>
       </template>
-      <label class="isian" v-if="f.sel.guru_id && f.sel.role !== 'moderator'">Lingkungan guru<select :value="f.sel.lingkungan" @change="ubah(f.sel, {lingkungan: $event.target.value})"><option>semua</option><option>putra</option><option>putri</option></select></label>
+      <label class="isian" v-if="!f.sel.santri_id && f.sel.role !== 'moderator'">Lingkungan<select :value="f.sel.lingkungan" @change="ubah(f.sel, {lingkungan: $event.target.value})"><option>semua</option><option>putra</option><option>putri</option></select></label>
       <div class="baris"><button class="kedua" @click="ubah(f.sel, {status: f.sel.status==='aktif' ? 'nonaktif' : 'aktif'})">{{ f.sel.status==='aktif' ? 'Nonaktifkan' : 'Aktifkan' }}</button>
         <button v-if="f.sel.role !== 'moderator' && !f.sel.santri_id" class="kedua" @click="jadikanMod(f.sel, true)">Jadikan Moderator</button>
         <button v-if="f.sel.punya_password || f.sel.santri_id" class="bahaya" @click="reset(f.sel)">Reset password</button></div>
@@ -1112,7 +1145,7 @@ const HALAMAN = { "/": Beranda, "/absensi": Absensi, "/perizinan": Perizinan, "/
 const GRUP_MENU = ["Beranda", "Administrasi", "Fungsi"];
 const MENU = [
   { jalur: "/", label: "Dashboard", grup: "Beranda", urutan: 1, syarat: () => true },
-  { jalur: "/data-master", label: "Data Master", grup: "Administrasi", urutan: 10, syarat: () => true },
+  { jalur: "/data-master", label: "Data Master", grup: "Administrasi", urutan: 10, syarat: (me) => me.moderator || me.akses.length > 0 },
   { jalur: "/absensi", label: "Absensi", grup: "Administrasi", urutan: 20, syarat: (me) => me.bisa.absensi || me.bisa.lihat_absensi },
   { jalur: "/perizinan", label: "Perizinan", grup: "Administrasi", urutan: 30, syarat: (me) => me.bisa.perizinan },
   { jalur: "/pengguna", label: "Pengguna & Akses", grup: "Fungsi", urutan: 70, syarat: (me) => me.role === "moderator" },

@@ -1,9 +1,10 @@
 // Modul Cari Santri & Guru — kartu detail santri (tanpa data kesehatan) dan detail guru. Daftar memakai GET /api/santri & GET /api/guru.
 export default function (H) {
-  const { on, json, gagal, lingIn, cekLing } = H;
+  const { on, json, gagal, lingIn, cekLing, wajibAdaAkses } = H;
 
   // Identitas, kelas, kamar, wali kelas & wali asuh tahun ajaran aktif.
   on("GET", "/api/cari/santri/:id", async ({ db, u, p }) => {
+    wajibAdaAkses(u); // akun tanpa akses tidak melihat data santri & kontak
     const s = await db.prepare(
       `SELECT s.id, s.nis, s.nama, s.jenis_kelamin, s.lingkungan, s.status, s.tempat_lahir, s.tanggal_lahir, s.kabupaten, s.provinsi, s.foto_url, s.tanggal_masuk,
               s.kelas_id, s.kamar_id, km.nama kamar, a.nama asrama, (k.tingkat || ' ' || k.rombel || ' ' || j.nama || COALESCE(' ' || k.label, '')) kelas
@@ -22,6 +23,7 @@ export default function (H) {
 
   // Daftar guru (cadangan bila GET /api/guru belum ada): nama/NIP, lingkungan 'semua' atau di lingkungan pengguna. Maks. 5 saran.
   on("GET", "/api/cari/guru", async ({ db, u, url }) => {
+    wajibAdaAkses(u);
     const l = lingIn(u, "g.lingkungan");
     const w = [`(g.lingkungan = 'semua' OR ${l.sql})`, "g.aktif = 1"], a = [...l.args];
     const q = (url.searchParams.get("q") || "").trim();
@@ -29,12 +31,13 @@ export default function (H) {
     const ling = url.searchParams.get("lingkungan");
     if (["putra", "putri", "semua"].includes(ling)) { w.push("g.lingkungan = ?"); a.push(ling); }
     const lim = Math.max(1, Math.min(+url.searchParams.get("limit") || 5, 5));
-    const r = await db.prepare(`SELECT g.id, g.nip, g.nama, g.jenis_kelamin, g.lingkungan, g.email, g.no_hp FROM guru g WHERE ${w.join(" AND ")} ORDER BY g.nama LIMIT ?`).bind(...a, lim).all();
+    const r = await db.prepare(`SELECT g.id, g.nip, g.nama, g.jenis_kelamin, g.lingkungan FROM guru g WHERE ${w.join(" AND ")} ORDER BY g.nama LIMIT ?`).bind(...a, lim).all();
     return json(r.results);
   });
 
   // Detail guru: kontak + tugas wali kelas / wali asuh tahun ajaran aktif (hanya kelas/kamar di lingkungan pengguna).
   on("GET", "/api/cari/guru/:id", async ({ db, u, p }) => {
+    wajibAdaAkses(u); // akun tanpa akses tidak melihat data santri & kontak
     const g = await db.prepare("SELECT id, nip, nama, jenis_kelamin, lingkungan, email, no_hp, aktif FROM guru WHERE id = ?").bind(p.id).first();
     if (!g) gagal(404, "Guru tidak ditemukan.");
     if (g.lingkungan !== "semua") cekLing(u, g.lingkungan);

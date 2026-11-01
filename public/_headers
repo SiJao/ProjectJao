@@ -1,0 +1,9 @@
+# Header keamanan untuk halaman & berkas statis (Workers Static Assets). Respons /api/* diatur di src/worker.js.
+# script-src 'unsafe-eval' wajib selama templat Vue dikompilasi di browser (tanpa build tool).
+# challenges.cloudflare.com = Turnstile (anti-robot Portal Wali); fonts.* = Google Fonts; img https: = foto santri (Google).
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-eval' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; object-src 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
