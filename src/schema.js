@@ -743,5 +743,15 @@ export const MIGRATIONS = [
       // Izin unduh backup per sesi (setelah konfirmasi password), berlaku singkat
       `ALTER TABLE sesi_login ADD COLUMN backup_sampai TEXT`
     ]
+  },
+  {
+    id: 6,
+    nama: "indeks-santri",
+    sql: [
+      // Hitungan santri per kelas (Data Master / Dashboard) dan lencana "menunggu penempatan" memindai seluruh tabel santri
+      // tanpa indeks ini → melewati batas baca harian D1 (paket gratis 5 juta baris/hari).
+      `CREATE INDEX IF NOT EXISTS santri_kelas ON santri (kelas_id, status)`,
+      `CREATE INDEX IF NOT EXISTS santri_menunggu ON santri (menunggu_penempatan, status)`
+    ]
   }
 ];
