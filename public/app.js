@@ -282,13 +282,81 @@ const GantiPassword = {
   </div>`,
 };
 
+// ---------------------------------------------------------------- Grafik (Chart.js, disimpan lokal: /chart.umd.min.js)
+// Pakai: <Grafik :cfg="{ type, data, options }" label="…"/> — cfg baru → digambar ulang. cfg tanpa fungsi (disalin JSON).
+const WARNA_GRAFIK = { hijau: "#1F6B45", merah: "#8E2A22", kuning: "#C08A2E", biru: "#23497E", abu: "#9AA59E" };
+if (window.Chart) Object.assign(window.Chart.defaults, { color: "#55605A", font: { ...window.Chart.defaults.font, family: "'Plus Jakarta Sans', system-ui, sans-serif" } });
+const Grafik = {
+  props: { cfg: Object, label: String, tinggi: { type: Number, default: 240 } },
+  setup(p) {
+    const el = ref(null); let ch = null;
+    const gambar = () => {
+      if (ch) { ch.destroy(); ch = null; }
+      if (window.Chart && el.value && p.cfg) ch = new window.Chart(el.value, JSON.parse(JSON.stringify(p.cfg)));
+    };
+    onMounted(gambar); watch(() => p.cfg, gambar);
+    Vue.onBeforeUnmount(() => { if (ch) ch.destroy(); });
+    return { el };
+  },
+  template: `<div :style="{ position: 'relative', height: tinggi + 'px' }"><canvas ref="el" role="img" :aria-label="label"></canvas></div>`,
+};
+// tanggal YYYY-MM-DD dari..sampai (WIB, dari server) → daftar hari & label "dd/mm"
+const daftarTanggal = (dari, sampai) => { const r = []; for (let t = Date.parse(dari + "T00:00:00Z"); t <= Date.parse(sampai + "T00:00:00Z"); t += 864e5) r.push(new Date(t).toISOString().slice(0, 10)); return r; };
+const labelTgl = (t) => t.slice(8, 10) + "/" + t.slice(5, 7);
+const NAMA_BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+function opsiBatang(tumpuk, horizontal = false) {
+  return { responsive: true, maintainAspectRatio: false, animation: GERAK ? { duration: 500 } : false, indexAxis: horizontal ? "y" : "x",
+    plugins: { legend: { display: tumpuk, position: "bottom", labels: { boxWidth: 12, boxHeight: 12 } } },
+    scales: { x: { stacked: tumpuk, grid: { display: horizontal }, ticks: horizontal ? { precision: 0 } : { maxRotation: 0, autoSkip: true, autoSkipPadding: 8 }, beginAtZero: true },
+      y: { stacked: tumpuk, beginAtZero: true, grid: { display: !horizontal }, ticks: horizontal ? {} : { precision: 0 } } } };
+}
+// data mentah /ringkasan/grafik → konfigurasi Chart.js per bagian (null bila tidak ada akses / tidak ada data)
+function susunGrafik(g) {
+  const hari = daftarTanggal(g.dari, g.sampai), labels = hari.map(labelTgl), cfg = {};
+  const perHari = (baris, cocok) => hari.map((t) => baris.filter((b) => b.tanggal === t && cocok(b)).reduce((n, b) => n + b.n, 0));
+  const batang = (datasets, tumpuk = true) => datasets.some((d) => d.data.some(Boolean)) ? { type: "bar", data: { labels, datasets }, options: opsiBatang(tumpuk) } : null;
+  if (g.kehadiran) {
+    const st = [...new Map(g.kehadiran.map((b) => [b.kode, b])).values()].sort((a, b) => a.urutan - b.urutan);
+    cfg.kehadiran = batang(st.map((s) => ({ label: s.nama, data: perHari(g.kehadiran, (b) => b.kode === s.kode), backgroundColor: s.warna, borderRadius: 2 })));
+  }
+  if (g.kesehatan) cfg.kesehatan = batang([
+    { label: "Berobat", data: perHari(g.kesehatan, (b) => !b.rawat), backgroundColor: WARNA_GRAFIK.kuning, borderRadius: 2 },
+    { label: "Dirawat", data: perHari(g.kesehatan, (b) => !!b.rawat), backgroundColor: WARNA_GRAFIK.merah, borderRadius: 2 }]);
+  if (g.perizinan) cfg.perizinan = batang([
+    { label: "Izin keluar", data: perHari(g.perizinan, (b) => !b.overdue), backgroundColor: WARNA_GRAFIK.biru, borderRadius: 2 },
+    { label: "Sempat overdue", data: perHari(g.perizinan, (b) => !!b.overdue), backgroundColor: WARNA_GRAFIK.merah, borderRadius: 2 }]);
+  if (g.kedisiplinan && g.kedisiplinan.length) cfg.kedisiplinan = { type: "bar", options: opsiBatang(false, true),
+    data: { labels: g.kedisiplinan.map((b) => b.kategori), datasets: [{ label: "Pelanggaran divonis", data: g.kedisiplinan.map((b) => b.n), backgroundColor: WARNA_GRAFIK.merah, borderRadius: 3 }] } };
+  if (g.prestasi) {
+    const bulan = [...new Set(hari.map((t) => t.slice(0, 7)))];
+    const data = bulan.map((b) => (g.prestasi.find((x) => x.bulan === b) || { n: 0 }).n);
+    if (data.some(Boolean)) cfg.prestasi = { type: "bar", options: opsiBatang(false),
+      data: { labels: bulan.map((b) => NAMA_BULAN[+b.slice(5, 7) - 1] + " " + b.slice(2, 4)), datasets: [{ label: "Prestasi", data, backgroundColor: WARNA_GRAFIK.hijau, borderRadius: 3, maxBarThickness: 48 }] } };
+  }
+  return cfg;
+}
+
 // ---------------------------------------------------------------- Dashboard
 const Beranda = {
   directives: { hitung: vHitung },
+  components: { Grafik },
   setup() {
     const d = ref(null), galat = ref("");
+    const g = reactive({ hari: 30, data: null, cfg: {}, galat: "" });
+    let nomor = 0;
+    async function muatGrafik() {
+      const n = ++nomor;
+      try { const r = await api("/ringkasan/grafik?hari=" + g.hari); if (n === nomor) { g.data = r; g.cfg = susunGrafik(r); g.galat = ""; } }
+      catch (e) { if (n === nomor) g.galat = e.message; }
+    }
     onMounted(async () => { try { d.value = await api("/ringkasan"); } catch (e) { galat.value = e.message; } });
-    return { d, galat, negara, labelAkun };
+    onMounted(muatGrafik); watch(() => g.hari, muatGrafik);
+    // bagian yang boleh dilihat akun ini (dikirim server sesuai akses), walau datanya kosong
+    const BAGIAN = [["kehadiran", "Kehadiran harian", "Catatan absensi kamar per status"], ["kesehatan", "Kesehatan", "Kunjungan per hari (tanpa keluhan/diagnosa)"],
+      ["perizinan", "Perizinan", "Izin keluar per tanggal berangkat"], ["kedisiplinan", "Kedisiplinan", "Pelanggaran yang sudah divonis, per kategori"],
+      ["prestasi", "Prestasi", "Prestasi tercatat per bulan"]];
+    const bagian = computed(() => g.data ? BAGIAN.filter(([k]) => k in g.data) : []);
+    return { d, galat, negara, labelAkun, g, bagian };
   },
   template: `<section class="sapaan"><span class="jejak">{{ d ? d.waktu + ' WIB' : '' }}</span><h1>Assalamu'alaikum, {{ negara.me.nama }}</h1>
     <span class="jejak">{{ labelAkun(negara.me) }} · HISADA</span><img src="/img/logo-hisada-256.png" alt=""></section>
@@ -303,6 +371,18 @@ const Beranda = {
     <div class="kartu stat"><div class="redup">Pulang hari ini</div><div class="angka" v-hitung="d.pulang_hari_ini"></div></div>
     <div class="kartu stat"><div class="redup">Alpha hari ini</div><div class="angka" style="color:var(--merah)" v-hitung="d.alpha_hari_ini"></div></div>
   </div>
+  <section class="kartu" v-if="bagian.length" style="display:flex;flex-direction:column;gap:12px">
+    <div class="baris" style="justify-content:space-between;align-items:center"><h2>Grafik {{ g.hari }} hari terakhir</h2>
+      <div class="tab" role="group" aria-label="Periode grafik"><button v-for="h in [7, 30, 90]" :key="h" :class="{aktif: g.hari === h}" :aria-pressed="g.hari === h" @click="g.hari = h">{{ h }} hari</button></div></div>
+    <div v-if="g.galat" class="pesan galat">{{ g.galat }}</div>
+    <div class="kisi-grafik">
+      <div v-for="[k, judul, ket] in bagian" :key="k" class="grafik-kotak">
+        <h3>{{ judul }}</h3><p class="redup">{{ ket }}</p>
+        <Grafik v-if="g.cfg[k]" :cfg="g.cfg[k]" :label="judul + ', ' + g.hari + ' hari terakhir'"/>
+        <p v-else class="redup grafik-kosong">Belum ada data pada periode ini.</p>
+      </div>
+    </div>
+  </section>
   <section class="kartu" v-if="d" style="display:flex;flex-direction:column;gap:10px">
     <div class="baris" style="justify-content:space-between;align-items:center"><h2>Agenda mendatang</h2><a href="#/tata-warkat">Kalender</a></div>
     <p v-if="!d.agenda.length" class="redup" style="margin:0">Belum ada agenda.</p>

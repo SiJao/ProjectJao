@@ -586,6 +586,30 @@ on("GET", "/api/ringkasan", async ({ db, u }) => {
   });
 });
 
+// Grafik Dashboard (7/30/90 hari): tiap bagian hanya untuk pemegang akses modulnya, data per lingkungan.
+// Hanya angka agregat — tanpa keluhan/diagnosa, tanpa keterangan pelanggaran.
+on("GET", "/api/ringkasan/grafik", async ({ db, u, url }) => {
+  const hari = [7, 30, 90].includes(+url.searchParams.get("hari")) ? +url.searchParams.get("hari") : 30;
+  const dari = wib(Date.now() - (hari - 1) * 864e5).slice(0, 10);
+  const l = (k) => lingIn(u, k);
+  const tugas = {};
+  if (boleh(u, "lihat_absensi")) tugas.kehadiran = db.prepare(`SELECT se.tanggal, sk.kode, sk.nama, sk.warna, sk.urutan, COUNT(*) n
+      FROM absensi a JOIN absensi_sesi se ON se.id = a.sesi_id JOIN status_kehadiran sk ON sk.id = a.status_kehadiran_id
+      WHERE se.jenis = 'harian' AND se.tanggal >= ? AND ${l("a.lingkungan").sql} GROUP BY se.tanggal, sk.id ORDER BY sk.urutan`).bind(dari, ...u.ling);
+  if (boleh(u, "kesehatan")) tugas.kesehatan = db.prepare(`SELECT substr(k.waktu, 1, 10) tanggal, (jk.status_kehadiran_id IS NOT NULL) rawat, COUNT(*) n
+      FROM kunjungan_kesehatan k JOIN jenis_kunjungan jk ON jk.id = k.jenis_kunjungan_id
+      WHERE k.status = 'aktif' AND k.waktu >= ? AND ${l("k.lingkungan").sql} GROUP BY 1, 2`).bind(dari, ...u.ling);
+  if (boleh(u, "lihat_perizinan")) tugas.perizinan = db.prepare(`SELECT substr(z.berangkat, 1, 10) tanggal, (z.overdue_at IS NOT NULL) overdue, COUNT(*) n
+      FROM izin z WHERE z.status <> 'dibatalkan' AND z.berangkat >= ? AND ${l("z.lingkungan").sql} GROUP BY 1, 2`).bind(dari, ...u.ling);
+  if (boleh(u, "lihat_vonis")) tugas.kedisiplinan = db.prepare(`SELECT kp.nama kategori, COUNT(*) n FROM pelanggaran p JOIN pilihan kp ON kp.id = p.kategori_id
+      WHERE p.status = 'divonis' AND p.tanggal >= ? AND ${l("p.lingkungan").sql} GROUP BY kp.id ORDER BY n DESC LIMIT 10`).bind(dari, ...u.ling);
+  if (boleh(u, "lihat_prestasi")) tugas.prestasi = db.prepare(`SELECT substr(pr.tanggal, 1, 7) bulan, COUNT(*) n FROM prestasi pr
+      WHERE pr.tanggal >= ? AND ${l("pr.lingkungan").sql} GROUP BY 1 ORDER BY 1`).bind(dari, ...u.ling);
+  const kunci = Object.keys(tugas);
+  const hasil = kunci.length ? await db.batch(kunci.map((k) => tugas[k])) : [];
+  return json({ hari, dari, sampai: hariIni(), ...Object.fromEntries(kunci.map((k, i) => [k, hasil[i].results])) });
+});
+
 // ---------------------------------------------------------------- data master
 on("GET", "/api/master", async ({ db, u }) => {
   const l = lingIn(u);

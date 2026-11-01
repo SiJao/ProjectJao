@@ -114,6 +114,10 @@ h2{margin:0;font-size:clamp(16px,.4vw + 14px,18px)}
 a.kartu{text-decoration:none;color:inherit;transition:transform .2s var(--ease),box-shadow .2s}
 a.kartu:hover{transform:translateY(-2px);box-shadow:0 10px 28px -14px rgba(16,40,26,.35)}
 .kisi{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));gap:clamp(10px,1.4vw,16px)}
+.kisi-grafik{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(420px,100%),1fr));gap:clamp(10px,1.4vw,16px)}
+.grafik-kotak{border:1px solid var(--garis-tipis);border-radius:14px;padding:14px;min-width:0;display:flex;flex-direction:column;gap:6px}
+.grafik-kotak h3{margin:0;font-size:15px}.grafik-kotak>p{margin:0;font-size:12.5px}
+.grafik-kosong{height:240px;display:grid;place-items:center;text-align:center}
 .stat{display:flex;flex-direction:column;gap:4px;position:relative;overflow:hidden}
 .stat::after{content:"";position:absolute;right:-28px;top:-28px;width:86px;height:86px;border-radius:50%;background:var(--hijau-pucat)}
 .stat>*{position:relative;z-index:1}

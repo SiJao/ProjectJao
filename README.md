@@ -693,6 +693,15 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
 ### Dashboard & Statistik
 
 - Ringkasan: jumlah santri putra / putri / total, sakit 30 hari, pulang hari ini, alpha hari ini, agenda mendatang.
+- **Grafik** (Chart.js, disimpan lokal di `public/chart.umd.min.js`), periode **7 / 30 / 90 hari**, per lingkungan. Tiap grafik **hanya tampil bagi pemegang akses modulnya**:
+
+| Grafik | Isi | Tampil bagi |
+|---|---|---|
+| Kehadiran harian | Catatan absensi kamar per status (Hadir/Sakit/Izin/Alpha…, warna dari Data Master) | Absensi · Lihat absensi |
+| Kesehatan | Kunjungan per hari: berobat / dirawat — **hanya angka**, tanpa keluhan/diagnosa | Kesehatan |
+| Perizinan | Izin keluar per tanggal berangkat, termasuk yang sempat overdue | Perizinan · Lihat perizinan |
+| Kedisiplinan | Pelanggaran yang sudah divonis, per kategori (tanpa keterangan) | Putusan · Lihat hasil vonis |
+| Prestasi | Prestasi tercatat per bulan | Prestasi · Lihat prestasi |
 - **Statistik tahunan** memakai rentang **masa khidmat**.
 
 ### Riwayat Perubahan
