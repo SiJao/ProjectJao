@@ -1,12 +1,12 @@
 // Modul tampilan perizinan2 — Libur Pondok (izin pulang massal), cetak semua Gate Pass, kembali massal.
 // Dibuka dari tombol di halaman Perizinan (tanpa menu). Membuat/membatalkan libur: Moderator saja (putra & putri bersamaan, K-106).
 const LiburPondok = {
-  components: { Pesan, FotoSantri },
+  components: { Pesan, FotoSantri, KonfirmasiSandi },
   directives: { baris: vBaris },
   setup() {
     const moderator = computed(() => negara.me && negara.me.role === "moderator");
     const m = computed(() => negara.master || {});
-    const f = reactive({ galat: "", ok: "", daftar: [], detail: null, pratinjau: null, kecuali: {}, cariPra: "", lingPra: "", hasil: null, cetak: false, sibuk: false,
+    const f = reactive({ galat: "", ok: "", daftar: [], detail: null, pratinjau: null, kecuali: {}, cariPra: "", lingPra: "", hasil: null, cetak: false, sibuk: false, tanya: null,
       baru: { nama: "", berangkat: "", kembali: "", jenis_izin_id: "" } });
     const km = reactive({ libur_id: "", kamar_id: "", q: "", daftar: [], pilih: {} });
     const jenisTanggal = computed(() => (m.value.jenis_izin || []).filter((j) => j.aktif));
@@ -39,21 +39,28 @@ const LiburPondok = {
     });
     const semuaKamar = (g) => g.santri.every((s) => f.kecuali[s.id]);
     const tandaiKamar = (g, v) => g.santri.forEach((s) => { f.kecuali[s.id] = v; });
-    const eksekusi = () => jalan(async () => {
+    // Proses besar: konfirmasi password lewat KonfirmasiSandi.
+    const eksekusi = () => {
       const j = jumlahPra.value;
-      if (!confirm(`Buat izin ${f.pratinjau.libur.nama} untuk ${j.pulang} santri? ${j.kecuali} dikecualikan, ${j.lewat} dilewati karena masih punya izin terbuka.`)) return;
-      f.sibuk = true;
+      f.tanya = { judul: "Eksekusi Libur Pondok", pesan: `Buat izin ${f.pratinjau.libur.nama} untuk ${j.pulang} santri? ${j.kecuali} dikecualikan, ${j.lewat} dilewati karena masih punya izin terbuka.`, ok: jalankanEksekusi };
+    };
+    const jalankanEksekusi = (password) => jalan(async () => {
+      f.tanya = null; f.sibuk = true;
       try {
         const kecuali = Object.keys(f.kecuali).filter((k) => f.kecuali[k]).map(Number);
-        f.hasil = await api(`/libur/${f.pratinjau.libur.id}/eksekusi`, { kecuali });
+        f.hasil = await api(`/libur/${f.pratinjau.libur.id}/eksekusi`, { kecuali, password });
         f.ok = `${f.hasil.dibuat} izin dibuat · ${f.hasil.pengumuman} pengumuman untuk akun wali masuk antrean.`;
         const id = f.pratinjau.libur.id; f.pratinjau = null; await muat(); await buka({ id });
       } finally { f.sibuk = false; }
     });
-    const batal = (lp) => jalan(async () => {
+    const batal = (lp) => {
       const alasan = prompt(`Batalkan ${lp.nama}? Semua izinnya ikut dibatalkan dan wali menerima ralat. Alasan:`);
       if (!alasan) return;
-      const r = await api(`/libur/${lp.id}/batal`, { alasan });
+      f.tanya = { judul: "Batalkan Libur Pondok", pesan: `${lp.nama} dibatalkan. Alasan: ${alasan}`, ok: (password) => jalankanBatal(lp, alasan, password) };
+    };
+    const jalankanBatal = (lp, alasan, password) => jalan(async () => {
+      f.tanya = null;
+      const r = await api(`/libur/${lp.id}/batal`, { alasan, password });
       f.ok = `Libur dibatalkan: ${r.izin_dibatalkan} izin dibatalkan, ${r.ralat} ralat masuk antrean.`;
       f.detail = null; f.pratinjau = null; await muat();
     });
@@ -124,6 +131,7 @@ const LiburPondok = {
   <template v-else>
   <div class="judul-hal"><div><span class="jejak">Administrasi › Kesantrian › Perizinan</span><h1>Libur Pondok & kembali massal</h1></div><a class="tombol kedua" href="#/perizinan">Kembali ke Perizinan</a></div>
   <Pesan :galat="f.galat" :ok="f.ok"/>
+  <KonfirmasiSandi v-if="f.tanya" :judul="f.tanya.judul" :pesan="f.tanya.pesan" @ok="f.tanya.ok" @batal="f.tanya=null"/>
 
   <div class="kartu" v-if="moderator" style="display:flex;flex-direction:column;gap:12px">
     <h2>Buat Libur Pondok</h2>

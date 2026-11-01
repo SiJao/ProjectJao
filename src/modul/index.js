@@ -10,5 +10,6 @@ import perizinan2 from "./perizinan2.js";
 import komunikasi from "./komunikasi.js";
 import portalwali from "./portalwali.js";
 import carisantri from "./carisantri.js";
+import notifikasi from "./notifikasi.js";
 
-export default [kesehatan, kedisiplinan, updatedata, kegiatan, rapor, tatawarkat, backup, perizinan2, komunikasi, portalwali, carisantri];
+export default [kesehatan, kedisiplinan, updatedata, kegiatan, rapor, tatawarkat, backup, perizinan2, komunikasi, portalwali, carisantri, notifikasi];

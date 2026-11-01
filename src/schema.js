@@ -638,5 +638,37 @@ export const MIGRATIONS = [
         ('pilihan.hasil_lomba','Daftar hasil lomba','Mengedit hasil lomba')`,
       `UPDATE akses SET keterangan = REPLACE(keterangan, ' (Tahap 2)', '')`
     ]
+  },
+  {
+    id: 3,
+    nama: "email-kirim-langsung",
+    sql: [
+      // Kunci baris yang sedang dikirim, agar kiriman langsung dan cron tidak mengirim email yang sama dua kali.
+      `ALTER TABLE email_antrean ADD COLUMN dikunci_at TEXT`,
+      // Akun yang dinonaktifkan (serah terima, PAW, alumni, manual) kehilangan akses tambahan dan sesinya,
+      // agar akses lama tidak hidup kembali saat akun itu diaktifkan lagi kelak.
+      `CREATE TRIGGER users_nonaktif AFTER UPDATE OF status ON users WHEN NEW.status = 'nonaktif' AND OLD.status <> 'nonaktif'
+       BEGIN
+         DELETE FROM user_akses WHERE user_id = NEW.id;
+         DELETE FROM sesi_login WHERE user_id = NEW.id;
+       END`,
+      `DELETE FROM user_akses WHERE user_id IN (SELECT id FROM users WHERE status = 'nonaktif')`,
+      // Batas percobaan tautan juga per NIS (bukan hanya per akun), agar tebakan tanggal lahir tidak bisa disebar ke banyak akun.
+      `ALTER TABLE percobaan_tautan ADD COLUMN nis TEXT`,
+      `CREATE INDEX percobaan_nis ON percobaan_tautan (nis, waktu)`,
+      // Notifikasi lonceng pengurus & guru (pengumuman internal, perubahan akun, kabar santri binaan).
+      // Tugas sesuai akses (overdue, sidang, pemeriksaan, absensi belum diisi) dihitung langsung, tidak disimpan.
+      `CREATE TABLE notifikasi (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        jenis TEXT NOT NULL CHECK (jenis IN ('pengumuman','akun','santri')),
+        judul TEXT NOT NULL,
+        isi TEXT,
+        tautan TEXT,
+        dibuat_at TEXT NOT NULL DEFAULT (datetime('now')),
+        dibaca_at TEXT
+      )`,
+      `CREATE INDEX notifikasi_user ON notifikasi (user_id, id)`
+    ]
   }
 ];

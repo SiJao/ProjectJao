@@ -22,6 +22,9 @@ const CariSantriGuru = {
     }
     watch(() => [s.q, s.kelas_id, s.kamar_id, s.status, s.ling], () => { clearTimeout(tS); tS = setTimeout(cariSantri, 250); });
     const bukaSantri = async (x) => { try { s.detail = await api("/cari/santri/" + x.id); s.hasil = []; } catch (e) { galat.value = e.message; } };
+    // tautan notifikasi santri binaan: #/cari?santri=<id>
+    const idTautan = new URLSearchParams(negara.rute.split("?")[1] || "").get("santri");
+    if (idTautan) bukaSantri({ id: +idTautan });
     const kelasList = computed(() => (m.value.kelas || []).filter((k) => k.aktif && (!s.ling || k.lingkungan === s.ling)));
     const kamarList = computed(() => (m.value.kamar || []).filter((k) => k.aktif && (!s.ling || k.lingkungan === s.ling)));
     // ---- guru

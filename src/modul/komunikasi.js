@@ -29,14 +29,15 @@ export default function (H) {
     wajibModerator(u);
     const r = await db.prepare("UPDATE email_antrean SET status = 'antre', percobaan = 0, galat = NULL WHERE id = ? AND status = 'gagal'").bind(p.id).run();
     if (!r.meta.changes) gagal(400, "Hanya email berstatus gagal yang bisa dikirim ulang.");
+    H.emailBaru();
     await catat(db, u, "komunikasi", "email_ulang", "email_antrean", +p.id, "Kirim ulang email gagal");
     return json({ ok: true });
   });
 
   on("POST", "/api/komunikasi/antrean/ulang-semua", async ({ db, u }) => {
     wajibModerator(u);
-    const r = await db.prepare("UPDATE email_antrean SET status = 'antre', percobaan = 0, galat = NULL WHERE status = 'gagal'").run();
-    if (r.meta.changes) await catat(db, u, "komunikasi", "email_ulang", "email_antrean", null, `Kirim ulang ${r.meta.changes} email gagal`);
+    const r = await db.prepare("UPDATE email_antrean SET status = 'antre', percobaan = 0, galat = NULL WHERE status = 'gagal' AND jenis <> 'akun' AND dibuat_at > datetime('now', '-1 day')").run();
+    if (r.meta.changes) { await catat(db, u, "komunikasi", "email_ulang", "email_antrean", null, `Kirim ulang ${r.meta.changes} email gagal`); H.emailBaru(); }
     return json({ ok: true, jumlah: r.meta.changes });
   });
 
@@ -82,7 +83,7 @@ export default function (H) {
     } else if (target !== "semua_wali") gagal(400, "Sasaran pengumuman tidak dikenal.");
     return (await db.prepare(
       `SELECT a.id, a.email, a.nama, MIN(s.lingkungan) lingkungan FROM akun_wali a JOIN tautan_wali t ON t.akun_wali_id = a.id AND t.dicabut_at IS NULL
-       JOIN santri s ON s.id = t.santri_id AND s.status = 'aktif'
+       JOIN santri s ON s.id = t.santri_id AND s.status IN ('aktif','skorsing')
        WHERE a.status = 'aktif' AND ${w.join(" AND ")} GROUP BY a.id ORDER BY a.nama`).bind(...a).all()).results;
   }
   const LABEL_TARGET = { semua_wali: "semua wali", wali_kelas: "wali per kelas", wali_kamar: "wali per kamar", pengurus: "semua pengurus" };
@@ -98,8 +99,10 @@ export default function (H) {
     if (daftar.length > 3000) gagal(400, "Penerima terlalu banyak; persempit sasaran.");
     const wali = body.target !== "pengurus";
     const ling = lingTeks(u);
-    const rw = await stmtCatat(db, u, "komunikasi", "pengumuman", "email_antrean", null,
-      `Pengumuman "${subjek}" ke ${LABEL_TARGET[body.target]}: ${daftar.length} penerima`, ling).run();
+    const ringkas = `Pengumuman "${subjek}" ke ${LABEL_TARGET[body.target]}: ${daftar.length} penerima`;
+    const ganda = await db.prepare("SELECT 1 FROM riwayat_perubahan WHERE user_id = ? AND aksi = 'pengumuman' AND ringkasan = ? AND waktu > datetime('now', '-2 minutes')").bind(u.id, ringkas).first();
+    if (ganda) gagal(409, "Pengumuman yang sama baru saja dikirim.");
+    const rw = await stmtCatat(db, u, "komunikasi", "pengumuman", "email_antrean", null, ringkas, ling).run();
     const rid = rw.meta.last_row_id;
     // satu pernyataan per 100 penerima (json_each), jauh di bawah batas query per permintaan
     const st = [];
@@ -110,6 +113,7 @@ export default function (H) {
         FROM json_each(?)`).bind("[HISADA] " + subjek, isi + (wali ? KAKI_WALI() : KAKI()), rid, ling, blok));
     }
     await db.batch(st);
+    H.emailBaru();
     return json({ ok: true, jumlah: daftar.length, id: rid });
   });
 
@@ -189,6 +193,8 @@ export default function (H) {
       st.push(db.prepare("UPDATE akun_wali SET status = CASE WHEN email_terverifikasi_at IS NULL THEN 'belum_verifikasi' ELSE 'aktif' END, gagal_login = 0, terkunci_sampai = NULL WHERE id = ?").bind(a.id));
     } else if (aksi === "buka_kunci") {
       st.push(db.prepare("UPDATE akun_wali SET terkunci_tautan_sampai = NULL, gagal_login = 0, terkunci_sampai = NULL WHERE id = ?").bind(a.id));
+      // percobaan gagal hari ini tidak lagi dihitung (berhasil = 2: dibuka Moderator), catatannya tetap ada
+      st.push(db.prepare("UPDATE percobaan_tautan SET berhasil = 2 WHERE akun_wali_id = ? AND berhasil = 0").bind(a.id));
     } else gagal(400, "Aksi tidak dikenal.");
     st.push(stmtCatat(db, u, "akun", "wali_" + aksi, "akun_wali", a.id, `Akun wali ${a.email}: ${aksi}`));
     await db.batch(st);

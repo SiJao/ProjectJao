@@ -19,7 +19,7 @@ export default function (H) {
     const pl = await db.prepare("SELECT id, status FROM pelanggaran WHERE izin_id = ? AND sumber = 'overdue'").bind(z.id).first();
     const t = wib();
     const st = [
-      db.prepare("UPDATE izin SET overdue_dikoreksi_at = ?, overdue_dikoreksi_oleh = ?, alasan_koreksi = ? WHERE id = ?").bind(t, u.id, alasan, z.id),
+      db.prepare("UPDATE izin SET overdue_dikoreksi_at = ?, overdue_dikoreksi_oleh = ?, alasan_koreksi = ? WHERE id = ? AND overdue_dikoreksi_at IS NULL").bind(t, u.id, alasan, z.id),
       db.prepare(`UPDATE absensi SET status_kehadiran_id = (SELECT id FROM status_kehadiran WHERE kode = 'H'), sumber = 'manual', keterangan = 'Koreksi overdue'
         WHERE izin_id = ? AND sumber = 'overdue'`).bind(z.id),
     ];
@@ -29,7 +29,9 @@ export default function (H) {
       st.push(db.prepare("UPDATE pelanggaran SET status = 'dibatalkan', dibatalkan_at = ?, dibatalkan_oleh = NULL, alasan_batal = ? WHERE id = ? AND status = 'menunggu'")
         .bind(t, "Koreksi overdue: " + alasan, pl.id));
     st.push(stmtCatat(db, u, "kesantrian", "koreksi_overdue", "izin", z.id, "Koreksi overdue: " + alasan, z.lingkungan));
+    // Permintaan ganda: koreksi pertama sudah tercatat, sisa pernyataan tidak mengubah apa-apa; ralat tidak dikirim lagi.
     const hasil = await db.batch(st);
+    if (!hasil[0].meta.changes) gagal(409, "Overdue izin ini sudah dikoreksi.");
     const ralat = await H.kabarKoreksi(db, "izin", z.id, "Ananda ternyata sudah kembali ke pondok tepat waktu; kabar keterlambatan sebelumnya tidak berlaku.", { subjek: "Belum kembali" });
     return json({
       ok: true, absensi_dikoreksi: hasil[1].meta.changes, ralat,
@@ -67,6 +69,8 @@ export default function (H) {
     if (!ji) gagal(400, "Jenis izin tidak valid.");
     const berangkat = b + " 00:00", kembali = k + " " + (ji.jam_kembali_bawaan || "17:00");
     if (kembali <= berangkat) gagal(400, "Tanggal kembali harus setelah tanggal berangkat.");
+    if (k < H.hariIni()) gagal(400, "Tanggal kembali sudah lewat. Periksa tahun dan bulannya.");
+    if ((Date.parse(k) - Date.parse(b)) / 864e5 > 60) gagal(400, "Libur lebih dari 60 hari. Periksa tanggalnya.");
     const r = await db.prepare("INSERT INTO libur_pondok (nama, berangkat, rencana_kembali, jenis_izin_id, status, dibuat_oleh) VALUES (?,?,?,?, 'rencana', ?)")
       .bind(nama, berangkat, kembali, ji.id, u.id).run();
     await catat(db, u, "kesantrian", "libur_buat", "libur_pondok", r.meta.last_row_id, `${nama}: ${berangkat} s.d. ${kembali}`);
@@ -93,6 +97,7 @@ export default function (H) {
     const lp = await db.prepare("SELECT lp.*, ji.nama jenis FROM libur_pondok lp JOIN jenis_izin ji ON ji.id = lp.jenis_izin_id WHERE lp.id = ?").bind(p.id).first();
     if (!lp) gagal(404, "Libur tidak ditemukan.");
     if (!["rencana", "berjalan"].includes(lp.status)) gagal(400, "Libur ini sudah " + lp.status + ".");
+    await H.cekSandi(u, body.password);
     const kecuali = JSON.stringify((Array.isArray(body.kecuali) ? body.kecuali : []).map((x) => +x).filter(Boolean));
     const app = H.APP();
     const [lewat, ins] = await db.batch([
@@ -115,6 +120,7 @@ export default function (H) {
          AND EXISTS (SELECT 1 FROM tautan_wali t JOIN izin z ON z.santri_id = t.santri_id AND z.libur_id = ? AND z.status <> 'dibatalkan' WHERE t.akun_wali_id = a.id AND t.dicabut_at IS NULL)
          AND NOT EXISTS (SELECT 1 FROM email_antrean e WHERE e.tabel_terkait = 'libur_pondok' AND e.id_terkait = ? AND e.akun_wali_id = a.id AND e.koreksi_dari_id IS NULL)`)
       .bind(("[HISADA] Pengumuman " + lp.nama).slice(0, 200), isi, lp.id, lp.id, lp.id).run();
+    if (em.meta.changes) H.emailBaru();
     await catat(db, u, "kesantrian", "libur_eksekusi", "libur_pondok", lp.id,
       `${lp.nama}: ${ins.meta.changes} izin dibuat, ${lewat.results.length} dilewati, ${JSON.parse(kecuali).length} dikecualikan, ${em.meta.changes} pengumuman`);
     return json({ ok: true, dibuat: ins.meta.changes, dilewati: lewat.results, pengumuman: em.meta.changes });
@@ -141,9 +147,10 @@ export default function (H) {
     wajibModerator(u);
     const lp = await db.prepare("SELECT * FROM libur_pondok WHERE id = ?").bind(p.id).first();
     if (!lp) gagal(404, "Libur tidak ditemukan.");
-    if (lp.status === "dibatalkan") gagal(409, "Libur ini sudah dibatalkan.");
+    if (!["rencana", "berjalan"].includes(lp.status)) gagal(409, "Libur ini sudah " + lp.status + "; tidak bisa dibatalkan.");
     const alasan = bersih(body.alasan, 200);
     if (!alasan) gagal(400, "Alasan pembatalan wajib diisi.");
+    await H.cekSandi(u, body.password);
     const t = wib();
     const subjek = ("[HISADA] Ralat: Pengumuman " + lp.nama).slice(0, 200);
     const isiRalat = `Assalamu'alaikum,\n\nRalat atas pengumuman sebelumnya: ${lp.nama} DIBATALKAN. Alasan: ${alasan}\nSantri tetap mengikuti kegiatan pondok seperti biasa.\n\nMohon maaf atas perubahan ini.\n\n— HISADA`;
@@ -159,6 +166,7 @@ export default function (H) {
         FROM email_antrean e WHERE e.tabel_terkait = 'libur_pondok' AND e.id_terkait = ? AND e.koreksi_dari_id IS NULL`).bind(subjek, isiRalat, lp.id),
       stmtCatat(db, u, "kesantrian", "libur_batal", "libur_pondok", lp.id, `${lp.nama} dibatalkan: ${alasan}`),
     ]);
+    if (hasil[4].meta.changes) H.emailBaru();
     return json({ ok: true, izin_dibatalkan: hasil[3].meta.changes, ralat: hasil[4].meta.changes, pelanggaran_dibatalkan: hasil[1].meta.changes });
   });
 

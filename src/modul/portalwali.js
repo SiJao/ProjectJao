@@ -5,8 +5,10 @@ export default function (H) {
   const { on, json, gagal, wib, hariIni, bersih, sha256, randomHex, hashPassword, cekPassword, normalHp, stmtEmail } = H;
   const COOKIE = "hisada_wali";
   const cookie = (token, maxAge) => `${COOKIE}=${token}; Path=/api/wali; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
-  const ambil = (req) => { const m = (req.headers.get("cookie") || "").match(/(?:^|;\s*)hisada_wali=([^;]+)/); return m ? decodeURIComponent(m[1]) : null; };
+  const ambil = (req) => { const m = (req.headers.get("cookie") || "").match(/(?:^|;\s*)hisada_wali=([^;]+)/); if (!m) return null; try { return decodeURIComponent(m[1]); } catch { return null; } };
   const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // Nama ikut tercetak di email dari akun pondok: hanya huruf dan tanda baca nama (tanpa tautan/angka) agar tidak bisa dipakai phishing.
+  const NAMA = /^[\p{L}][\p{L} .,'’()-]{1,119}$/u;
   const iso = (ms) => new Date(ms).toISOString();
   const KAKI = "\n\n— HISADA, Pesantren Modern Daarul 'Uluum Lido";
   const PESAN_TERKIRIM = "Bila data sesuai, email telah dikirim. Periksa kotak masuk (dan folder spam).";
@@ -40,6 +42,8 @@ export default function (H) {
     }));
     return st;
   }
+  const stmtPakai = (db, t) => db.prepare("UPDATE token_akun SET dipakai_at = ? WHERE id = ? AND dipakai_at IS NULL").bind(wib(), t.id);
+  const cekTerpakai = (hasil) => { if (!hasil.meta.changes) gagal(400, "Tautan tidak valid atau sudah dipakai."); };
   async function pakaiToken(db, token, jenis) {
     if (!/^[0-9a-f]{48}$/.test(String(token || ""))) gagal(400, "Tautan tidak valid.");
     const t = await db.prepare("SELECT * FROM token_akun WHERE token_hash = ? AND jenis = ? AND akun_wali_id IS NOT NULL").bind(await sha256(token), jenis).first();
@@ -53,27 +57,35 @@ export default function (H) {
     const nama = bersih(body.nama, 120), email = bersih(body.email, 120)?.toLowerCase(), hp = normalHp(bersih(body.no_hp, 20));
     const pw = String(body.password || "");
     if (!nama || !email || !EMAIL.test(email)) gagal(400, "Isi nama dan email yang valid.");
+    if (!NAMA.test(nama)) gagal(400, "Nama hanya boleh berisi huruf dan tanda baca nama.");
     if (!hp || !/^62\d{8,13}$/.test(hp)) gagal(400, "No. HP tidak valid. Gunakan nomor yang terdaftar di pondok.");
     if (pw.length < 8) gagal(400, "Password minimal 8 karakter.");
     if (body.setuju !== true) gagal(400, "Centang persetujuan penggunaan data untuk melanjutkan.");
     const ada = await db.prepare("SELECT id, nama, email, status FROM akun_wali WHERE email = ?").bind(email).first();
+    const hash = await hashPassword(pw);
     if (ada) {
-      // Tidak membocorkan bahwa email sudah terdaftar; pemiliknya diberi tahu lewat email.
-      if (ada.status === "belum_verifikasi") await db.batch(await stmtToken(db, ada, "verifikasi_email", 24));
-      else await H.antreEmail(db, { penerima: ada.email, jenis: "akun", tabel: "akun_wali", id: ada.id, akun_wali_id: ada.id, subjek: "[HISADA] Pendaftaran Portal Wali",
+      // Tidak membocorkan bahwa email sudah terdaftar; pemiliknya diberi tahu lewat email (maks. sekali per 5 menit).
+      const baru = await db.prepare("SELECT 1 FROM email_antrean WHERE akun_wali_id = ? AND jenis = 'akun' AND dibuat_at > datetime('now', '-5 minutes')")
+        .bind(ada.id).first();
+      if (baru) return json({ ok: true, pesan: "Pendaftaran diterima. " + PESAN_TERKIRIM });
+      if (ada.status === "belum_verifikasi") await db.batch([
+        db.prepare("UPDATE akun_wali SET nama = ?, no_hp_normal = ?, password_hash = ?, persetujuan_data_at = ? WHERE id = ? AND status = 'belum_verifikasi'").bind(nama, hp, hash, wib(), ada.id),
+        ...(await stmtToken(db, { ...ada, nama }, "verifikasi_email", 24)),
+      ]);
+      else if (ada.status === "aktif") await H.antreEmail(db, { penerima: ada.email, jenis: "akun", tabel: "akun_wali", id: ada.id, akun_wali_id: ada.id, subjek: "[HISADA] Pendaftaran Portal Wali",
         isi: `Assalamu'alaikum ${ada.nama},\n\nAda pendaftaran Portal Wali dengan email Anda, padahal email ini sudah terdaftar. Silakan masuk, atau gunakan "Lupa password" di ${H.APP()}/wali.html#/lupa` + KAKI });
       return json({ ok: true, pesan: "Pendaftaran diterima. " + PESAN_TERKIRIM });
     }
     const r = await db.prepare("INSERT INTO akun_wali (email, password_hash, nama, no_hp_normal, persetujuan_data_at, status) VALUES (?,?,?,?,?, 'belum_verifikasi')")
-      .bind(email, await hashPassword(pw), nama, hp, wib()).run();
+      .bind(email, hash, nama, hp, wib()).run();
     await db.batch(await stmtToken(db, { id: r.meta.last_row_id, nama, email }, "verifikasi_email", 24));
     return json({ ok: true, pesan: "Pendaftaran diterima. " + PESAN_TERKIRIM });
   }, { publik: true });
 
   on("POST", "/api/wali/verifikasi", async ({ db, body }) => {
     const t = await pakaiToken(db, body.token, "verifikasi_email");
+    cekTerpakai(await stmtPakai(db, t).run());
     await db.batch([
-      db.prepare("UPDATE token_akun SET dipakai_at = ? WHERE id = ?").bind(wib(), t.id),
       db.prepare("UPDATE akun_wali SET status = 'aktif', email_terverifikasi_at = ? WHERE id = ? AND status = 'belum_verifikasi'").bind(wib(), t.akun_wali_id),
     ]);
     return json({ ok: true });
@@ -99,17 +111,17 @@ export default function (H) {
     if (!a) { await cekPassword("x", "pbkdf2$100000$00$00"); salah(); }
     if (a.terkunci_sampai && a.terkunci_sampai > wib()) gagal(429, "Terlalu banyak percobaan. Coba lagi nanti.");
     if (!(await cekPassword(String(body.password || ""), a.password_hash))) {
-      const batas = +(await H.pengaturan(db, "login.batas_gagal", "5"));
-      const menit = +(await H.pengaturan(db, "login.lama_kunci_menit", "15"));
-      const n = a.gagal_login + 1;
-      await db.prepare("UPDATE akun_wali SET gagal_login = ?, terkunci_sampai = ? WHERE id = ?")
-        .bind(n >= batas ? 0 : n, n >= batas ? wib(Date.now() + menit * 60e3) : null, a.id).run();
+      const batas = +(await H.pengaturan(db, "login.batas_gagal", "5")) || 5;
+      const menit = +(await H.pengaturan(db, "login.lama_kunci_menit", "15")) || 15;
+      await db.prepare(`UPDATE akun_wali SET terkunci_sampai = CASE WHEN gagal_login + 1 >= ? THEN ? ELSE terkunci_sampai END,
+          gagal_login = CASE WHEN gagal_login + 1 >= ? THEN 0 ELSE gagal_login + 1 END WHERE id = ?`)
+        .bind(batas, wib(Date.now() + menit * 60e3), batas, a.id).run();
       salah();
     }
     if (a.status === "belum_verifikasi") gagal(403, "Email belum diverifikasi. Buka tautan verifikasi di email Anda, atau kirim ulang tautannya.");
     if (a.status !== "aktif") gagal(403, "Akun dinonaktifkan. Hubungi pondok.");
     const token = randomHex(32);
-    const jam = +(await H.pengaturan(db, "sesi.lama_jam", "12"));
+    const jam = +(await H.pengaturan(db, "sesi.lama_jam", "12")) || 12;
     await db.batch([
       db.prepare("DELETE FROM sesi_wali WHERE kedaluwarsa < ?").bind(iso(Date.now())),
       db.prepare("INSERT INTO sesi_wali (token_hash, akun_wali_id, kedaluwarsa) VALUES (?,?,?)").bind(await sha256(token), a.id, iso(Date.now() + jam * 3600e3)),
@@ -140,11 +152,12 @@ export default function (H) {
     const pw = String(body.password || "");
     if (pw.length < 8) gagal(400, "Password minimal 8 karakter.");
     const t = await pakaiToken(db, body.token, "reset_password");
+    const hash = await hashPassword(pw);
+    cekTerpakai(await stmtPakai(db, t).run());
     await db.batch([
-      db.prepare("UPDATE token_akun SET dipakai_at = ? WHERE id = ?").bind(wib(), t.id),
       db.prepare(`UPDATE akun_wali SET password_hash = ?, gagal_login = 0, terkunci_sampai = NULL,
         status = CASE WHEN status = 'belum_verifikasi' THEN 'aktif' ELSE status END, email_terverifikasi_at = COALESCE(email_terverifikasi_at, ?) WHERE id = ?`)
-        .bind(await hashPassword(pw), wib(), t.akun_wali_id),
+        .bind(hash, wib(), t.akun_wali_id),
       db.prepare("DELETE FROM sesi_wali WHERE akun_wali_id = ?").bind(t.akun_wali_id),
     ]);
     return json({ ok: true });
@@ -171,32 +184,43 @@ export default function (H) {
     if (a.terkunci_tautan_sampai && a.terkunci_tautan_sampai > wib()) gagal(429, kunci + a.terkunci_tautan_sampai + " WIB, atau hubungi pondok.");
     const nis = String(body.nis || "").trim(), tgl = String(body.tanggal_lahir || "").trim();
     if (!/^\d{4,12}$/.test(nis) || !/^\d{4}-\d{2}-\d{2}$/.test(tgl)) gagal(400, "Isi NIS dan tanggal lahir anak.");
+    const batas = +(await H.pengaturan(db, "tautan_wali.batas_gagal_per_hari", "5")) || 5;
+    const jam = +(await H.pengaturan(db, "tautan_wali.lama_kunci_jam", "24")) || 24;
+    const awalHari = hariIni() + " 00:00";
+    const [catatan, perAkun, perNis] = await db.batch([
+      db.prepare("INSERT INTO percobaan_tautan (akun_wali_id, waktu, berhasil, nis) VALUES (?,?,0,?)").bind(a.id, wib(), nis),
+      db.prepare("SELECT COUNT(*) n FROM percobaan_tautan WHERE akun_wali_id = ? AND berhasil = 0 AND waktu >= ?").bind(a.id, awalHari),
+      db.prepare("SELECT COUNT(*) n FROM percobaan_tautan WHERE nis = ? AND berhasil = 0 AND waktu >= ?").bind(nis, awalHari),
+    ]);
+    // n = percobaan gagal hari ini termasuk yang ini (dicatat dulu sebagai gagal, diubah jadi berhasil bila cocok).
+    const n = perAkun.results[0].n;
+    const kunciAkun = async () => {
+      const sampai = wib(Date.now() + jam * 3600e3);
+      await db.prepare("UPDATE akun_wali SET terkunci_tautan_sampai = ? WHERE id = ?").bind(sampai, a.id).run();
+      gagal(429, kunci + sampai + " WIB, atau hubungi pondok.");
+    };
+    if (n > batas) await kunciAkun(); // permintaan paralel yang melewati pemeriksaan kunci di atas
+    if (perNis.results[0].n > batas * 2) gagal(429, "Terlalu banyak percobaan untuk NIS ini hari ini. Coba lagi besok, atau hubungi pondok.");
     const cocok = a.no_hp_normal && await db.prepare(
       `SELECT s.id, s.nama, s.lingkungan, w.id wali_id FROM santri s JOIN santri_wali sw ON sw.santri_id = s.id JOIN wali w ON w.id = sw.wali_id
-       WHERE s.nis = ? AND s.tanggal_lahir = ? AND s.status = 'aktif' AND w.no_hp_normal = ? LIMIT 1`).bind(nis, tgl, a.no_hp_normal).first();
+       WHERE s.nis = ? AND s.tanggal_lahir = ? AND s.status IN ('aktif','skorsing') AND w.no_hp_normal = ? LIMIT 1`).bind(nis, tgl, a.no_hp_normal).first();
     if (!cocok) {
-      const batas = +(await H.pengaturan(db, "tautan_wali.batas_gagal_per_hari", "5"));
-      const jam = +(await H.pengaturan(db, "tautan_wali.lama_kunci_jam", "24"));
-      const [, n] = await db.batch([
-        db.prepare("INSERT INTO percobaan_tautan (akun_wali_id, waktu, berhasil) VALUES (?,?,0)").bind(a.id, wib()),
-        db.prepare("SELECT COUNT(*) n FROM percobaan_tautan WHERE akun_wali_id = ? AND berhasil = 0 AND waktu >= ?").bind(a.id, hariIni() + " 00:00"),
-      ]);
-      if (n.results[0].n >= batas) {
-        const sampai = wib(Date.now() + jam * 3600e3);
-        await db.prepare("UPDATE akun_wali SET terkunci_tautan_sampai = ? WHERE id = ?").bind(sampai, a.id).run();
-        gagal(429, kunci + sampai + " WIB, atau hubungi pondok.");
-      }
+      if (n >= batas) await kunciAkun();
       // Pesan sengaja tidak menyebut bagian mana yang tidak cocok.
-      gagal(400, `Data tidak cocok dengan catatan pondok (sisa percobaan hari ini: ${batas - n.results[0].n}). Pastikan NIS, tanggal lahir anak, dan No. HP akun Anda sesuai data pondok. `
+      gagal(400, `Data tidak cocok dengan catatan pondok (sisa percobaan hari ini: ${Math.max(0, batas - n)}). Pastikan NIS, tanggal lahir anak, dan No. HP akun Anda sesuai data pondok. `
         + "Bila tetap gagal, hubungi pondok: Moderator dapat menautkan secara manual atau memperbarui No. HP Anda.");
     }
+    const idPercobaan = catatan.meta.last_row_id;
     const sudah = await db.prepare("SELECT id FROM tautan_wali WHERE akun_wali_id = ? AND santri_id = ? AND dicabut_at IS NULL").bind(a.id, cocok.id).first();
-    if (sudah) return json({ ok: true, sudah: true });
+    if (sudah) {
+      await db.prepare("UPDATE percobaan_tautan SET berhasil = 1 WHERE id = ?").bind(idPercobaan).run();
+      return json({ ok: true, sudah: true });
+    }
     const lain = (await db.prepare(`SELECT ak.id, ak.nama, ak.email FROM tautan_wali t JOIN akun_wali ak ON ak.id = t.akun_wali_id
       WHERE t.santri_id = ? AND t.dicabut_at IS NULL AND ak.status = 'aktif' AND ak.id <> ?`).bind(cocok.id, a.id).all()).results;
     await db.batch([
       db.prepare("INSERT INTO tautan_wali (akun_wali_id, santri_id, lingkungan, wali_id, cara) VALUES (?,?,?,?, 'otomatis')").bind(a.id, cocok.id, cocok.lingkungan, cocok.wali_id),
-      db.prepare("INSERT INTO percobaan_tautan (akun_wali_id, waktu, berhasil) VALUES (?,?,1)").bind(a.id, wib()),
+      db.prepare("UPDATE percobaan_tautan SET berhasil = 1 WHERE id = ?").bind(idPercobaan),
       H.stmtCatat(db, null, "akun", "tautan_otomatis", "tautan_wali", null, `Portal Wali: ${a.email} menautkan santri ${nis}`, cocok.lingkungan),
       // Pengaman: wali yang sudah tertaut diberi tahu ada akun baru menautkan anak yang sama.
       ...lain.map((w) => stmtEmail(db, {
@@ -217,7 +241,7 @@ export default function (H) {
     if (!s) gagal(404, "Anak tidak ditemukan atau belum tertaut ke akun Anda.");
     const h90 = wib(Date.now() - 90 * 864e5), h30 = wib(Date.now() - 30 * 864e5).slice(0, 10);
     const [izin, absen, rawat, kunjungan, disiplin, prestasi] = await db.batch([
-      db.prepare(`SELECT z.id, ji.nama jenis, ji.basis_waktu, z.keterangan, z.berangkat, z.rencana_kembali, z.kembali_at, z.status, z.overdue_dikoreksi_at
+      db.prepare(`SELECT z.id, ji.nama jenis, ji.basis_waktu, z.berangkat, z.rencana_kembali, z.kembali_at, z.status, z.overdue_dikoreksi_at
         FROM izin z JOIN jenis_izin ji ON ji.id = z.jenis_izin_id
         WHERE z.santri_id = ? AND z.status <> 'dibatalkan' AND (z.status IN ('berjalan','overdue') OR z.berangkat >= ?) ORDER BY z.berangkat DESC LIMIT 100`).bind(s.id, h90),
       db.prepare(`SELECT sk.kode, sk.nama, sk.warna, COUNT(*) n FROM absensi ab JOIN absensi_sesi se ON se.id = ab.sesi_id JOIN status_kehadiran sk ON sk.id = ab.status_kehadiran_id

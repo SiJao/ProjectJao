@@ -105,7 +105,8 @@ function unduhBerkas(nama, isi, tipe) {
   a.download = nama; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
-const selCsv = (v) => { const s = v == null ? "" : String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+// Sel diawali = + - @ (bukan angka biasa) dinetralkan dengan petik agar tidak dijalankan sebagai rumus saat dibuka di Excel.
+const selCsv = (v) => { let s = v == null ? "" : String(v); if (/^[=+\-@\t\r]/.test(s) && !/^[+-]?\d+([.,]\d+)?$/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
 const unduhCsv = (nama, baris) => unduhBerkas(nama, "﻿" + baris.map((r) => r.map(selCsv).join(",")).join("\r\n"), "text/csv;charset=utf-8");
 
 // .xlsx asli tanpa pustaka (README Export Excel): zip "stored" + CRC32, sel teks inline, angka sebagai angka.
@@ -290,7 +291,9 @@ const Absensi = {
   components: { Pesan, FotoSantri },
   directives: { baris: vBaris },
   setup() {
-    const f = reactive({ asrama_id: "", kamar_id: "", tanggal: hariIni(), sesi_id: "", data: null, galat: "", ok: "", rekap: [] });
+    const tglTautan = (/[?&]tanggal=(\d{4}-\d{2}-\d{2})/.exec(negara.rute) || [])[1];
+    const f = reactive({ asrama_id: "", kamar_id: "", tanggal: tglTautan && tglTautan <= hariIni() ? tglTautan : hariIni(), sesi_id: "", data: null, galat: "", ok: "", rekap: [] });
+    let nomorMuat = 0;
     const m = computed(() => negara.master || {});
     const kamarList = computed(() => (m.value.kamar || []).filter((k) => k.aktif && (!f.asrama_id || k.asrama_id == f.asrama_id)));
     const sesiList = computed(() => (m.value.pilihan || []).filter((p) => p.kelompok === "sesi_absensi" && p.aktif));
@@ -299,7 +302,8 @@ const Absensi = {
     async function muat() {
       f.ok = ""; f.galat = ""; f.data = null;
       if (!f.kamar_id || !f.sesi_id) return;
-      try { f.data = await api(`/absensi?kamar_id=${f.kamar_id}&tanggal=${f.tanggal}&sesi_id=${f.sesi_id}`); } catch (e) { f.galat = e.message; }
+      const n = ++nomorMuat;
+      try { const d = await api(`/absensi?kamar_id=${f.kamar_id}&tanggal=${f.tanggal}&sesi_id=${f.sesi_id}`); if (n === nomorMuat) f.data = d; } catch (e) { if (n === nomorMuat) f.galat = e.message; }
     }
     async function rekap() { try { f.rekap = await api("/absensi/rekap?tanggal=" + f.tanggal); } catch (e) { f.galat = e.message; } }
     function semuaHadir() { const h = statusList.value.find((s) => s.kode === "H"); if (h) f.data.santri.forEach((s) => { if (!s.otomatis) s.status_kehadiran_id = h.id; }); }
@@ -572,7 +576,7 @@ const DataMaster = {
   directives: { baris: vBaris },
   setup() {
     const tab = ref("santri");
-    const f = reactive({ galat: "", ok: "", q: "", santri: [], memuat: false, edit: null, kelompok: "sesi_absensi", baru: "", ling: "semua", impor: null, imporHasil: null, sibuk: false });
+    const f = reactive({ galat: "", ok: "", q: "", santri: [], memuat: false, edit: null, kelompok: "sesi_absensi", baru: "", ling: negara.me.role === "moderator" || negara.me.lingkungan === "semua" ? "semua" : negara.me.lingkungan, impor: null, imporHasil: null, sibuk: false });
     const m = computed(() => negara.master || {});
     const moderator = computed(() => negara.me && negara.me.role === "moderator");
     const bisaPilihan = (k) => moderator.value || (negara.me.akses || []).includes("pilihan." + k);
@@ -640,12 +644,41 @@ const DataMaster = {
       } catch (e) { f.galat = e.message; } finally { g.sibuk = false; }
     }
     const templatGuru = () => unduhCsv("templat-guru.csv", [["NIP", "NAMA", "L/P", "EMAIL", "NO HP", "LINGKUNGAN"], ["9901", "Ust. Contoh Guru", "L", "contoh@daarululuumlido.com", "081200000000", "putra"]]);
+    // wali kelas / wali asuh tahun ajaran aktif
+    const waliDari = (jenis, id) => (m.value[jenis === "kelas" ? "wali_kelas" : "wali_asuh"] || []).filter((w) => w[jenis === "kelas" ? "kelas_id" : "kamar_id"] === id);
+    const guruUntuk = (ling, jenis, id) => (m.value.guru || []).filter((g) => g.aktif && (g.lingkungan === "semua" || g.lingkungan === ling) && !waliDari(jenis, id).some((w) => w.guru_id === g.id));
+    async function aturWali(jenis, target, guruId) {
+      if (!guruId) return;
+      const ada = waliDari(jenis, target.id).some((w) => w.peran === (jenis === "kelas" ? "wali" : "wali_asuh"));
+      f.galat = ""; f.ok = "";
+      try { await api("/wali-binaan", { jenis, target_id: target.id, guru_id: +guruId, peran: ada ? "asisten" : "" }); f.ok = "Tersimpan."; await muatMaster(); } catch (e) { f.galat = e.message; }
+    }
+    async function hapusWali(jenis, w) {
+      if (!confirm(`Hapus ${w.nama} dari penetapan ini?`)) return;
+      try { await api("/wali-binaan", { jenis, hapus_id: w.id }); await muatMaster(); } catch (e) { f.galat = e.message; }
+    }
+    const PERAN_WALI = { wali: "wali", asisten: "asisten", wali_asuh: "wali asuh" };
     async function simpanMaster(tabel, data) { f.galat = ""; f.ok = ""; try { await api("/master/" + tabel, data); f.ok = "Tersimpan."; await muatMaster(); } catch (e) { f.galat = e.message; } }
     async function bukaSantri(s) { f.edit = s ? await api("/santri/" + s.id) : { nis: "", nama: "", jenis_kelamin: "L", status: "aktif" }; }
     async function simpanSantri() { f.galat = ""; try { await api("/santri", f.edit); f.ok = "Data santri tersimpan."; f.edit = null; cari(); muatMaster(); } catch (e) { f.galat = e.message; } }
     const isiPilihan = computed(() => (m.value.pilihan || []).filter((p) => p.kelompok === f.kelompok));
     async function tambahPilihan() { f.galat = ""; try { await api("/pilihan", { kelompok: f.kelompok, nama: f.baru, lingkungan: f.ling }); f.baru = ""; await muatMaster(); } catch (e) { f.galat = e.message; } }
-    async function ubahPilihan(p, data) { f.galat = ""; try { await api("/pilihan", { id: p.id, kelompok: p.kelompok, lingkungan: p.lingkungan, ...data }); await muatMaster(); } catch (e) { f.galat = e.message; } }
+    async function ubahPilihan(p, data) { f.galat = ""; try { await api("/pilihan", { id: p.id, kelompok: p.kelompok, ...data }); await muatMaster(); return true; } catch (e) { f.galat = e.message; return false; } }
+    // Sunting baris di tempat: ed = salinan baris yang sedang diedit (pilihan / status kehadiran / jenis izin).
+    const ed = reactive({ jenis: "", id: null, data: {} });
+    const sunting = (jenis, baris) => { ed.jenis = jenis; ed.id = baris ? baris.id : "baru"; ed.data = baris ? { ...baris } : jenis === "_status" ? { kode: "", nama: "", warna: "#55605A", dihitung_hadir: 0, urutan: 0 } : { nama: "", basis_waktu: "tanggal", wajib_wali: 0, jam_kembali_bawaan: "", status_kehadiran_id: "", urutan: 0 }; };
+    const batalSunting = () => { ed.jenis = ""; ed.id = null; };
+    const sedangSunting = (jenis, id) => ed.jenis === jenis && ed.id === id;
+    async function simpanSunting() {
+      const d = ed.data, baru = ed.id === "baru";
+      if (ed.jenis === "pilihan") { if (await ubahPilihan(d, { nama: d.nama, urutan: d.urutan, lingkungan: d.lingkungan })) batalSunting(); return; }
+      const tabel = ed.jenis === "_status" ? "status_kehadiran" : "jenis_izin";
+      const kolom = tabel === "status_kehadiran" ? ["kode", "nama", "warna", "dihitung_hadir", "urutan"] : ["nama", "basis_waktu", "wajib_wali", "jam_kembali_bawaan", "status_kehadiran_id", "urutan"];
+      const data = Object.fromEntries(kolom.filter((k) => !(k === "kode" && !baru)).map((k) => [k, d[k]]));
+      if (!baru) data.id = ed.id;
+      f.galat = ""; f.ok = "";
+      try { await api("/master/" + tabel, data); f.ok = "Tersimpan."; batalSunting(); await muatMaster(); } catch (e) { f.galat = e.message; }
+    }
     const baru = reactive({ kelas: { tingkat: 1, rombel: "", jenjang_id: 1, label: "", lingkungan: "putra" }, asrama: { nama: "", lingkungan: "putra" }, kamar: { asrama_id: "", nomor: "" }, guru: { nip: "", nama: "", jenis_kelamin: "L", email: "", lingkungan: "semua" }, ta: { nama: "", status: "persiapan" } });
     function tambahKamar() { const a = (m.value.asrama || []).find((x) => x.id == baru.kamar.asrama_id); if (!a) { f.galat = "Pilih asrama."; return; } simpanMaster("kamar", { asrama_id: a.id, nomor: baru.kamar.nomor, nama: a.nama + "-" + baru.kamar.nomor }); }
 
@@ -706,7 +739,7 @@ const DataMaster = {
       } catch (e) { f.galat = `${e.message} — berhenti pada santri ke-${i + 1}. Klik Impor sekarang lagi; NIS yang sudah masuk hanya diperbarui, tidak dobel.`; } finally { f.sibuk = false; }
     }
     onMounted(async () => { await muatMaster(); cari(); });
-    return { tab, f, m, moderator, bisaPilihan, cari, simpanMaster, bukaSantri, simpanSantri, KELOMPOK, isiPilihan, tambahPilihan, ubahPilihan, baru, tambahKamar, bacaFile, jalankanImpor, namaKelas,
+    return { waliDari, guruUntuk, aturWali, hapusWali, PERAN_WALI, tab, f, m, moderator, bisaPilihan, cari, simpanMaster, bukaSantri, simpanSantri, KELOMPOK, isiPilihan, tambahPilihan, ubahPilihan, ed, sunting, batalSunting, sedangSunting, simpanSunting, baru, tambahKamar, bacaFile, jalankanImpor, namaKelas,
       saring, saranSantri, pilihSaran, navS, tutupSaran, g, guruTersaring, saranGuru, ubahGuru, navG, tutupSaranGuru, simpanGuru, guruKosong, isiGuru, bacaGuru, imporGuru, templatGuru };
   },
   template: `<div><span class="jejak">Administrasi</span><h1>Data Master</h1></div>
@@ -758,9 +791,14 @@ const DataMaster = {
       <label class="isian">Lingkungan<select v-model="baru.kelas.lingkungan"><option>putra</option><option>putri</option></select></label>
       <button @click="simpanMaster('kelas', baru.kelas)">Tambah rombel</button>
     </div>
-    <div class="tabel"><table><thead><tr><th>Kelas</th><th>Lingkungan</th><th>Santri aktif</th><th>Status</th><th></th></tr></thead>
-      <tbody><tr v-for="k in m.kelas" :key="k.id"><td><strong>{{ namaKelas(k) }}</strong></td><td>{{ k.lingkungan }}</td><td>{{ k.jumlah }}</td><td>{{ k.aktif ? 'Aktif' : 'Nonaktif' }}</td><td><button class="kedua kecil" @click="simpanMaster('kelas', {id: k.id, aktif: k.aktif ? 0 : 1})">{{ k.aktif ? 'Nonaktifkan' : 'Aktifkan' }}</button></td></tr></tbody></table></div>
-    <p class="redup">Rombel statis (K-89): yang berubah tiap tahun hanya santri dan wali kelasnya.</p>
+    <div class="tabel"><table><thead><tr><th>Kelas</th><th>Lingkungan</th><th>Santri aktif</th><th>Wali kelas (TA aktif)</th><th>Status</th><th></th></tr></thead>
+      <tbody><tr v-for="k in m.kelas" :key="k.id"><td><strong>{{ namaKelas(k) }}</strong></td><td>{{ k.lingkungan }}</td><td>{{ k.jumlah }}</td>
+        <td><div class="baris" style="gap:4px"><span v-for="w in waliDari('kelas', k.id)" :key="w.id" class="lencana" :class="w.peran === 'wali' ? 'hijau' : ''">{{ w.nama }} · {{ PERAN_WALI[w.peran] }}
+          <button v-if="moderator" class="tanpa-gaya" :aria-label="'Hapus ' + w.nama" @click="hapusWali('kelas', w)">✕</button></span>
+          <select v-if="moderator && k.aktif" class="kecil" aria-label="Tetapkan wali kelas" @change="aturWali('kelas', k, $event.target.value); $event.target.value = ''">
+            <option value="">+ {{ waliDari('kelas', k.id).length ? 'asisten' : 'wali' }}…</option><option v-for="g in guruUntuk(k.lingkungan, 'kelas', k.id)" :value="g.id">{{ g.nama }}</option></select></div></td>
+        <td>{{ k.aktif ? 'Aktif' : 'Nonaktif' }}</td><td><button class="kedua kecil" @click="simpanMaster('kelas', {id: k.id, aktif: k.aktif ? 0 : 1})">{{ k.aktif ? 'Nonaktifkan' : 'Aktifkan' }}</button></td></tr></tbody></table></div>
+    <p class="redup">Rombel statis (K-89): yang berubah tiap tahun hanya santri dan wali kelasnya. Wali kelas ditetapkan per tahun ajaran aktif; guru yang punya akun menerima kabar santri binaannya di notifikasi.</p>
   </template>
 
   <template v-if="tab==='asrama'">
@@ -768,8 +806,13 @@ const DataMaster = {
       <div class="kartu baris"><label class="isian">Asrama baru<input v-model="baru.asrama.nama"></label><label class="isian">Lingkungan<select v-model="baru.asrama.lingkungan"><option>putra</option><option>putri</option></select></label><button @click="simpanMaster('asrama', baru.asrama)">Tambah</button></div>
       <div class="kartu baris"><label class="isian">Asrama<select v-model="baru.kamar.asrama_id"><option v-for="a in m.asrama" :value="a.id">{{ a.nama }}</option></select></label><label class="isian">Nomor kamar<input v-model="baru.kamar.nomor" placeholder="01"></label><button @click="tambahKamar">Tambah kamar</button></div>
     </div>
-    <div class="tabel"><table><thead><tr><th>Kamar</th><th>Lingkungan</th><th>Penghuni</th><th>Status</th><th></th></tr></thead>
-      <tbody><tr v-for="k in m.kamar" :key="k.id"><td><strong>{{ k.nama }}</strong></td><td>{{ k.lingkungan }}</td><td>{{ k.jumlah }}</td><td>{{ k.aktif ? 'Aktif' : 'Nonaktif' }}</td><td><button class="kedua kecil" @click="simpanMaster('kamar', {id: k.id, aktif: k.aktif ? 0 : 1})">{{ k.aktif ? 'Nonaktifkan' : 'Aktifkan' }}</button></td></tr></tbody></table></div>
+    <div class="tabel"><table><thead><tr><th>Kamar</th><th>Lingkungan</th><th>Penghuni</th><th>Wali asuh (TA aktif)</th><th>Status</th><th></th></tr></thead>
+      <tbody><tr v-for="k in m.kamar" :key="k.id"><td><strong>{{ k.nama }}</strong></td><td>{{ k.lingkungan }}</td><td>{{ k.jumlah }}</td>
+        <td><div class="baris" style="gap:4px"><span v-for="w in waliDari('kamar', k.id)" :key="w.id" class="lencana" :class="w.peran === 'wali_asuh' ? 'hijau' : ''">{{ w.nama }} · {{ PERAN_WALI[w.peran] }}
+          <button v-if="moderator" class="tanpa-gaya" :aria-label="'Hapus ' + w.nama" @click="hapusWali('kamar', w)">✕</button></span>
+          <select v-if="moderator && k.aktif" class="kecil" aria-label="Tetapkan wali asuh" @change="aturWali('kamar', k, $event.target.value); $event.target.value = ''">
+            <option value="">+ {{ waliDari('kamar', k.id).length ? 'asisten' : 'wali asuh' }}…</option><option v-for="g in guruUntuk(k.lingkungan, 'kamar', k.id)" :value="g.id">{{ g.nama }}</option></select></div></td>
+        <td>{{ k.aktif ? 'Aktif' : 'Nonaktif' }}</td><td><button class="kedua kecil" @click="simpanMaster('kamar', {id: k.id, aktif: k.aktif ? 0 : 1})">{{ k.aktif ? 'Nonaktifkan' : 'Aktifkan' }}</button></td></tr></tbody></table></div>
   </template>
 
   <template v-if="tab==='guru'">
@@ -832,23 +875,69 @@ const DataMaster = {
       <div class="kartu" style="display:flex;flex-direction:column;gap:12px">
         <template v-if="f.kelompok==='_status'">
           <h2>Status kehadiran</h2>
-          <div class="tabel"><table><thead><tr><th>Kode</th><th>Nama</th><th>Dihitung hadir</th><th>Status</th></tr></thead>
-            <tbody><tr v-for="s in m.status_kehadiran"><td>{{ s.kode }}</td><td :style="{color: s.warna, fontWeight: 700}">{{ s.nama }}</td><td>{{ s.dihitung_hadir ? 'Ya' : 'Tidak' }}</td><td><button v-if="moderator" class="kedua kecil" @click="simpanMaster('status_kehadiran', {id: s.id, aktif: s.aktif ? 0 : 1})">{{ s.aktif ? 'Aktif' : 'Nonaktif' }}</button></td></tr></tbody></table></div>
+          <div class="baris" v-if="moderator && !sedangSunting('_status','baru')"><button class="kedua" @click="sunting('_status')">+ Tambah status</button></div>
+          <div class="tabel"><table><thead><tr><th>Kode</th><th>Nama</th><th>Warna</th><th>Dihitung hadir</th><th>Urutan</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="s in [...(sedangSunting('_status','baru') ? [{id:'baru'}] : []), ...m.status_kehadiran]" :key="s.id">
+                <template v-if="sedangSunting('_status', s.id)">
+                  <td><input v-if="s.id==='baru'" v-model="ed.data.kode" maxlength="3" style="width:56px"><strong v-else>{{ s.kode }}</strong></td>
+                  <td><input v-model="ed.data.nama" style="min-width:140px"></td>
+                  <td><input type="color" v-model="ed.data.warna" style="width:48px;padding:2px"></td>
+                  <td><select v-model.number="ed.data.dihitung_hadir"><option :value="1">Ya</option><option :value="0">Tidak</option></select></td>
+                  <td><input type="number" v-model.number="ed.data.urutan" style="width:70px"></td>
+                  <td colspan="2"><div class="baris"><button class="kecil" @click="simpanSunting">Simpan</button><button class="kedua kecil" @click="batalSunting">Batal</button></div></td>
+                </template>
+                <template v-else>
+                  <td>{{ s.kode }}</td><td :style="{color: s.warna, fontWeight: 700}">{{ s.nama }}</td><td><span :style="{display:'inline-block',width:'18px',height:'18px',borderRadius:'4px',background:s.warna}"></span></td>
+                  <td>{{ s.dihitung_hadir ? 'Ya' : 'Tidak' }}</td><td>{{ s.urutan }}</td>
+                  <td><button v-if="moderator" class="kedua kecil" @click="simpanMaster('status_kehadiran', {id: s.id, aktif: s.aktif ? 0 : 1})">{{ s.aktif ? 'Aktif' : 'Nonaktif' }}</button></td>
+                  <td><button v-if="moderator" class="kedua kecil" @click="sunting('_status', s)">Ubah</button></td>
+                </template>
+              </tr></tbody></table></div>
+          <p class="redup">Kode tidak bisa diubah setelah dibuat karena dipakai aturan otomatis (mis. overdue → A, skorsing → P).</p>
         </template>
         <template v-else-if="f.kelompok==='_izin'">
           <h2>Jenis izin</h2>
-          <div class="tabel"><table><thead><tr><th>Nama</th><th>Basis waktu</th><th>Wajib wali</th><th>Status absensi</th><th></th></tr></thead>
-            <tbody><tr v-for="j in m.jenis_izin"><td><strong>{{ j.nama }}</strong></td><td>{{ j.basis_waktu }}</td><td>{{ j.wajib_wali ? 'Ya' : 'Tidak' }}</td><td>{{ (m.status_kehadiran.find(s => s.id===j.status_kehadiran_id)||{}).nama }}</td><td><button v-if="moderator" class="kedua kecil" @click="simpanMaster('jenis_izin', {id: j.id, aktif: j.aktif ? 0 : 1})">{{ j.aktif ? 'Aktif' : 'Nonaktif' }}</button></td></tr></tbody></table></div>
+          <div class="baris" v-if="moderator && !sedangSunting('_izin','baru')"><button class="kedua" @click="sunting('_izin')">+ Tambah jenis izin</button></div>
+          <div class="tabel"><table><thead><tr><th>Nama</th><th>Basis waktu</th><th>Jam kembali bawaan</th><th>Wajib wali</th><th>Status absensi</th><th>Urutan</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="j in [...(sedangSunting('_izin','baru') ? [{id:'baru'}] : []), ...m.jenis_izin]" :key="j.id">
+                <template v-if="sedangSunting('_izin', j.id)">
+                  <td><input v-model="ed.data.nama" style="min-width:140px"></td>
+                  <td><select v-model="ed.data.basis_waktu"><option value="jam">jam</option><option value="tanggal_jam">tanggal_jam</option><option value="tanggal">tanggal</option></select></td>
+                  <td><input type="time" v-model="ed.data.jam_kembali_bawaan"></td>
+                  <td><select v-model.number="ed.data.wajib_wali"><option :value="1">Ya</option><option :value="0">Tidak</option></select></td>
+                  <td><select v-model="ed.data.status_kehadiran_id"><option value="">—</option><option v-for="s in m.status_kehadiran" :value="s.id">{{ s.nama }}</option></select></td>
+                  <td><input type="number" v-model.number="ed.data.urutan" style="width:70px"></td>
+                  <td colspan="2"><div class="baris"><button class="kecil" @click="simpanSunting">Simpan</button><button class="kedua kecil" @click="batalSunting">Batal</button></div></td>
+                </template>
+                <template v-else>
+                  <td><strong>{{ j.nama }}</strong></td><td>{{ j.basis_waktu }}</td><td>{{ j.jam_kembali_bawaan || '—' }}</td><td>{{ j.wajib_wali ? 'Ya' : 'Tidak' }}</td>
+                  <td>{{ (m.status_kehadiran.find(s => s.id===j.status_kehadiran_id)||{}).nama }}</td><td>{{ j.urutan }}</td>
+                  <td><button v-if="moderator" class="kedua kecil" @click="simpanMaster('jenis_izin', {id: j.id, aktif: j.aktif ? 0 : 1})">{{ j.aktif ? 'Aktif' : 'Nonaktif' }}</button></td>
+                  <td><button v-if="moderator" class="kedua kecil" @click="sunting('_izin', j)">Ubah</button></td>
+                </template>
+              </tr></tbody></table></div>
         </template>
         <template v-else>
           <h2>{{ (KELOMPOK.find(k => k[1]===f.kelompok)||[])[2] }}</h2>
           <div class="baris" v-if="bisaPilihan(f.kelompok)"><label class="isian" style="flex:2 1 200px">Pilihan baru<input v-model="f.baru" @keyup.enter="tambahPilihan"></label>
             <label class="isian">Lingkungan<select v-model="f.ling"><option>semua</option><option>putra</option><option>putri</option></select></label><button @click="tambahPilihan">Tambah</button></div>
-          <div class="tabel"><table><thead><tr><th>Urutan</th><th>Pilihan</th><th>Lingkungan</th><th>Status</th></tr></thead>
-            <tbody><tr v-for="p in isiPilihan" :key="p.id" :style="{color: p.aktif ? '' : '#6B756F'}"><td>{{ p.urutan }}</td><td><strong>{{ p.nama }}</strong></td><td>{{ p.lingkungan }}</td>
-              <td><button class="kecil" :class="p.aktif ? '' : 'kedua'" :disabled="!bisaPilihan(p.kelompok)" @click="ubahPilihan(p, {aktif: p.aktif ? 0 : 1})">{{ p.aktif ? 'Aktif' : 'Nonaktif' }}</button></td></tr></tbody></table>
+          <div class="tabel"><table><thead><tr><th>Urutan</th><th>Pilihan</th><th>Lingkungan</th><th>Status</th><th></th></tr></thead>
+            <tbody><tr v-for="p in isiPilihan" :key="p.id" :style="{color: p.aktif ? '' : '#6B756F'}">
+              <template v-if="sedangSunting('pilihan', p.id)">
+                <td><input type="number" v-model.number="ed.data.urutan" style="width:70px"></td>
+                <td><input v-model="ed.data.nama" maxlength="120" style="min-width:160px" @keyup.enter="simpanSunting" @keyup.esc="batalSunting"></td>
+                <td><select v-model="ed.data.lingkungan"><option>semua</option><option>putra</option><option>putri</option></select></td>
+                <td colspan="2"><div class="baris"><button class="kecil" @click="simpanSunting">Simpan</button><button class="kedua kecil" @click="batalSunting">Batal</button></div></td>
+              </template>
+              <template v-else>
+                <td>{{ p.urutan }}</td><td><strong>{{ p.nama }}</strong></td><td>{{ p.lingkungan }}</td>
+                <td><button class="kecil" :class="p.aktif ? '' : 'kedua'" :disabled="!bisaPilihan(p.kelompok)" @click="ubahPilihan(p, {aktif: p.aktif ? 0 : 1})">{{ p.aktif ? 'Aktif' : 'Nonaktif' }}</button></td>
+                <td><button v-if="bisaPilihan(p.kelompok)" class="kedua kecil" @click="sunting('pilihan', p)">Ubah</button></td>
+              </template></tr></tbody></table>
             <p v-if="!isiPilihan.length" class="redup" style="padding:14px">Belum ada pilihan.</p></div>
-          <p class="redup">Pilihan yang sudah dipakai tidak dihapus — cukup dinonaktifkan.</p>
+          <p class="redup">Klik <strong>Ubah</strong> untuk mengganti nama, urutan, atau lingkungan. Mengganti nama juga mengubah tampilan di data lama yang memakai pilihan ini. Pilihan yang sudah dipakai tidak dihapus — cukup dinonaktifkan.</p>
         </template>
       </div>
     </div>
@@ -961,8 +1050,106 @@ function daftarHalaman(jalur, komponen, menu) {
 }
 window.daftarHalaman = daftarHalaman;
 
+// ---------------------------------------------------------------- lonceng notifikasi & detail akun (kerangka)
+// Tugas sesuai akses dihitung server tiap muat; notifikasi tersimpan (pengumuman, akun, kabar santri binaan) punya tanda dibaca.
+const notif = reactive({ data: { tugas: [], daftar: [], belum_dibaca: 0 }, buka: false, akun: false });
+const muatNotif = async () => { if (negara.me && !negara.me.wajib_ganti_password) notif.data = await api("/notifikasi").catch(() => notif.data); };
+const waktuLalu = (t) => {
+  if (!t) return "";
+  const ms = Date.now() - Date.parse(t.replace(" ", "T") + (t.length === 16 ? ":00+07:00" : "Z"));
+  const m = Math.round(ms / 60e3);
+  if (m < 1) return "baru saja"; if (m < 60) return m + " menit lalu";
+  const j = Math.round(m / 60); if (j < 24) return j + " jam lalu";
+  const h = Math.round(j / 24); return h < 30 ? h + " hari lalu" : t.slice(0, 10);
+};
+const LABEL_JENIS_NOTIF = { pengumuman: "Pengumuman", akun: "Akun", santri: "Santri binaan" };
+async function bukaNotif(n) {
+  if (!n.dibaca_at) { n.dibaca_at = "kini"; notif.data.belum_dibaca = Math.max(0, notif.data.belum_dibaca - 1); api("/notifikasi/baca", { id: n.id }).catch(() => {}); }
+  notif.buka = false;
+  if (n.tautan === "/akun") notif.akun = true; else if (n.tautan) pergi(n.tautan);
+}
+async function bacaSemua() { await api("/notifikasi/baca", {}).catch(() => {}); await muatNotif(); }
+
+const Lonceng = {
+  props: { terang: Boolean },
+  setup() {
+    const jumlah = computed(() => notif.data.belum_dibaca + notif.data.tugas.length);
+    const panel = ref(null);
+    watch(() => notif.buka, (b) => { if (b) { muatNotif(); nextTick(() => panel.value && panel.value.focus()); } });
+    return { notif, jumlah, panel, waktuLalu, bukaNotif, bacaSemua, LABEL_JENIS_NOTIF, pergi };
+  },
+  template: `<button class="lonceng" :class="{terang}" type="button" :aria-label="'Notifikasi' + (jumlah ? ', ' + jumlah + ' baru' : '')" :aria-expanded="notif.buka" @click="notif.buka = !notif.buka">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      <span v-if="jumlah" class="badge">{{ jumlah > 99 ? '99+' : jumlah }}</span></button>
+    <teleport to="body"><template v-if="notif.buka">
+      <div class="tirai-notif" @click="notif.buka = false"></div>
+      <aside class="laci-notif" ref="panel" tabindex="-1" role="dialog" aria-label="Notifikasi" @keydown.esc="notif.buka = false">
+        <header><h2>Notifikasi</h2><button v-if="notif.data.belum_dibaca" class="kedua kecil" @click="bacaSemua">Tandai semua dibaca</button>
+          <button class="kedua kecil" aria-label="Tutup" @click="notif.buka = false">✕</button></header>
+        <section v-if="notif.data.tugas.length"><h3>Perlu ditindaklanjuti</h3>
+          <div v-for="t in notif.data.tugas" :key="t.kunci" class="notif-item tugas">
+            <a :href="'#' + t.tautan" @click="notif.buka = false"><strong>{{ t.judul }}</strong><span>{{ t.isi }}</span></a>
+            <ul v-if="t.rinci" class="notif-rinci"><li v-for="r in t.rinci.slice(0, 3)" :key="r.tanggal"><a :href="'#' + r.tautan" @click="notif.buka = false">{{ r.label }}</a> — {{ r.kamar }} kamar · {{ r.sesi }} sesi</li>
+              <li v-if="t.rinci.length > 3"><a href="#/notifikasi" @click="notif.buka = false">Lihat selengkapnya ({{ t.rinci.length }} hari)</a></li></ul>
+          </div></section>
+        <section><h3>Terbaru</h3>
+          <button v-for="n in notif.data.daftar.slice(0, 8)" :key="n.id" type="button" class="notif-item" :class="{baru: !n.dibaca_at}" @click="bukaNotif(n)">
+            <span class="titik" aria-hidden="true"></span><span style="flex:1;min-width:0"><strong>{{ n.judul }}</strong><span v-if="n.isi" class="potong">{{ n.isi }}</span>
+            <small>{{ LABEL_JENIS_NOTIF[n.jenis] }} · {{ waktuLalu(n.dibuat_at) }}</small></span></button>
+          <p v-if="!notif.data.daftar.length" class="redup" style="padding:6px 2px">Belum ada notifikasi.</p></section>
+        <footer><a href="#/notifikasi" @click="notif.buka = false">Lihat semua notifikasi</a></footer>
+      </aside></template></teleport>`,
+};
+
+// Detail akun: foto dari database foto santri (bila ada), selain itu inisial.
+const DetailAkun = {
+  components: { FotoSantri, Pesan },
+  props: { modal: Boolean },
+  emits: ["tutup"],
+  setup(props, { emit }) {
+    const d = ref(null), galat = ref("");
+    onMounted(async () => { try { d.value = await api("/akun-saya"); } catch (e) { galat.value = e.message; } });
+    const LING = { putra: "Putra", putri: "Putri", semua: "Putra & Putri" };
+    const PERAN = { wali: "Wali kelas", asisten: "Asisten", wali_asuh: "Wali asuh" };
+    async function keluar() { await api("/logout", {}).catch(() => {}); negara.me = null; emit("tutup"); pergi("/masuk"); }
+    return { d, galat, LING, PERAN, keluar, waktuLalu, inisial };
+  },
+  template: `<div :class="modal ? 'foto-lihat' : ''" :style="modal ? 'cursor:default' : ''" @click.self="$emit('tutup')" :role="modal ? 'dialog' : null" aria-label="Detail akun">
+    <div class="kartu akun-detail" @keydown.esc="$emit('tutup')">
+      <Pesan :galat="galat"/>
+      <div v-if="!d && !galat" class="muat">Memuat…</div>
+      <template v-if="d">
+        <div class="akun-kepala">
+          <FotoSantri v-if="d.foto_url" :s="{ nama: d.nama, foto_url: d.foto_url }" ukuran="besar" class="foto-akun"/>
+          <span v-else class="foto foto-akun inisial" aria-hidden="true">{{ inisial(d.nama) }}</span>
+          <div style="min-width:0"><h2 style="margin:0">{{ d.nama }}</h2><div class="redup">{{ d.email }}</div>
+            <div class="baris" style="margin-top:6px;gap:6px"><span class="lencana hijau">{{ d.role_label || 'Menunggu role' }}</span><span class="lencana">{{ LING[d.lingkungan] }}</span>
+              <span v-if="d.status !== 'aktif'" class="lencana merah">{{ d.status }}</span></div></div>
+          <button v-if="modal" class="kedua kecil" style="margin-left:auto;align-self:flex-start" aria-label="Tutup" @click="$emit('tutup')">✕</button>
+        </div>
+        <dl class="akun-isi">
+          <template v-if="d.santri"><dt>NIS</dt><dd>{{ d.santri.nis }}</dd><dt>Kelas</dt><dd>{{ d.santri.kelas || '—' }}</dd><dt>Kamar</dt><dd>{{ d.santri.kamar || '—' }}</dd>
+            <dt>Jabatan</dt><dd><template v-if="d.jabatan.length"><div v-for="j in d.jabatan">{{ j.nama }} <span class="redup">· {{ j.masa }}</span></div></template><span v-else class="redup">—</span></dd></template>
+          <template v-if="d.guru"><dt>NIP</dt><dd>{{ d.guru.nip }}</dd>
+            <dt>Wali kelas</dt><dd><template v-if="d.wali_kelas.length"><div v-for="k in d.wali_kelas">{{ k.nama }} <span class="redup">· {{ PERAN[k.peran] }}</span></div></template><span v-else class="redup">—</span></dd>
+            <dt>Wali asuh</dt><dd><template v-if="d.wali_asuh.length"><div v-for="k in d.wali_asuh">{{ k.nama }} <span class="redup">· {{ PERAN[k.peran] }}</span></div></template><span v-else class="redup">—</span></dd></template>
+          <dt>Akses</dt><dd><span v-if="d.role === 'moderator'" class="lencana hijau">Semua akses</span>
+            <span v-for="a in d.akses_bawaan" class="lencana" style="margin:0 4px 4px 0">{{ a }}</span>
+            <span v-for="a in d.akses_tambahan" class="lencana biru" style="margin:0 4px 4px 0" :title="'Diberikan ' + a.diberikan_at">{{ a.nama }}</span>
+            <span v-if="d.role !== 'moderator' && !d.akses_bawaan.length && !d.akses_tambahan.length" class="redup">—</span></dd>
+          <dt>Login terakhir</dt><dd>{{ d.login_terakhir ? waktuLalu(d.login_terakhir) : '—' }} <span class="redup">· {{ d.sesi_aktif }} sesi aktif</span></dd>
+          <dt>Akun dibuat</dt><dd>{{ d.dibuat_at ? d.dibuat_at.slice(0, 10) : '—' }}</dd>
+        </dl>
+        <p v-if="d.akses_tambahan.length" class="redup" style="margin:0;font-size:12px">Lencana biru = akses tambahan dari Moderator.</p>
+        <div class="baris"><a class="tombol kedua" href="#/ganti-password" @click="$emit('tutup')">{{ d.punya_password ? 'Ganti password' : 'Buat password' }}</a>
+          <a class="tombol kedua" href="#/notifikasi" @click="$emit('tutup')">Notifikasi</a>
+          <button class="bahaya" style="margin-left:auto" @click="keluar">Keluar</button></div>
+      </template>
+    </div></div>`,
+};
+
 const App = {
-  components: { Masuk, GatePass },
+  components: { Masuk, GatePass, Lonceng, DetailAkun },
   setup() {
     const jalur = computed(() => negara.rute.split("?")[0]);
     const halaman = computed(() => HALAMAN[jalur.value] || Beranda);
@@ -973,19 +1160,20 @@ const App = {
     });
     // badge sidebar: dimuat ulang saat pindah halaman dan tiap menit
     const lencana = ref({});
-    const muatLencana = async () => { if (negara.me && !negara.me.wajib_ganti_password) lencana.value = await api("/lencana").catch(() => ({})); };
+    const muatLencana = async () => { if (negara.me && !negara.me.wajib_ganti_password) { lencana.value = await api("/lencana").catch(() => ({})); muatNotif(); } };
     watch(() => [negara.rute, !!negara.me], muatLencana, { immediate: true });
     setInterval(muatLencana, 60e3);
     async function keluar() { await api("/logout", {}); negara.me = null; pergi("/masuk"); }
     // menu laci (HP/tablet): tertutup saat pindah halaman atau tekan Esc
     const laci = ref(false);
     watch(jalur, () => { laci.value = false; });
-    window.addEventListener("keydown", (e) => { if (e.key === "Escape") { laci.value = false; negara.fotoBesar = null; } });
+    window.addEventListener("keydown", (e) => { if (e.key === "Escape") { laci.value = false; negara.fotoBesar = null; notif.buka = false; notif.akun = false; } });
+    watch(jalur, () => { notif.buka = false; notif.akun = false; });
     // animasi isi halaman setiap pindah halaman
     const isi = ref(null);
     watch(() => [jalur.value, !!negara.me], () => nextTick(() => gerak.masuk(isi.value)), { immediate: true });
     const ling = computed(() => negara.me && (negara.me.lingkungan === "semua" ? "Putra & Putri" : negara.me.lingkungan === "putra" ? "Putra" : "Putri"));
-    return { negara, jalur, halaman, menu, keluar, LABEL_ROLE, laci, isi, ling, IKON, inisial, lencana };
+    return { negara, jalur, halaman, menu, keluar, LABEL_ROLE, laci, isi, ling, IKON, inisial, lencana, notif, fotoKecil };
   },
   template: `
   <Masuk v-if="jalur === '/masuk' || !negara.me"/>
@@ -993,21 +1181,25 @@ const App = {
   <div v-else class="tata">
     <header class="bar-atas">
       <img src="/img/logo-hisada-64.png" alt="" width="34" height="34"><strong>HISADA</strong>
+      <Lonceng terang/>
       <button class="tombol-menu" :aria-expanded="laci" aria-controls="menu-utama" aria-label="Buka menu" @click="laci = !laci"><span></span><span></span><span></span></button>
     </header>
     <div class="tirai" :class="{terbuka: laci}" @click="laci = false"></div>
     <nav id="menu-utama" class="samping" :class="{terbuka: laci}" aria-label="Menu utama">
-      <a class="merek" href="#/"><img src="/img/logo-hisada-64.png" alt="" width="46" height="46"><span><strong>HISADA</strong><small>{{ ling }}</small></span></a>
+      <div class="merek"><a href="#/" class="merek-tautan"><img src="/img/logo-hisada-64.png" alt="" width="46" height="46"><span><strong>HISADA</strong><small>{{ ling }}</small></span></a><Lonceng class="hanya-lebar"/></div>
       <div class="grup-menu" v-for="[g, items] in menu" :key="g"><span class="judul">{{ g }}</span>
         <a v-for="i in items" :key="i[0]" :href="'#' + i[0]" :class="{aktif: jalur === i[0]}" :aria-current="jalur === i[0] ? 'page' : null">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" v-html="IKON[i[0]] || IKON['/']"></svg><span style="flex:1">{{ i[1] }}</span>
           <span v-if="lencana[i[0]]" class="badge" :aria-label="lencana[i[0]] + ' perlu tindakan'">{{ lencana[i[0]] }}</span></a></div>
-      <div class="akun"><span class="inisial" aria-hidden="true">{{ inisial(negara.me.nama) }}</span>
-        <div style="min-width:0"><strong>{{ negara.me.nama }}</strong><span>{{ negara.me.role ? LABEL_ROLE[negara.me.role] : 'Menunggu role' }}</span>
-        <div><a href="#/ganti-password">Ganti password</a><a href="#" @click.prevent="keluar">Keluar</a></div></div></div>
+      <div class="akun"><button type="button" class="akun-tombol" aria-haspopup="dialog" @click="notif.akun = true; laci = false" title="Lihat detail akun">
+          <img v-if="negara.me.foto_url" class="inisial" :src="fotoKecil(negara.me.foto_url, 96)" alt="" referrerpolicy="no-referrer" @error="negara.me.foto_url = null">
+          <span v-else class="inisial" aria-hidden="true">{{ inisial(negara.me.nama) }}</span>
+          <span style="min-width:0;text-align:left"><strong>{{ negara.me.nama }}</strong><span>{{ negara.me.role ? LABEL_ROLE[negara.me.role] : 'Menunggu role' }}</span></span></button>
+        <div class="akun-tautan"><a href="#/ganti-password">Ganti password</a><a href="#" @click.prevent="keluar">Keluar</a></div></div>
     </nav>
     <main class="isi" ref="isi"><component :is="halaman" :key="jalur"/></main>
   </div>
+  <DetailAkun v-if="notif.akun && negara.me" modal @tutup="notif.akun = false"/>
   <figure v-if="negara.fotoBesar" class="foto-lihat" @click="negara.fotoBesar = null" role="dialog" aria-label="Foto santri">
     <div><img :src="negara.fotoBesar.url" :alt="'Foto ' + negara.fotoBesar.nama" referrerpolicy="no-referrer"><figcaption>{{ negara.fotoBesar.nama }}</figcaption></div>
   </figure>`,

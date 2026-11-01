@@ -80,7 +80,7 @@
         if (!f.kelas_id) return;
         f.memuat = true;
         try {
-          const santri = await api(`/santri?kelas_id=${f.kelas_id}&limit=2000`);
+          const santri = await api(`/santri?kelas_id=${f.kelas_id}&status=aktif,skorsing&limit=2000`);
           const hasil = [];
           for (let i = 0; i < santri.length; i++) {
             f.proses = `Memuat rapor ${i + 1} dari ${santri.length}…`;

@@ -317,6 +317,8 @@ export default function (H) {
     } else {
       id = (await db.prepare("INSERT INTO prestasi (santri_id, lingkungan, nama_kegiatan, lokasi, tingkat_lomba_id, hasil_lomba_id, keterangan, tanggal, dicatat_oleh) VALUES (?,?,?,?,?,?,?,?,?)")
         .bind(s.id, s.lingkungan, d.nama_kegiatan, d.lokasi, tingkat, hasil, d.keterangan, d.tanggal, u.id).run()).meta.last_row_id;
+      // kabar baik untuk guru binaan (wali kelas / wali asuh) lewat lonceng
+      await H.stmtNotifGuru(db, s.id, { judul: `Prestasi — ${s.nama}`, isi: d.nama_kegiatan + (d.lokasi ? ` (${d.lokasi})` : "") }).run();
     }
     await H.catat(db, u, "kesantrian", lama ? "prestasi_ubah" : "prestasi_tambah", "prestasi", id, `${s.nis} ${s.nama}: ${d.nama_kegiatan}`, s.lingkungan);
     return json({ ok: true, id });

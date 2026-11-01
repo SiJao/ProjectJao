@@ -28,7 +28,7 @@ export default function (H) {
     if (q) { w.push("(g.nama LIKE ? OR g.nip LIKE ?)"); a.push(`%${q}%`, `${q}%`); }
     const ling = url.searchParams.get("lingkungan");
     if (["putra", "putri", "semua"].includes(ling)) { w.push("g.lingkungan = ?"); a.push(ling); }
-    const lim = Math.min(+url.searchParams.get("limit") || 5, 5);
+    const lim = Math.max(1, Math.min(+url.searchParams.get("limit") || 5, 5));
     const r = await db.prepare(`SELECT g.id, g.nip, g.nama, g.jenis_kelamin, g.lingkungan, g.email, g.no_hp FROM guru g WHERE ${w.join(" AND ")} ORDER BY g.nama LIMIT ?`).bind(...a, lim).all();
     return json(r.results);
   });

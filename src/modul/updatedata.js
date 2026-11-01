@@ -57,7 +57,8 @@ export default function (H) {
       db.prepare("SELECT id, waktu FROM impor_batch WHERE jenis = 'update_kelas_tahunan' AND tahun_ajaran_id = ? AND berlaku = 1").bind(taId),
       db.prepare(`SELECT k.id, k.tingkat, k.rombel, k.jenjang_id, k.lingkungan, k.aktif, ${NAMA_KELAS} nama FROM kelas k JOIN jenjang j ON j.id = k.jenjang_id`),
       db.prepare(`SELECT id, nis, nama, status, lingkungan, kelas_id, foto_url FROM santri WHERE nis IN (${ID_JSON})`).bind(JSON.stringify(nisList)),
-      db.prepare("SELECT id, nis, nama, lingkungan, kelas_id, foto_url FROM santri WHERE status = 'aktif' ORDER BY nama"),
+      // santri yang sedang diskors tetap santri aktif untuk kenaikan kelas
+      db.prepare("SELECT id, nis, nama, lingkungan, kelas_id, foto_url FROM santri WHERE status IN ('aktif','skorsing') ORDER BY nama"),
     ]);
     const ta = taR.results[0];
     if (!ta) gagal(400, "Pilih tahun ajaran tujuan.");
@@ -82,7 +83,7 @@ export default function (H) {
       if (hitung[nis] > 1) return tolak("NIS dobel di file");
       const s = santri[nis];
       if (!s) return tolak("NIS tidak ditemukan");
-      if (s.status !== "aktif") return tolak(`Santri tidak aktif (${s.status})`, s);
+      if (!["aktif", "skorsing"].includes(s.status)) return tolak(`Santri tidak aktif (${s.status})`, s);
       const kb = H.bacaKelas(kt);
       if (!kb) return tolak(kt ? "Format kelas tidak dikenal" : "Kelas kosong", s);
       // Kelas tujuan: rombel aktif, lingkungan sama dengan santri. Bila jenjang tidak ditulis, cocokkan tanpa jenjang asal tunggal.
@@ -152,7 +153,7 @@ export default function (H) {
         FROM (SELECT json_extract(value, '$.id') id, json_extract(value, '$.k') k FROM json_each(?)) j WHERE santri.id = j.id`).bind(P),
       // Kelas 6 → Alumni dengan efek penutupan yang sama seperti stmtUbahStatus (K-112), berbasis himpunan
       db.prepare(`INSERT INTO riwayat_status_santri (santri_id, lingkungan, status_lama, status_baru, alasan, impor_batch_id, oleh)
-        SELECT id, lingkungan, status, 'alumni', 'Update Kelas Tahunan', ${BATCH_INI}, ? FROM santri WHERE status = 'aktif' AND id IN (${ID_JSON})`).bind(u.id, A),
+        SELECT id, lingkungan, status, 'alumni', 'Update Kelas Tahunan', ${BATCH_INI}, ? FROM santri WHERE status IN ('aktif','skorsing') AND id IN (${ID_JSON})`).bind(u.id, A),
       db.prepare(`UPDATE santri SET status = 'alumni', kamar_id = NULL, menunggu_penempatan = 0, diubah_at = datetime('now') WHERE id IN (${ID_JSON})`).bind(A),
       db.prepare(`UPDATE riwayat_kelas SET selesai = ? WHERE selesai IS NULL AND santri_id IN (${ID_JSON})`).bind(t, A),
       db.prepare(`UPDATE riwayat_kamar SET selesai = ? WHERE selesai IS NULL AND santri_id IN (${ID_JSON})`).bind(t, A),

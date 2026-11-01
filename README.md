@@ -692,7 +692,11 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
 
 ### Notifikasi
 
-**Di dalam aplikasi:** badge di sidebar (pelanggaran menunggu sidang, santri menunggu pemeriksaan, izin overdue, pengurus menunggu role).
+**Di dalam aplikasi:** badge di sidebar (pelanggaran menunggu sidang, santri menunggu pemeriksaan, izin overdue, pengurus menunggu role) dan **lonceng notifikasi** untuk pengurus & guru:
+- **Perlu ditindaklanjuti** (dihitung langsung sesuai akses): izin overdue, pelanggaran menunggu sidang, kunjungan belum diperiksa, absensi kamar yang belum diisi per tanggal (sejak absensi mulai dipakai, 7 hari terakhir).
+- **Pengumuman internal** dari Moderator/pemegang akses Pengumuman ke pengurus, guru, atau semua akun (lingkungan sendiri).
+- **Perubahan akun sendiri**: role, lingkungan, akses diberikan/dicabut, password direset, penetapan wali kelas/wali asuh.
+- **Kabar santri binaan** untuk guru wali kelas & wali asuh (tahun ajaran aktif): izin, overdue, sakit dirawat, vonis berat, prestasi — tanpa data sensitif.
 
 **Email** (via Google Workspace pondok, untuk semua user):
 

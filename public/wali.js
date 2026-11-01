@@ -225,7 +225,7 @@ const DetailAnak = {
           <span class="lencana" :class="lencana(z.keadaan)">{{ LABEL[z.keadaan] }}</span></div></div>
         <p class="redup" style="margin:0">90 hari terakhir</p>
         <p v-if="!d.izin.length" class="redup" style="margin:0">Tidak ada izin.</p>
-        <div class="daftar-kecil"><div v-for="z in d.izin" :key="z.id"><span><strong>{{ z.jenis }}</strong> <span class="redup">{{ z.keterangan }}</span><br>
+        <div class="daftar-kecil"><div v-for="z in d.izin" :key="z.id"><span><strong>{{ z.jenis }}</strong><br>
           <span class="redup">{{ fmt(z.berangkat, z.basis_waktu) }} → {{ z.kembali_at || fmt(z.rencana_kembali, z.basis_waktu) }}</span></span>
           <span class="lencana" :class="lencana(z.keadaan)">{{ LABEL[z.keadaan] || z.keadaan }}{{ z.overdue_dikoreksi_at ? ' (dikoreksi)' : '' }}</span></div></div></div>
 

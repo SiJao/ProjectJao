@@ -39,7 +39,7 @@ Satu permintaan sebaiknya **≤ 40 query**. Baca data acuan sekali, tulis massal
 
 ### Rentang id migrasi
 
-kesehatan/kedisiplinan 100–199 · updatedata 200–299 · kegiatan/rapor 300–399 · tatawarkat/backup 400–499 · perizinan2/komunikasi/portalwali 500–599.
+kesehatan/kedisiplinan 100–199 · updatedata 200–299 · kegiatan/rapor 300–399 · tatawarkat/backup 400–499 · perizinan2/komunikasi/portalwali 500–599 · notifikasi 600–699 (tabel notifikasi ada di migrasi inti 3).
 
 ## Tampilan
 
