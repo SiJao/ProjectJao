@@ -670,5 +670,62 @@ export const MIGRATIONS = [
       )`,
       `CREATE INDEX notifikasi_user ON notifikasi (user_id, id)`
     ]
+  },
+  {
+    id: 4,
+    nama: "preset-akses",
+    sql: [
+      // Sistem role dihapus: akses diatur manual per akun. Preset = templat kumpulan akses yang DISALIN ke akun saat diterapkan
+      // (mengubah preset tidak mengubah akun yang sudah ada). Moderator tetap status khusus (users.role = 'moderator').
+      `CREATE TABLE preset (
+        id INTEGER PRIMARY KEY,
+        nama TEXT NOT NULL UNIQUE,
+        keterangan TEXT,
+        urutan INTEGER NOT NULL DEFAULT 0,
+        dibuat_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE TABLE preset_akses (
+        preset_id INTEGER NOT NULL REFERENCES preset(id) ON DELETE CASCADE,
+        akses_kode TEXT NOT NULL REFERENCES akses(kode),
+        PRIMARY KEY (preset_id, akses_kode)
+      )`,
+      // preset yang terakhir diterapkan ke akun (keterangan saja; akses akun tetap bisa diubah satu per satu)
+      `ALTER TABLE users ADD COLUMN preset_id INTEGER REFERENCES preset(id) ON DELETE SET NULL`,
+      // akses yang dulu hanya ikut role kini bisa diberikan manual
+      `INSERT OR IGNORE INTO akses (kode, nama, keterangan) VALUES
+        ('kegiatan','Kegiatan & absensi kegiatan','Mengelola grup kegiatan/ekstrakurikuler dan absensinya'),
+        ('prestasi','Prestasi','Mencatat prestasi santri'),
+        ('rapor','Rapor','Mencetak rapor kesantrian'),
+        ('tata_warkat','Tata Warkat','Kalender (edit), korespondensi, inventaris'),
+        ('pengumuman','Pengumuman','Pengumuman email ke wali dan pengumuman internal'),
+        ('isi_pengurus','Isi bagian pengurus','Mengisi jabatan pengurus masa khidmat'),
+        ('riwayat','Riwayat perubahan','Melihat riwayat perubahan (masa khidmat aktif)'),
+        ('lihat_absensi','Lihat absensi','Melihat absensi tanpa mengisi'),
+        ('lihat_perizinan','Lihat perizinan','Melihat izin tanpa menerbitkan'),
+        ('lihat_vonis','Lihat hasil vonis','Melihat hasil putusan kedisiplinan'),
+        ('lihat_prestasi','Lihat prestasi','Melihat prestasi tanpa mencatat'),
+        ('lihat_rapor','Lihat rapor','Melihat rapor tanpa mencetak')`,
+      `INSERT OR IGNORE INTO preset (nama, keterangan, urutan) VALUES
+        ('Piket', 'Absensi harian kamar', 1),
+        ('Kesehatan', 'Kunjungan kesehatan (pemeriksaan diberikan terpisah)', 2),
+        ('Kedisiplinan', 'Input pelanggaran', 3),
+        ('Sekretaris', 'Absensi, kegiatan, prestasi, rapor, tata warkat, pengumuman, isi pengurus, riwayat', 4),
+        ('Asatidz', 'Lihat absensi, perizinan, vonis, prestasi, rapor', 5)`,
+      `INSERT OR IGNORE INTO preset_akses (preset_id, akses_kode) SELECT p.id, a.kode FROM preset p JOIN akses a ON
+        (p.nama = 'Piket' AND a.kode IN ('absensi'))
+        OR (p.nama = 'Kesehatan' AND a.kode IN ('kesehatan'))
+        OR (p.nama = 'Kedisiplinan' AND a.kode IN ('input_pelanggaran'))
+        OR (p.nama = 'Sekretaris' AND a.kode IN ('absensi','kegiatan','prestasi','rapor','tata_warkat','pengumuman','isi_pengurus','riwayat'))
+        OR (p.nama = 'Asatidz' AND a.kode IN ('lihat_absensi','lihat_perizinan','lihat_vonis','lihat_prestasi','lihat_rapor'))`,
+      // Konversi akun lama: akses bawaan role lama disalin menjadi akses manual (tidak ada yang kehilangan akses), lalu role dikosongkan.
+      `INSERT OR IGNORE INTO user_akses (user_id, akses_kode)
+        SELECT u.id, a.kode FROM users u JOIN akses a ON
+          (u.role = 'piket' AND a.kode IN ('absensi'))
+          OR (u.role = 'sekretaris' AND a.kode IN ('absensi','kegiatan','prestasi','rapor','tata_warkat','pengumuman','isi_pengurus','riwayat'))
+          OR (u.role = 'asatidz' AND a.kode IN ('lihat_absensi','lihat_perizinan','lihat_vonis','lihat_prestasi','lihat_rapor'))
+        WHERE u.status <> 'nonaktif'`,
+      `UPDATE users SET preset_id = (SELECT id FROM preset WHERE lower(nama) = users.role) WHERE role IS NOT NULL AND role <> 'moderator'`,
+      `UPDATE users SET role = NULL WHERE role IS NOT NULL AND role <> 'moderator'`
+    ]
   }
 ];

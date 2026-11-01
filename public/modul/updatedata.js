@@ -334,14 +334,14 @@
         if (f.rows.length) pratinjau();
       }
       async function simpan() {
-        await coba(f, async () => { const r = await api("/updatedata/pengurus", { rows: f.rows }); f.ok = `${r.jumlah} pengurus diisi; akun dibuat/diaktifkan (menunggu role dari Moderator)${r.tertahan ? `, ${r.tertahan} akun tertahan (tanggal lahir kosong)` : ""}.`; f.p = null; f.rows = []; await muat(); muatSantri(); emit("ubah"); });
+        await coba(f, async () => { const r = await api("/updatedata/pengurus", { rows: f.rows }); f.ok = `${r.jumlah} pengurus diisi; akun dibuat/diaktifkan (menunggu akses dari Moderator)${r.tertahan ? `, ${r.tertahan} akun tertahan (tanggal lahir kosong)` : ""}.`; f.p = null; f.rows = []; await muat(); muatSantri(); emit("ubah"); });
       }
       const tambahJabatan = () => coba(f, async () => { await api("/updatedata/jabatan", { nama: f.baru, lingkungan: f.ling }); f.baru = ""; await muat(); });
       const ubahJabatan = (j) => coba(f, async () => { await api("/updatedata/jabatan", { id: j.id, aktif: j.aktif ? 0 : 1 }); await muat(); });
       const templat = () => unduhCsv("templat-pengurus.csv", [["NIS", "JABATAN"], ["990101", "Bagian Keamanan"]]);
       const lencanaAkun = (p) => p.user_status === "aktif" ? "hijau" : p.user_status === "tertahan" ? "kuning" : "merah";
       onMounted(async () => { await muatMaster(); await muat(); muatSantri(); });
-      return { f, moderator, kelas5, tampil, terpilih, jabatanAktif, pengurusTampil, dariPilihan, pilihFile, simpan, tambahJabatan, ubahJabatan, templat, lencanaAkun, namaKelas, LABEL_ROLE };
+      return { f, moderator, kelas5, tampil, terpilih, jabatanAktif, pengurusTampil, dariPilihan, pilihFile, simpan, tambahJabatan, ubahJabatan, templat, lencanaAkun, namaKelas };
     },
     template: `<div v-if="!info.masa_khidmat" class="pesan info">Belum ada masa khidmat aktif. Moderator membuatnya di tab Masa Khidmat & Serah Terima.</div>
     <div class="kartu" style="display:flex;flex-direction:column;gap:12px">
@@ -380,7 +380,7 @@
           <td><div class="santri-sel"><FotoSantri :s="p"/><span><strong>{{ p.nama }}</strong><div class="redup">{{ p.nis }} · Kelas {{ p.tingkat }}</div></span></div></td>
           <td>{{ p.jabatan }}</td><td>{{ p.lingkungan }}</td>
           <td><span class="lencana" :class="lencanaAkun(p)">{{ p.user_status || 'belum ada' }}</span></td>
-          <td><span class="lencana" :class="{kuning: !p.role}">{{ p.role ? LABEL_ROLE[p.role] : 'Menunggu role' }}</span></td></tr></tbody></table>
+          <td><span class="lencana" :class="{kuning: !p.jumlah_akses}">{{ p.preset || (p.jumlah_akses ? 'Akses manual' : 'Belum ada akses') }}</span></td></tr></tbody></table>
         <p v-if="!pengurusTampil.length" class="redup" style="padding:14px">Belum ada pengurus.</p></div>
     </div>
     <div v-if="moderator" class="kartu" style="display:flex;flex-direction:column;gap:10px">
@@ -400,22 +400,24 @@
     directives: { baris: vBaris },
     emits: ["ubah"],
     setup(_, { emit }) {
-      const f = reactive({ pengurus: [], q: "", sel: null, alasan: "", ganti: null, role: "", tanya: false, galat: "", ok: "", sibuk: false });
+      const f = reactive({ pengurus: [], q: "", sel: null, alasan: "", ganti: null, preset_id: "", preset: [], tanya: false, galat: "", ok: "", sibuk: false });
       const moderator = computed(() => negara.me.role === "moderator");
+      onMounted(async () => { if (moderator.value) f.preset = await api("/preset").catch(() => []); });
+      const namaPreset = () => (f.preset.find((p) => p.id == f.preset_id) || {}).nama;
       const muat = () => coba(f, async () => { f.pengurus = (await api("/updatedata/pengurus")).pengurus; });
       const tampil = computed(() => f.pengurus.filter((p) => cocokTeks(p, f.q) || (f.q.length > 1 && p.jabatan.toLowerCase().includes(f.q.toLowerCase()))));
       const pesan = computed(() => f.sel ? `PAW ${f.sel.jabatan} (${f.sel.lingkungan}):\n\n• ${f.sel.nama} (${f.sel.nis}) dinonaktifkan dari jabatan; akun loginnya nonaktif.\n• Alasan: ${f.alasan}\n`
-        + (f.ganti ? `• Pengganti: ${f.ganti.nama} (${f.ganti.nis})${f.role ? ", role " + LABEL_ROLE[f.role] : ", menunggu role"}.\n` : "• Belum ada pengganti (jabatan kosong).\n") + "\nYakin?" : "");
+        + (f.ganti ? `• Pengganti: ${f.ganti.nama} (${f.ganti.nis})${f.preset_id ? ", preset " + namaPreset() : ", menunggu akses dari Moderator"}.\n` : "• Belum ada pengganti (jabatan kosong).\n") + "\nYakin?" : "");
       async function jalankan(pw) {
         f.tanya = false;
         await coba(f, async () => {
-          const r = await api("/updatedata/paw", { pengurus_id: f.sel.id, alasan: f.alasan, santri_id: f.ganti ? f.ganti.id : null, role: f.role || null, password: pw });
+          const r = await api("/updatedata/paw", { pengurus_id: f.sel.id, alasan: f.alasan, santri_id: f.ganti ? f.ganti.id : null, preset_id: f.preset_id || null, password: pw });
           f.ok = "PAW selesai." + (r.pengganti ? ` Pengganti ${r.pengganti.nama}: akun ${r.pengganti.status}${r.pengganti.status === 'tertahan' ? ' (tanggal lahir kosong)' : ' — password sementara NIS + tanggal lahir'}.` : "");
-          f.sel = null; f.alasan = ""; f.ganti = null; f.role = ""; await muat(); emit("ubah");
+          f.sel = null; f.alasan = ""; f.ganti = null; f.preset_id = ""; await muat(); emit("ubah");
         });
       }
       onMounted(muat);
-      return { f, moderator, tampil, pesan, jalankan, LABEL_ROLE };
+      return { f, moderator, tampil, pesan, jalankan };
     },
     template: `<div class="dua-kolom">
       <div class="kartu" style="display:flex;flex-direction:column;gap:10px">
@@ -435,7 +437,7 @@
           <div><strong>{{ f.sel.jabatan }}</strong> — {{ f.sel.nama }} ({{ f.sel.nis }})</div>
           <label class="isian">Alasan (wajib)<input v-model="f.alasan" maxlength="200"></label>
           <label class="isian">Pengganti (kosongkan bila belum ada)<CariSantri v-model="f.ganti"/></label>
-          <label v-if="moderator" class="isian">Role pengganti<select v-model="f.role"><option value="">Menunggu role</option><option v-for="r in ['piket','kesehatan','kedisiplinan','sekretaris']" :value="r">{{ LABEL_ROLE[r] }}</option></select></label>
+          <label v-if="moderator" class="isian">Preset akses pengganti<select v-model="f.preset_id"><option value="">Menunggu akses</option><option v-for="p in f.preset" :value="p.id">{{ p.nama }}</option></select></label>
           <div><button class="bahaya" :disabled="!f.alasan || f.sibuk" @click="f.tanya=true">Jalankan PAW…</button></div>
         </template>
         <Pesan :galat="f.galat" :ok="f.ok"/>

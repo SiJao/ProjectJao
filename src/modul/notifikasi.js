@@ -17,7 +17,7 @@ export default function (H) {
     if (boleh(u, "pemeriksaan")) tambah("periksa", db.prepare(`SELECT COUNT(*) n FROM kunjungan_kesehatan k WHERE k.status = 'aktif' AND ${lingIn(u, "k.lingkungan").sql}
       AND NOT EXISTS (SELECT 1 FROM pemeriksaan p WHERE p.kunjungan_id = k.id)`).bind(...l.args));
     if (u.role === "moderator") {
-      tambah("tanpa_role", db.prepare("SELECT COUNT(*) n FROM users WHERE role IS NULL AND status = 'aktif'"));
+      tambah("tanpa_akses", db.prepare("SELECT COUNT(*) n FROM users us WHERE role IS NULL AND status = 'aktif' AND NOT EXISTS (SELECT 1 FROM user_akses ua WHERE ua.user_id = us.id)"));
       tambah("email_gagal", db.prepare("SELECT COUNT(*) n FROM email_antrean WHERE status = 'gagal'"));
     }
     if (boleh(u, "absensi")) {
@@ -39,7 +39,7 @@ export default function (H) {
     if (n("overdue")) tugas.push({ kunci: "overdue", judul: `${n("overdue")} santri overdue`, isi: "Belum kembali ke pondok setelah batas waktu izin.", tautan: "/perizinan", jumlah: n("overdue") });
     if (n("sidang")) tugas.push({ kunci: "sidang", judul: `${n("sidang")} pelanggaran menunggu sidang`, isi: "Perlu diputuskan.", tautan: "/kedisiplinan", jumlah: n("sidang") });
     if (n("periksa")) tugas.push({ kunci: "periksa", judul: `${n("periksa")} kunjungan belum diperiksa`, isi: "Kunjungan kesehatan tanpa pemeriksaan.", tautan: "/kesehatan", jumlah: n("periksa") });
-    if (n("tanpa_role")) tugas.push({ kunci: "tanpa_role", judul: `${n("tanpa_role")} akun menunggu role`, isi: "Tentukan role di Pengguna & Akses.", tautan: "/pengguna", jumlah: n("tanpa_role") });
+    if (n("tanpa_akses")) tugas.push({ kunci: "tanpa_akses", judul: `${n("tanpa_akses")} akun belum punya akses`, isi: "Terapkan preset atau centang akses di Pengguna & Akses.", tautan: "/pengguna", jumlah: n("tanpa_akses") });
     if (n("email_gagal")) tugas.push({ kunci: "email_gagal", judul: `${n("email_gagal")} email gagal terkirim`, isi: "Lihat Komunikasi → Antrean email.", tautan: "/komunikasi", jumlah: n("email_gagal") });
     if (hasil.absensi && hasil.absensi.length) {
       const hi = hariIni();
@@ -70,8 +70,9 @@ export default function (H) {
   });
 
   // ---------------------------------------------------------------- pengumuman internal (lonceng)
-  // sasaran: pengurus (akun santri) · guru (akun guru) · semua (semua akun ber-role). Selain Moderator: hanya lingkungan sendiri.
-  const SASARAN = { pengurus: "us.santri_id IS NOT NULL", guru: "us.guru_id IS NOT NULL", semua: "us.role IS NOT NULL" };
+  // sasaran: pengurus (akun santri) · guru (akun guru) · semua (Moderator + akun yang punya akses). Selain Moderator: hanya lingkungan sendiri.
+  const SASARAN = { pengurus: "us.santri_id IS NOT NULL", guru: "us.guru_id IS NOT NULL",
+    semua: "(us.role = 'moderator' OR EXISTS (SELECT 1 FROM user_akses ua WHERE ua.user_id = us.id))" };
   function penerima(u, body) {
     const syarat = SASARAN[body.sasaran];
     if (!syarat) gagal(400, "Pilih sasaran pengumuman.");
@@ -119,19 +120,16 @@ export default function (H) {
       db.prepare(`SELECT a.kode, a.nama, ua.diberikan_at FROM user_akses ua JOIN akses a ON a.kode = ua.akses_kode WHERE ua.user_id = ? ORDER BY a.nama`).bind(u.id),
       db.prepare("SELECT COUNT(*) n FROM sesi_login WHERE user_id = ? AND kedaluwarsa > ?").bind(u.id, new Date().toISOString()),
     ]);
-    const bawaan = u.role === "moderator" ? [] : (H.AKSES_ROLE[u.role] || []);
-    const namaAkses = bawaan.length ? Object.fromEntries((await db.prepare("SELECT kode, nama FROM akses WHERE kode IN (SELECT value FROM json_each(?))")
-      .bind(JSON.stringify(bawaan)).all()).results.map((r) => [r.kode, r.nama])) : {};
     const s = santri.results[0] || null, g = guru.results[0] || null;
+    const preset = u.preset_id ? await db.prepare("SELECT nama FROM preset WHERE id = ?").bind(u.preset_id).first("nama") : null;
     return json({
-      id: u.id, nama: u.nama, email: u.email, role: u.role, role_label: u.role ? H.LABEL_ROLE[u.role] : null, lingkungan: u.lingkungan, status: u.status,
+      id: u.id, nama: u.nama, email: u.email, moderator: u.role === "moderator", preset: preset || null, lingkungan: u.lingkungan, status: u.status,
       dibuat_at: u.dibuat_at || null, login_terakhir: u.login_terakhir || null, punya_password: !!u.password_hash, sesi_aktif: sesi.results[0].n,
       // foto hanya dari database foto santri (bila ada); guru & moderator memakai inisial
       foto_url: s && s.foto_url ? s.foto_url : null,
       santri: s, jabatan: jabatan.results,
       guru: g, wali_kelas: kelas.results, wali_asuh: kamar.results,
-      akses_bawaan: bawaan.map((k) => namaAkses[k] || k),
-      akses_tambahan: akses.results,
+      akses: akses.results,
     });
   });
 

@@ -111,23 +111,34 @@ async function penggunaDariSesi(db, req) {
   return u;
 }
 
-// Akses bawaan role (Peta Akses README, K-55, K-63, K-75, K-86): sisanya lewat Manajemen Akses.
-// "lihat_X" otomatis dimiliki siapa pun yang punya X.
-const LABEL_ROLE = { moderator: "Moderator", sekretaris: "Sekretaris", piket: "Piket", kesehatan: "Kesehatan", kedisiplinan: "Kedisiplinan", asatidz: "Asatidz" };
-const AKSES_ROLE = {
-  piket: ["absensi"],
-  sekretaris: ["absensi", "kegiatan", "prestasi", "rapor", "tata_warkat", "pengumuman", "isi_pengurus", "riwayat"],
-  asatidz: ["lihat_absensi", "lihat_perizinan", "lihat_vonis", "lihat_prestasi", "lihat_rapor"],
-};
+// Tanpa role: setiap akun memegang akses manual (user_akses). Preset = templat akses yang disalin ke akun saat diterapkan.
+// Moderator adalah status khusus (users.role = 'moderator') = semua akses. "lihat_X" otomatis dimiliki siapa pun yang punya X.
 const KEMAMPUAN = ["absensi", "lihat_absensi", "perizinan", "lihat_perizinan", "kesehatan", "pemeriksaan", "profil_kesehatan",
   "input_pelanggaran", "putusan_kedisiplinan", "lihat_vonis", "kegiatan", "prestasi", "lihat_prestasi", "rapor", "lihat_rapor",
   "tata_warkat", "pengumuman", "isi_pengurus", "update_kamar", "paw", "riwayat"];
 // lihat_vonis tidak punya kode "vonis": pemegangnya adalah pemutus (hakim).
 const LIHAT_DARI = { lihat_vonis: "putusan_kedisiplinan" };
-const boleh = (u, kode) => u.role === "moderator" || u.akses.includes(kode) || (AKSES_ROLE[u.role] || []).includes(kode)
+const boleh = (u, kode) => u.role === "moderator" || u.akses.includes(kode)
   || (kode.startsWith("lihat_") && boleh(u, LIHAT_DARI[kode] || kode.slice(6)));
 const wajib = (u, kode) => { if (!boleh(u, kode)) gagal(403, "Anda tidak punya akses untuk tindakan ini."); };
 const wajibModerator = (u) => { if (u.role !== "moderator") gagal(403, "Hanya Moderator."); };
+// Preset dari {preset_id} atau {preset: "nama"}; null bila tidak diminta, galat bila tidak ditemukan.
+async function cariPreset(db, body) {
+  if (!body.preset_id && !body.preset) return null;
+  const p = body.preset_id ? await db.prepare("SELECT * FROM preset WHERE id = ?").bind(+body.preset_id).first()
+    : await db.prepare("SELECT * FROM preset WHERE lower(nama) = lower(?)").bind(String(body.preset)).first();
+  if (!p) gagal(400, "Preset tidak ditemukan.");
+  return p;
+}
+// Terapkan preset ke satu akun: akses akun DIGANTI dengan isi preset (salinan). userSql = "?" atau subkueri, mis. "(SELECT id FROM users WHERE santri_id = ?)".
+function stmtTerapkanPreset(db, userSql, userArgs, presetSql, presetArgs, olehId = null) {
+  return [
+    db.prepare(`DELETE FROM user_akses WHERE user_id = ${userSql}`).bind(...userArgs),
+    db.prepare(`INSERT OR IGNORE INTO user_akses (user_id, akses_kode, diberikan_oleh) SELECT ${userSql}, akses_kode, ? FROM preset_akses WHERE preset_id = ${presetSql}`)
+      .bind(...userArgs, olehId, ...presetArgs),
+    db.prepare(`UPDATE users SET preset_id = ${presetSql} WHERE id = ${userSql}`).bind(...presetArgs, ...userArgs),
+  ];
+}
 const lingIn = (u, kolom = "lingkungan") => ({ sql: `${kolom} IN (${u.ling.map(() => "?").join(",")})`, args: u.ling });
 const cekLing = (u, ling) => { if (!u.ling.includes(ling)) gagal(403, "Data di luar lingkungan Anda."); };
 
@@ -467,7 +478,8 @@ on("GET", "/api/auth/callback", async ({ env, db, url, req }) => {
 
 // ---------------------------------------------------------------- akun saya
 on("GET", "/api/me", async ({ db, u }) => json({
-  id: u.id, nama: u.nama, email: u.email, role: u.role, lingkungan: u.lingkungan, akses: u.akses,
+  id: u.id, nama: u.nama, email: u.email, role: u.role, moderator: u.role === "moderator", lingkungan: u.lingkungan, akses: u.akses,
+  preset: u.preset_id ? (await db.prepare("SELECT nama FROM preset WHERE id = ?").bind(u.preset_id).first("nama")) || null : null,
   foto_url: u.santri_id ? (await db.prepare("SELECT foto_url FROM santri WHERE id = ?").bind(u.santri_id).first("foto_url")) || null : null,
   bisa: Object.fromEntries(KEMAMPUAN.map((k) => [k, boleh(u, k)])),
   punya_password: !!u.password_hash,
@@ -482,7 +494,7 @@ on("GET", "/api/lencana", async ({ db, u }) => {
   if (boleh(u, "pemeriksaan")) h["/kesehatan"] = (await db.prepare(
     `SELECT COUNT(*) n FROM kunjungan_kesehatan k WHERE k.status = 'aktif' AND ${lingIn(u, "k.lingkungan").sql} AND NOT EXISTS (SELECT 1 FROM pemeriksaan p WHERE p.kunjungan_id = k.id)`).bind(...l.args).first()).n;
   if (u.role === "moderator") {
-    h["/pengguna"] = (await db.prepare("SELECT COUNT(*) n FROM users WHERE role IS NULL AND status = 'aktif'").first()).n;
+    h["/pengguna"] = (await db.prepare("SELECT COUNT(*) n FROM users us WHERE role IS NULL AND status = 'aktif' AND NOT EXISTS (SELECT 1 FROM user_akses ua WHERE ua.user_id = us.id)").first()).n;
     h["/update-data"] = (await db.prepare("SELECT COUNT(*) n FROM santri WHERE menunggu_penempatan = 1 AND status = 'aktif'").first()).n;
     h["/komunikasi"] = (await db.prepare("SELECT COUNT(*) n FROM email_antrean WHERE status = 'gagal'").first()).n;
   }
@@ -944,23 +956,30 @@ on("POST", "/api/impor/foto", async ({ db, u, body }) => {
 on("GET", "/api/users", async ({ db, u }) => {
   wajibModerator(u);
   const r = await db.prepare(
-    `SELECT u.id, u.email, u.nama, u.role, u.lingkungan, u.status, u.login_terakhir, u.santri_id, u.guru_id,
+    `SELECT u.id, u.email, u.nama, u.role, u.lingkungan, u.status, u.login_terakhir, u.santri_id, u.guru_id, u.preset_id, pr.nama preset,
             (u.password_hash IS NOT NULL) punya_password, s.nis, g.nip,
             (SELECT GROUP_CONCAT(akses_kode) FROM user_akses ua WHERE ua.user_id = u.id) akses
-     FROM users u LEFT JOIN santri s ON s.id = u.santri_id LEFT JOIN guru g ON g.id = u.guru_id ORDER BY u.role IS NULL DESC, u.nama`).all();
-  const ak = await db.prepare("SELECT * FROM akses ORDER BY kode").all();
-  return json({ users: r.results.map((x) => ({ ...x, akses: x.akses ? x.akses.split(",") : [] })), akses: ak.results });
+     FROM users u LEFT JOIN santri s ON s.id = u.santri_id LEFT JOIN guru g ON g.id = u.guru_id LEFT JOIN preset pr ON pr.id = u.preset_id
+     ORDER BY u.status <> 'aktif', u.role IS NOT NULL, akses IS NOT NULL, u.nama`).all();
+  const [ak, pr, pa] = await db.batch([
+    db.prepare("SELECT * FROM akses ORDER BY kode"),
+    db.prepare("SELECT * FROM preset ORDER BY urutan, nama"),
+    db.prepare("SELECT preset_id, akses_kode FROM preset_akses"),
+  ]);
+  const presets = pr.results.map((x) => ({ ...x, akses: pa.results.filter((a) => a.preset_id === x.id).map((a) => a.akses_kode) }));
+  return json({ users: r.results.map((x) => ({ ...x, akses: x.akses ? x.akses.split(",") : [] })), akses: ak.results, preset: presets });
 });
 
 on("POST", "/api/users/dari-santri", async ({ db, u, body }) => {
   wajibModerator(u);
   const s = await db.prepare("SELECT * FROM santri WHERE id = ?").bind(body.santri_id).first();
   if (!s || s.status !== "aktif") gagal(400, "Santri tidak ditemukan atau tidak aktif.");
-  if (body.role && !["piket", "kesehatan", "kedisiplinan", "sekretaris"].includes(body.role)) gagal(400, "Role ini tidak boleh untuk akun santri.");
+  const preset = await cariPreset(db, body);
   const pw = passwordSementara(s.nis, s.tanggal_lahir);
-  const r = await db.prepare("INSERT INTO users (email, password_hash, nama, role, santri_id, lingkungan, status, wajib_ganti_password) VALUES (?,?,?,?,?,?,?,1)")
-    .bind(`${s.nis}@daarululuumlido.com`, pw ? await hashPassword(pw) : null, s.nama, body.role || null, s.id, s.lingkungan, pw ? "aktif" : "tertahan").run();
-  await catat(db, u, "akun", "buat", "users", r.meta.last_row_id, `Akun pengurus ${s.nis}${pw ? "" : " (tertahan: tanggal lahir kosong)"}`, s.lingkungan);
+  const r = await db.prepare("INSERT INTO users (email, password_hash, nama, santri_id, lingkungan, status, wajib_ganti_password) VALUES (?,?,?,?,?,?,1)")
+    .bind(`${s.nis}@daarululuumlido.com`, pw ? await hashPassword(pw) : null, s.nama, s.id, s.lingkungan, pw ? "aktif" : "tertahan").run();
+  if (preset) await db.batch(stmtTerapkanPreset(db, "?", [r.meta.last_row_id], "?", [preset.id], u.id));
+  await catat(db, u, "akun", "buat", "users", r.meta.last_row_id, `Akun pengurus ${s.nis}${preset ? " · preset " + preset.nama : ""}${pw ? "" : " (tertahan: tanggal lahir kosong)"}`, s.lingkungan);
   return json({ ok: true, id: r.meta.last_row_id, tertahan: !pw });
 });
 
@@ -970,9 +989,11 @@ on("POST", "/api/users/guru", async ({ db, u, body }) => {
   if (!g) gagal(400, "Guru tidak ditemukan.");
   const email = bersih(body.email || g.email, 120)?.toLowerCase();
   if (!email) gagal(400, "Email guru wajib diisi.");
-  const r = await db.prepare("INSERT INTO users (email, nama, role, guru_id, lingkungan, wajib_ganti_password) VALUES (?,?,?,?,?,0)")
-    .bind(email, g.nama, "asatidz", g.id, g.lingkungan).run();
-  await catat(db, u, "akun", "buat", "users", r.meta.last_row_id, `Akun guru ${g.nip} (login dengan Google)`);
+  const preset = await cariPreset(db, body);
+  const r = await db.prepare("INSERT INTO users (email, nama, guru_id, lingkungan, wajib_ganti_password) VALUES (?,?,?,?,0)")
+    .bind(email, g.nama, g.id, g.lingkungan).run();
+  if (preset) await db.batch(stmtTerapkanPreset(db, "?", [r.meta.last_row_id], "?", [preset.id], u.id));
+  await catat(db, u, "akun", "buat", "users", r.meta.last_row_id, `Akun guru ${g.nip}${preset ? " · preset " + preset.nama : ""} (login dengan Google)`);
   return json({ ok: true, id: r.meta.last_row_id });
 });
 
@@ -989,20 +1010,19 @@ on("POST", "/api/users/:id", async ({ db, u, p, body }) => {
   wajibModerator(u);
   const t = await db.prepare("SELECT * FROM users WHERE id = ?").bind(p.id).first();
   if (!t) gagal(404, "Akun tidak ditemukan.");
-  const role = "role" in body ? (body.role || null) : t.role;
-  if (role === "moderator" && t.santri_id) gagal(400, "Role Moderator tidak boleh untuk akun santri (K-11).");
-  if (role === "asatidz" && !t.guru_id) gagal(400, "Role Asatidz hanya untuk akun guru.");
-  if (["piket", "kesehatan", "kedisiplinan", "sekretaris"].includes(role) && !t.santri_id) gagal(400, "Role pengurus hanya untuk akun santri.");
+  // Moderator = status khusus (bukan role/preset); akun santri tidak boleh menjadi Moderator (K-11).
+  const role = "moderator" in body ? (body.moderator ? "moderator" : null) : t.role;
+  if (role === "moderator" && t.santri_id) gagal(400, "Akun santri tidak boleh menjadi Moderator (K-11).");
   const status = body.status && ["aktif", "nonaktif"].includes(body.status) ? body.status : t.status;
   if (t.id === u.id && (status !== "aktif" || role !== "moderator")) gagal(400, "Anda tidak bisa menonaktifkan atau menurunkan akun sendiri.");
-  const ling = t.guru_id && body.lingkungan ? body.lingkungan : t.lingkungan;
+  const ling = t.guru_id && ["putra", "putri", "semua"].includes(body.lingkungan) ? body.lingkungan : role === "moderator" ? "semua" : t.lingkungan;
   const st = [db.prepare("UPDATE users SET role = ?, status = ?, lingkungan = ? WHERE id = ?").bind(role, status, ling, t.id)];
-  if (role !== t.role) st.push(stmtNotif(db, t.id, { jenis: "akun", judul: role ? `Role Anda sekarang: ${LABEL_ROLE[role] || role}` : "Role Anda dicabut",
-    isi: role ? "Menu dan akses mengikuti role baru. Muat ulang halaman bila menu belum berubah." : "Hubungi Moderator bila ini keliru.", tautan: "/akun" }));
+  if (role !== t.role) st.push(stmtNotif(db, t.id, { jenis: "akun", judul: role ? "Anda sekarang Moderator" : "Status Moderator Anda dicabut",
+    isi: role ? "Semua menu dan akses tersedia. Muat ulang halaman bila menu belum berubah." : "Akses Anda kini mengikuti akses yang diberikan Moderator.", tautan: "/akun" }));
   if (ling !== t.lingkungan) st.push(stmtNotif(db, t.id, { jenis: "akun", judul: `Lingkungan Anda sekarang: ${ling}`, tautan: "/akun" }));
   await db.batch(st);
   if (status !== "aktif") await db.prepare("DELETE FROM sesi_login WHERE user_id = ?").bind(t.id).run();
-  await catat(db, u, "akses", "ubah_akun", "users", t.id, `${t.email}: role=${role} status=${status} lingkungan=${ling}`);
+  await catat(db, u, "akses", "ubah_akun", "users", t.id, `${t.email}: ${role === "moderator" ? "Moderator" : "akses manual"}, status=${status}, lingkungan=${ling}`);
   return json({ ok: true });
 });
 
@@ -1017,6 +1037,68 @@ on("POST", "/api/users/:id/akses", async ({ db, u, p, body }) => {
   if (r.meta.changes) await stmtNotif(db, +p.id, { jenis: "akun", judul: `Akses ${body.beri ? "diberikan" : "dicabut"}: ${ak.nama}`,
     isi: body.beri ? "Menu terkait kini tersedia untuk Anda." : null, tautan: "/akun" }).run();
   await catat(db, u, "akses", body.beri ? "beri" : "cabut", "user_akses", +p.id, kode);
+  return json({ ok: true });
+});
+
+// Terapkan preset: akses akun diganti dengan isi preset (salinan). Sesudahnya akses bisa diubah satu per satu.
+on("POST", "/api/users/:id/preset", async ({ db, u, p, body }) => {
+  wajibModerator(u);
+  const t = await db.prepare("SELECT * FROM users WHERE id = ?").bind(p.id).first();
+  if (!t) gagal(404, "Akun tidak ditemukan.");
+  if (t.role === "moderator") gagal(400, "Moderator sudah memegang semua akses.");
+  const pr = await cariPreset(db, body);
+  if (!pr) gagal(400, "Pilih preset.");
+  await db.batch([
+    ...stmtTerapkanPreset(db, "?", [t.id], "?", [pr.id], u.id),
+    stmtNotif(db, t.id, { jenis: "akun", judul: `Akses Anda diperbarui: preset ${pr.nama}`, isi: "Muat ulang halaman bila menu belum berubah.", tautan: "/akun" }),
+    stmtCatat(db, u, "akses", "terapkan_preset", "users", t.id, `${t.email}: preset ${pr.nama}`),
+  ]);
+  return json({ ok: true });
+});
+
+on("GET", "/api/preset", async ({ db, u }) => {
+  wajibModerator(u);
+  const [pr, pa, dipakai] = await db.batch([
+    db.prepare("SELECT * FROM preset ORDER BY urutan, nama"),
+    db.prepare("SELECT preset_id, akses_kode FROM preset_akses"),
+    db.prepare("SELECT preset_id, COUNT(*) n FROM users WHERE preset_id IS NOT NULL AND status = 'aktif' GROUP BY preset_id"),
+  ]);
+  return json(pr.results.map((x) => ({ ...x, akses: pa.results.filter((a) => a.preset_id === x.id).map((a) => a.akses_kode),
+    dipakai: (dipakai.results.find((d) => d.preset_id === x.id) || {}).n || 0 })));
+});
+// {id?, nama, keterangan, urutan, akses: [kode…]}. Mengubah preset TIDAK mengubah akun yang sudah memakainya.
+on("POST", "/api/preset", async ({ db, u, body }) => {
+  wajibModerator(u);
+  const nama = bersih(body.nama, 60), ket = bersih(body.keterangan, 200);
+  if (!nama) gagal(400, "Nama preset wajib diisi.");
+  const kode = [...new Set((Array.isArray(body.akses) ? body.akses : []).map(String))];
+  const sah = new Set((await db.prepare("SELECT kode FROM akses").all()).results.map((r) => r.kode));
+  if (kode.some((k) => !sah.has(k))) gagal(400, "Ada jenis akses yang tidak dikenal.");
+  let id = +body.id || 0;
+  if (id) {
+    if (!(await db.prepare("SELECT 1 FROM preset WHERE id = ?").bind(id).first())) gagal(404, "Preset tidak ditemukan.");
+    await db.prepare("UPDATE preset SET nama = ?, keterangan = ?, urutan = COALESCE(?, urutan) WHERE id = ?").bind(nama, ket, body.urutan ?? null, id).run();
+  } else {
+    id = (await db.prepare("INSERT INTO preset (nama, keterangan, urutan) VALUES (?,?, COALESCE(?, (SELECT COALESCE(MAX(urutan),0)+1 FROM preset)))").bind(nama, ket, body.urutan ?? null).run()).meta.last_row_id;
+  }
+  await db.batch([
+    db.prepare("DELETE FROM preset_akses WHERE preset_id = ?").bind(id),
+    db.prepare("INSERT INTO preset_akses (preset_id, akses_kode) SELECT ?, value FROM json_each(?)").bind(id, JSON.stringify(kode)),
+    stmtCatat(db, u, "akses", body.id ? "ubah_preset" : "buat_preset", "preset", id, `Preset ${nama}: ${kode.join(", ") || "(kosong)"}`),
+  ]);
+  return json({ ok: true, id });
+});
+on("POST", "/api/preset/:id/hapus", async ({ db, u, p }) => {
+  wajibModerator(u);
+  const pr = await db.prepare("SELECT * FROM preset WHERE id = ?").bind(p.id).first();
+  if (!pr) gagal(404, "Preset tidak ditemukan.");
+  // akun yang pernah memakai preset ini tetap memegang aksesnya; hanya keterangan presetnya yang hilang
+  await db.batch([
+    db.prepare("UPDATE users SET preset_id = NULL WHERE preset_id = ?").bind(pr.id),
+    db.prepare("DELETE FROM preset_akses WHERE preset_id = ?").bind(pr.id),
+    db.prepare("DELETE FROM preset WHERE id = ?").bind(pr.id),
+    stmtCatat(db, u, "akses", "hapus_preset", "preset", pr.id, `Preset ${pr.nama} dihapus`),
+  ]);
   return json({ ok: true });
 });
 
@@ -1293,7 +1375,7 @@ const H = {
   on, json, gagal, Galat, wib, hariIni, keMs, bersih, normalHp, randomHex, sha256, hashPassword, cekPassword, passwordSementara,
   pengaturan, boleh, wajib, wajibModerator, lingIn, cekLing, catat, stmtCatat, tanda, cekSandi, taAktif, masaKhidmatAktif,
   TUTUP_STATUS, stmtUbahStatus, pindahRiwayat, bacaKelas, statusOtomatis, perbaruiOverdue, keadaanIzin, buatSesi,
-  stmtNotif, stmtNotifGuru, GURU_BINAAN, AKSES_ROLE, LABEL_ROLE,
+  stmtNotif, stmtNotifGuru, GURU_BINAAN, stmtTerapkanPreset, cariPreset,
   antreEmail, stmtEmail, kabarWali, kabarKoreksi, kirimAntrean, tugasBerkala, APP: () => APP(ENV), env: () => ENV,
   migrasi: (list) => MIGRASI_MODUL.push(...list),
   berkala: (nama, fn) => TUGAS_BERKALA.push({ nama, fn }),

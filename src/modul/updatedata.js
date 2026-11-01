@@ -9,7 +9,6 @@ export default function (H) {
   const teks = (x) => String(x ?? "").trim();
   const ID_JSON = "SELECT value FROM json_each(?)";
   const BATCH_INI = "(SELECT MAX(id) FROM impor_batch)"; // batch baru, dibaca di transaksi yang sama
-  const ROLE_PENGURUS = ["piket", "kesehatan", "kedisiplinan", "sekretaris"];
 
   // Riwayat Perubahan dengan data_id dari subquery (mis. impor_batch yang baru dibuat di batch yang sama).
   const catatSql = (db, u, kategori, aksi, tabel, ringkasan, ling = "semua", dataIdSql = "NULL") => db.prepare(
@@ -299,20 +298,24 @@ export default function (H) {
 
   // ------------------------------------------------------------ akun pengurus (satu santri): buat atau aktifkan lagi
   // Password sementara = NIS + tanggal lahir, wajib ganti. Tanpa tanggal lahir → tertahan (tanpa password).
-  async function stmtAkun(db, s, lama, role) {
+  // presetSql/presetArgs: preset yang disalin ke akun (mis. "(SELECT id FROM preset WHERE nama = ?)", ["Sekretaris"]); null = tanpa akses.
+  async function stmtAkun(db, s, lama, presetSql = null, presetArgs = []) {
     const pw = H.passwordSementara(s.nis, s.tanggal_lahir);
     const hash = pw ? await H.hashPassword(pw) : null;
     if (lama) {
       const status = hash || lama.password_hash ? "aktif" : "tertahan";
-      return { status, st: db.prepare(`UPDATE users SET role = ?, status = ?, password_hash = COALESCE(?, password_hash), wajib_ganti_password = CASE WHEN ? IS NULL THEN wajib_ganti_password ELSE 1 END,
-        lingkungan = ?, gagal_login = 0, terkunci_sampai = NULL WHERE id = ?`).bind(role, status, hash, hash, s.lingkungan, lama.id) };
+      return { status, st: [db.prepare(`UPDATE users SET role = NULL, status = ?, password_hash = COALESCE(?, password_hash), wajib_ganti_password = CASE WHEN ? IS NULL THEN wajib_ganti_password ELSE 1 END,
+        lingkungan = ?, gagal_login = 0, terkunci_sampai = NULL WHERE id = ?`).bind(status, hash, hash, s.lingkungan, lama.id), ...presetAkun(db, s, presetSql, presetArgs)] };
     }
-    return { status: hash ? "aktif" : "tertahan", st: db.prepare("INSERT INTO users (email, password_hash, nama, role, santri_id, lingkungan, status, wajib_ganti_password) VALUES (?,?,?,?,?,?,?,1)")
-      .bind(EMAIL(s.nis), hash, s.nama, role, s.id, s.lingkungan, hash ? "aktif" : "tertahan") };
+    return { status: hash ? "aktif" : "tertahan", st: [db.prepare("INSERT INTO users (email, password_hash, nama, santri_id, lingkungan, status, wajib_ganti_password) VALUES (?,?,?,?,?,?,1)")
+      .bind(EMAIL(s.nis), hash, s.nama, s.id, s.lingkungan, hash ? "aktif" : "tertahan"), ...presetAkun(db, s, presetSql, presetArgs)] };
   }
+  const presetAkun = (db, s, presetSql, presetArgs) => presetSql
+    ? H.stmtTerapkanPreset(db, "(SELECT id FROM users WHERE santri_id = ?)", [s.id], presetSql, presetArgs)
+    : [db.prepare("UPDATE users SET preset_id = NULL WHERE santri_id = ?").bind(s.id)];
   // Santri + tingkat kelas + akun + jabatan aktif (untuk pemeriksaan calon pengurus).
   const SQL_CALON = `SELECT s.id, s.nis, s.nama, s.status, s.lingkungan, s.tanggal_lahir, s.foto_url, k.tingkat,
-      u.id user_id, u.status user_status, u.password_hash, u.role, pg.id pengurus_id, jb.nama jabatan_aktif
+      u.id user_id, u.status user_status, u.password_hash, pg.id pengurus_id, jb.nama jabatan_aktif
     FROM santri s LEFT JOIN kelas k ON k.id = s.kelas_id LEFT JOIN users u ON u.santri_id = s.id
     LEFT JOIN pengurus pg ON pg.santri_id = s.id AND pg.selesai IS NULL LEFT JOIN jabatan jb ON jb.id = pg.jabatan_id`;
   const jabatanUntuk = (daftar, nama, ling) => {
@@ -326,7 +329,8 @@ export default function (H) {
     const l = H.lingIn(u, "p.lingkungan"), lj = H.lingIn(u, "lingkungan");
     const [pR, jR] = await db.batch([
       db.prepare(`SELECT p.id, p.santri_id, p.lingkungan, p.jabatan_id, p.mulai, jb.nama jabatan, s.nis, s.nama, s.foto_url, s.tanggal_lahir, k.tingkat,
-          u.id user_id, u.status user_status, u.role
+          u.id user_id, u.status user_status, (SELECT nama FROM preset WHERE id = u.preset_id) preset,
+          (SELECT COUNT(*) FROM user_akses ua WHERE ua.user_id = u.id) jumlah_akses
         FROM pengurus p JOIN santri s ON s.id = p.santri_id JOIN jabatan jb ON jb.id = p.jabatan_id
         LEFT JOIN kelas k ON k.id = s.kelas_id LEFT JOIN users u ON u.santri_id = s.id
         WHERE p.selesai IS NULL AND ${l.sql} ORDER BY p.lingkungan, jb.urutan, s.nama`).bind(...l.args),
@@ -374,9 +378,9 @@ export default function (H) {
     ];
     // 3. Sekretaris baru: akun dibuat/diaktifkan lagi + baris pengurus
     for (const s of cR.results) {
-      const a = await stmtAkun(db, s, s.user_id ? { id: s.user_id, password_hash: s.password_hash } : null, "sekretaris");
+      const a = await stmtAkun(db, s, s.user_id ? { id: s.user_id, password_hash: s.password_hash } : null, "(SELECT id FROM preset WHERE nama = 'Sekretaris')");
       akun.push({ nis: s.nis, nama: s.nama, status: a.status });
-      st.push(a.st, db.prepare(`INSERT INTO pengurus (masa_khidmat_id, santri_id, lingkungan, jabatan_id, user_id, mulai, oleh)
+      st.push(...a.st, db.prepare(`INSERT INTO pengurus (masa_khidmat_id, santri_id, lingkungan, jabatan_id, user_id, mulai, oleh)
         VALUES ((SELECT id FROM masa_khidmat WHERE status = 'aktif'), ?, ?, ?, (SELECT id FROM users WHERE santri_id = ?), ?, ?)`)
         .bind(s.id, s.lingkungan, jabatanUntuk(jR.results, "Sekretaris", s.lingkungan).id, s.id, t, u.id));
     }
@@ -440,14 +444,14 @@ export default function (H) {
     const J = JSON.stringify(data);
     const DATA = `SELECT json_extract(value, '$.id') id, json_extract(value, '$.j') j, json_extract(value, '$.l') l, json_extract(value, '$.e') e, json_extract(value, '$.n') n, json_extract(value, '$.h') h FROM json_each(?)`;
     const st = [
-      // akun lama santri diaktifkan lagi (role kembali "menunggu role" bila sebelumnya tidak aktif)
-      db.prepare(`UPDATE users SET role = CASE WHEN users.status = 'aktif' THEN users.role ELSE NULL END,
+      // akun lama santri diaktifkan lagi (akun yang tadinya nonaktif mulai tanpa akses; Moderator menerapkan preset)
+      db.prepare(`UPDATE users SET role = NULL,
           status = CASE WHEN COALESCE(j.h, users.password_hash) IS NULL THEN 'tertahan' ELSE 'aktif' END,
           password_hash = COALESCE(j.h, users.password_hash), wajib_ganti_password = CASE WHEN j.h IS NULL THEN users.wajib_ganti_password ELSE 1 END,
           lingkungan = j.l, gagal_login = 0, terkunci_sampai = NULL
         FROM (${DATA}) j WHERE users.santri_id = j.id`).bind(J),
-      db.prepare(`INSERT INTO users (email, password_hash, nama, role, santri_id, lingkungan, status, wajib_ganti_password)
-        SELECT j.e, j.h, j.n, NULL, j.id, j.l, CASE WHEN j.h IS NULL THEN 'tertahan' ELSE 'aktif' END, 1 FROM (${DATA}) j
+      db.prepare(`INSERT INTO users (email, password_hash, nama, santri_id, lingkungan, status, wajib_ganti_password)
+        SELECT j.e, j.h, j.n, j.id, j.l, CASE WHEN j.h IS NULL THEN 'tertahan' ELSE 'aktif' END, 1 FROM (${DATA}) j
         WHERE NOT EXISTS (SELECT 1 FROM users x WHERE x.santri_id = j.id)`).bind(J),
       db.prepare(`INSERT INTO pengurus (masa_khidmat_id, santri_id, lingkungan, jabatan_id, user_id, mulai, oleh)
         SELECT ?, j.id, j.l, j.j, (SELECT x.id FROM users x WHERE x.santri_id = j.id), ?, ? FROM (${DATA}) j`).bind(p.masa.id, t, u.id, J),
@@ -455,7 +459,7 @@ export default function (H) {
     for (const [l, n] of perLing(p.siap)) {
       const di = p.siap.filter((s) => s.lingkungan === l);
       st.push(catatSql(db, u, "jabatan", "isi_pengurus", "pengurus", `${n} pengurus diisi: ${di.map((s) => s.nis + " " + s.jabatan).join("; ")}`.slice(0, 900), l));
-      st.push(catatSql(db, u, "akun", "akun_pengurus", "users", `${n} akun pengurus dibuat/diaktifkan (menunggu role)${di.some((s) => s.tertahan) ? "; tertahan: " + di.filter((s) => s.tertahan).map((s) => s.nis).join(", ") : ""}`.slice(0, 900), l));
+      st.push(catatSql(db, u, "akun", "akun_pengurus", "users", `${n} akun pengurus dibuat/diaktifkan (menunggu akses dari Moderator)${di.some((s) => s.tertahan) ? "; tertahan: " + di.filter((s) => s.tertahan).map((s) => s.nis).join(", ") : ""}`.slice(0, 900), l));
     }
     await db.batch(st);
     return json({ ok: true, jumlah: p.siap.length, tertahan: p.siap.filter((s) => s.tertahan).length });
@@ -486,9 +490,9 @@ export default function (H) {
     if (!boleh(u, "paw")) gagal(403, "Anda tidak punya akses PAW.");
     const alasan = bersih(body.alasan, 200);
     if (!alasan) gagal(400, "Alasan PAW wajib diisi.");
-    const role = body.role ? String(body.role) : null;
-    if (role && u.role !== "moderator") gagal(403, "Hanya Moderator yang menetapkan role.");
-    if (role && !ROLE_PENGURUS.includes(role)) gagal(400, "Role tidak valid untuk pengurus.");
+    // preset akses untuk pengganti (disalin) — hanya Moderator
+    if ((body.preset_id || body.preset) && u.role !== "moderator") gagal(403, "Hanya Moderator yang menetapkan akses.");
+    const preset = await H.cariPreset(db, body);
     await cekSandi(u, body.password);
     const lama = await db.prepare(`SELECT p.*, s.nis, s.nama, jb.nama jabatan FROM pengurus p JOIN santri s ON s.id = p.santri_id JOIN jabatan jb ON jb.id = p.jabatan_id WHERE p.id = ?`).bind(+body.pengurus_id).first();
     if (!lama || lama.selesai) gagal(400, "Jabatan aktif tidak ditemukan.");
@@ -508,13 +512,13 @@ export default function (H) {
       if (s.lingkungan !== lama.lingkungan) gagal(400, "Pengganti harus dari lingkungan yang sama.");
       if (s.status !== "aktif" || ![5, 6].includes(s.tingkat)) gagal(400, "Pengganti harus santri aktif Kelas 5 atau 6.");
       if (s.pengurus_id) gagal(400, `${s.nama} sudah memegang jabatan ${s.jabatan_aktif}.`);
-      const a = await stmtAkun(db, s, s.user_id ? { id: s.user_id, password_hash: s.password_hash } : null, role);
+      const a = await stmtAkun(db, s, s.user_id ? { id: s.user_id, password_hash: s.password_hash } : null, preset ? "?" : null, preset ? [preset.id] : []);
       ganti = { nis: s.nis, nama: s.nama, status: a.status };
-      st.push(a.st, db.prepare(`INSERT INTO pengurus (masa_khidmat_id, santri_id, lingkungan, jabatan_id, user_id, mulai, oleh)
+      st.push(...a.st, db.prepare(`INSERT INTO pengurus (masa_khidmat_id, santri_id, lingkungan, jabatan_id, user_id, mulai, oleh)
         VALUES (?, ?, ?, ?, (SELECT id FROM users WHERE santri_id = ?), ?, ?)`).bind(lama.masa_khidmat_id, s.id, s.lingkungan, lama.jabatan_id, s.id, t, u.id));
     }
     st.push(H.stmtCatat(db, u, "jabatan", "paw", "pengurus", lama.id, `PAW ${lama.jabatan}: ${lama.nis} ${lama.nama} diganti${ganti ? " " + ganti.nis + " " + ganti.nama : " (belum ada pengganti)"} — ${alasan}`, lama.lingkungan));
-    st.push(H.stmtCatat(db, u, "akun", "paw", "users", null, `Akun ${lama.nis} nonaktif${ganti ? `; akun ${ganti.nis} ${ganti.status}${role ? " role " + role : " (menunggu role)"}` : ""}`, lama.lingkungan));
+    st.push(H.stmtCatat(db, u, "akun", "paw", "users", null, `Akun ${lama.nis} nonaktif${ganti ? `; akun ${ganti.nis} ${ganti.status}${preset ? " preset " + preset.nama : " (menunggu akses)"}` : ""}`, lama.lingkungan));
     await db.batch(st);
     return json({ ok: true, pengganti: ganti });
   });
@@ -523,7 +527,7 @@ export default function (H) {
   on("GET", "/api/updatedata/akun-tertahan", async ({ db, u }) => {
     if (!boleh(u, "isi_pengurus")) gagal(403, "Anda tidak punya akses.");
     const l = H.lingIn(u, "s.lingkungan");
-    const r = await db.prepare(`SELECT u.id, u.email, u.role, s.id santri_id, s.nis, s.nama, s.foto_url, s.lingkungan, s.tanggal_lahir, jb.nama jabatan
+    const r = await db.prepare(`SELECT u.id, u.email, s.id santri_id, s.nis, s.nama, s.foto_url, s.lingkungan, s.tanggal_lahir, jb.nama jabatan
       FROM users u JOIN santri s ON s.id = u.santri_id LEFT JOIN pengurus p ON p.santri_id = s.id AND p.selesai IS NULL LEFT JOIN jabatan jb ON jb.id = p.jabatan_id
       WHERE u.status = 'tertahan' AND ${l.sql} ORDER BY s.lingkungan, s.nama`).bind(...l.args).all();
     return json(r.results);

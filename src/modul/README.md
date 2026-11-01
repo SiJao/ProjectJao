@@ -54,7 +54,7 @@ const Contoh = {
 daftarHalaman("/contoh", Contoh, { label: "Contoh", grup: "Administrasi", urutan: 65, syarat: (me) => me.bisa.kegiatan, ikon: '<circle cx="12" cy="12" r="9"/>' });
 ```
 
-- Global dari `app.js`: `reactive, ref, computed, onMounted, watch, nextTick`, `api(path, data?)` (POST bila `data` ada; galat → `throw Error(pesan)`), `negara` (`me`, `master`, `rute`), `muatMaster()`, `hariIni()`, `namaKelas(k)`, `LABEL_ROLE`, `pergi(hash)`, `gerak`, `vBaris`, `vHitung`, `bacaCsv(file, kolomWajib)`, `parseCsv`, `unduhCsv(nama, baris)`, `unduhXlsx(nama, [{nama, baris}])`, `unduhBerkas`.
+- Global dari `app.js`: `reactive, ref, computed, onMounted, watch, nextTick`, `api(path, data?)` (POST bila `data` ada; galat → `throw Error(pesan)`), `negara` (`me`, `master`, `rute`), `muatMaster()`, `hariIni()`, `namaKelas(k)`, `labelAkun(me)`, `pergi(hash)`, `gerak`, `vBaris`, `vHitung`, `bacaCsv(file, kolomWajib)`, `parseCsv`, `unduhCsv(nama, baris)`, `unduhXlsx(nama, [{nama, baris}])`, `unduhBerkas`.
 - Komponen: `Pesan` (`:galat :ok`), `CariSantri` (`v-model` → `{id, nis, nama, kelas, kamar, foto_url}`), `FotoSantri` (`:s`, `ukuran` ''|'kecil'|'besar'), `KonfirmasiSandi` (`:pesan`, `@ok="pw => …"`, `@batal`).
 - Parameter halaman lewat query: `#/rapor?santri=12` → baca `negara.rute`.
 - Kelas CSS yang tersedia: `kartu`, `baris`, `isian`, `tabel`, `tab`, `dua-kolom`, `kisi`, `stat`, `angka`, `lencana` (+`hijau|merah|kuning|biru`), `pesan galat|ok|info`, `redup`, `jejak`, `judul-hal`, `santri-sel`, `tombol`, `button.kedua|bahaya|kecil`, `tidak-cetak` (disembunyikan saat cetak).

@@ -74,7 +74,7 @@ Fungsi Sistem HISADA
 │   │   └── Wajib ganti saat login pertama
 │   └── Kelola User & Role
 │       ├── Role: Piket · Kesehatan · Kedisiplinan · Sekretaris · Asatidz · Moderator
-│       └── Manajemen Akses: akses di luar role, per orang (hanya Moderator)
+│       └── Manajemen Akses: akses manual per akun + preset (hanya Moderator)
 ├── Pengolahan Data
 │   ├── Update Data & Import
 │   │   ├── Upload file (CSV)
@@ -101,7 +101,7 @@ Fungsi Sistem HISADA
 - [Lingkungan Pondok](#lingkungan-pondok)
 - [Prototipe Tampilan](#prototipe-tampilan)
 - [Flowchart Sistem](#flowchart-sistem)
-- [Role, Manajemen Akses & Cakupan Data](#role-manajemen-akses--cakupan-data)
+- [Akses, Preset & Cakupan Data](#akses-preset--cakupan-data)
 - [Siklus Tahunan](#siklus-tahunan)
 - **Modul — Administrasi**
   - Data Master — [Data Master](#data-master) · [Tahun Ajaran](#tahun-ajaran)
@@ -245,7 +245,7 @@ Kegiatan mingguan, semesteran, dan tahunan cukup dicatat di [Kalender Akademik](
 Prototipe tampilan yang bisa diklik untuk **13 layar** (Login, Dashboard, seluruh menu Administrasi dan Fungsi), memakai **data contoh** (nama fiktif, NIS/NIP palsu berawalan 99). Belum terhubung ke database. Sumber dan daftar layar: [prototipe/](prototipe/README.md).
 
 - Sidebar mengikuti mindmap: **Beranda · Administrasi · Fungsi**.
-- Bisa dilihat sebagai **role apa pun** (pilihan di sidebar); menu mengikuti Peta Akses.
+- Bisa dilihat sebagai **preset apa pun** (pilihan di sidebar); menu mengikuti akses.
 
 ---
 
@@ -257,21 +257,15 @@ Alur dari login sampai modul yang bisa dibuka.
 flowchart TD
     A["Login<br/>email + password"] --> B{"Akun aktif?"}
     B -- "tidak" --> Z["Ditolak login"]
-    B -- "ya" --> C{"Role<br/>(satu role per user)"}
+    B -- "ya" --> C{"Akses akun<br/>(dicentang Moderator,<br/>bisa lewat preset)"}
 
-    C -- "Piket" --> M1["Absensi"]
-    C -- "Sekretaris" --> M1
-    C -- "Moderator" --> M1
-    C -- "Kesehatan / Kedisiplinan<br/>jika dicentang" --> M1
-
-    C -- "Piket jika dicentang" --> M2["Perizinan & Gate Pass"]
-    C -- "Kesehatan jika dicentang" --> M3["Kesehatan"]
-    C -- "Kedisiplinan jika diberi akses<br/>input / putusan" --> M4["Kedisiplinan Santri"]
-    C -- "Sekretaris" --> M5["Korespondensi, Prestasi, Inventaris,<br/>Rapor, Kalender, Kegiatan & Ekstrakurikuler,<br/>bagian pengurus, pengumuman"]
-    C -- "Asatidz" --> M6["Lihat data santri<br/>di lingkungannya"]
-    C -- "Asatidz jika diberi akses<br/>(mis. guru hakim/pengasuhan)" --> M4
-    C -- "Asatidz jika diberi akses<br/>(mis. wali kamar)" --> M1
-    C -- "Moderator" --> M7["Semua modul"]
+    C -- "absensi" --> M1["Absensi"]
+    C -- "perizinan" --> M2["Perizinan & Gate Pass"]
+    C -- "kesehatan / pemeriksaan" --> M3["Kesehatan"]
+    C -- "input / putusan pelanggaran" --> M4["Kedisiplinan Santri"]
+    C -- "kegiatan, prestasi, rapor,<br/>tata warkat, pengumuman, …" --> M5["Korespondensi, Prestasi, Inventaris,<br/>Rapor, Kalender, Kegiatan & Ekstrakurikuler,<br/>bagian pengurus, pengumuman"]
+    C -- "lihat_*" --> M6["Lihat data santri<br/>di lingkungannya"]
+    C -- "Moderator (status khusus)" --> M7["Semua modul"]
 
     S["Cakupan data pengurus:<br/>putra / putri sesuai jenis kelaminnya"] -.-> C
 
@@ -291,38 +285,45 @@ flowchart TD
 
 ---
 
-## Role, Manajemen Akses & Cakupan Data
+## Akses, Preset & Cakupan Data
 
-### Role (satu role per user)
+**Tidak ada sistem role.** Setiap akun memegang **akses manual** yang dicentang Moderator satu per satu. Untuk mempercepat, Moderator memakai **preset**.
 
-| Role | Pemegang | Modul |
-|---|---|---|
-| **Piket** | Pengurus santri | Absensi (otomatis) · Perizinan & Gate Pass (jika dicentang Moderator) |
-| **Kesehatan** | Pengurus santri | Kesehatan (jika dicentang Moderator) · Absensi (jika dicentang) |
-| **Kedisiplinan** | Pengurus santri | Kedisiplinan Santri (input dan/atau putusan, jika diberi akses) · Absensi (jika dicentang) |
-| **Sekretaris** | Pengurus santri | Korespondensi, Prestasi, Inventaris, Rapor, Kalender (edit), Absensi, Kegiatan & Ekstrakurikuler, Riwayat Perubahan (masa jabatannya), isi bagian pengurus, pengumuman email |
-| **Asatidz** | Guru | Lihat data santri di lingkungannya (tanpa data Kesehatan) |
-| **Moderator** | Pihak pondok / tim IT (**bukan santri**) | Semua modul |
+### Preset akses
+- **Preset = templat kumpulan akses.** Saat diterapkan ke akun, aksesnya **disalin** (akses akun diganti isi preset); sesudahnya akses akun tetap bisa ditambah/dikurangi satu per satu.
+- **Mengubah atau menghapus preset tidak mengubah akun** yang sudah memakainya. Akun hanya menyimpan keterangan "preset terakhir".
+- Preset bebas dipakai untuk akun santri maupun guru (tidak ada batasan jenis akun).
+- Preset bawaan (bisa diubah/ditambah Moderator di **Pengguna & Akses → Preset akses**):
 
-- **Jabatan ≠ role.** Jabatan (mis. "Ketua Bagian Keamanan") adalah label organisasi yang diisi Sekretaris. Role menentukan hak akses dan ditetapkan Moderator.
-- **Role Moderator tidak pernah diberikan ke akun santri.** Jika ditemukan, role dicabut.
+| Preset | Isi akses |
+|---|---|
+| **Piket** | Absensi |
+| **Kesehatan** | Kesehatan (Pemeriksaan diberikan terpisah) |
+| **Kedisiplinan** | Input pelanggaran |
+| **Sekretaris** | Absensi, Kegiatan, Prestasi, Rapor, Tata Warkat, Pengumuman, Isi bagian pengurus, Riwayat |
+| **Asatidz** | Lihat absensi, perizinan, hasil vonis, prestasi, rapor |
+
+- Serah Terima memberi Sekretaris baru preset **Sekretaris** (bila preset itu ada); akun pengurus lain menunggu akses dari Moderator.
+
+### Moderator (status khusus)
+- **Moderator** bukan preset dan bukan akses biasa: Moderator memegang **semua akses** (kelola pengguna & preset, Data Master, backup, Update Kelas Tahunan, Serah Terima, dll.).
+- **Akun santri tidak pernah menjadi Moderator** (K-11). Moderator tidak bisa mencabut status Moderator dirinya sendiri.
+- **Jabatan ≠ akses.** Jabatan (mis. "Ketua Bagian Keamanan") adalah label organisasi yang diisi Sekretaris; hak akses diatur Moderator.
 
 ### Manajemen Akses (hanya Moderator)
+- Akses diberikan per orang, untuk pengurus **dan guru** (mis. guru hakim, guru pengasuhan, wali kamar).
+- Akun yang **dinonaktifkan** (manual, Serah Terima, PAW, alumni) otomatis **kehilangan semua aksesnya**; bila diaktifkan lagi, akses diatur ulang.
+- Setiap pemberian/pencabutan akses dan penerapan preset tercatat di Riwayat Perubahan dan muncul di notifikasi pemilik akun.
+- Akses "lihat_X" otomatis dimiliki pemegang X.
 
-- Peran atau akses **di luar role** diberikan per orang lewat **Manajemen Akses**. **Hanya Moderator (admin)** yang dapat mengelolanya.
-- Berlaku untuk pengurus **dan guru**. Guru yang memegang banyak peran (hakim, guru pengasuhan, wali kelas, pengajar, dll.) diberi akses sesuai tugasnya lewat Manajemen Akses.
-- Setiap pemberian/pencabutan akses tercatat di Riwayat Perubahan.
-
-Akses yang sudah ditetapkan untuk role pengurus:
-
-| Akses | Untuk role |
+| Akses | Keterangan |
 |---|---|
-| Absensi | Kesehatan, Kedisiplinan · guru sesuai tugas (wali kamar, pelatih, guru halaqah) |
-| Kesehatan | Kesehatan (role saja belum cukup — wajib diberi akses) |
-| Perizinan | Piket |
-| Input pelanggaran · Putusan kedisiplinan | Dipilih manual per orang (pengurus atau guru, mis. guru hakim) |
-| Profil kesehatan (alergi, penyakit kronis) | Dipilih manual per orang |
-| Edit daftar pilihan tertentu (mis. obat, diagnosa) | Dipilih manual per orang, per daftar |
+| Absensi · Perizinan · Kesehatan · Pemeriksaan · Profil kesehatan | Fungsi harian |
+| Input pelanggaran · Putusan kedisiplinan | Kedisiplinan (pemutus = hakim) |
+| Kegiatan · Prestasi · Rapor · Tata Warkat · Pengumuman · Isi bagian pengurus · Riwayat | Administrasi |
+| Update Kamar · PAW | Proses data |
+| Lihat absensi / perizinan / hasil vonis / prestasi / rapor | Lihat saja |
+| Edit daftar pilihan tertentu (mis. obat, diagnosa) | Per daftar |
 
 ### Cakupan data Putra / Putri
 - Pengurus santri **otomatis** hanya melihat dan mengelola data santri sesuai **jenis kelaminnya** (putra → putra, putri → putri).
@@ -330,6 +331,8 @@ Akses yang sudah ditetapkan untuk role pengurus:
 - Satu database; **setiap data ditandai lingkungan** putra/putri, **termasuk Tata Warkat** (Kalender, Korespondensi, Inventaris). Daftar pilihan, jabatan, dan guru boleh bernilai `semua` (K-88).
 
 ### Peta akses
+
+*Sejak sistem role dihapus, kolom di bawah adalah **preset bawaan** (titik awal), bukan role. ✔ = termasuk isi preset; ☑/👁 = bisa ditambahkan per akun oleh Moderator.*
 
 Keterangan: ✔ otomatis · ☑ jika diberi lewat Manajemen Akses · 👁 lihat saja · ✖ tidak · ⏳ belum diputuskan
 
@@ -363,7 +366,7 @@ flowchart LR
     B --> C["Update Kamar<br/>1-2x setahun"]
     C --> D["Serah Terima Jabatan<br/>akhir Semester 1"]
     D --> D2["Sekretaris baru isi bagian<br/>pengurus lain"]
-    D2 --> E["Moderator tetapkan role<br/>& akses pengurus baru"]
+    D2 --> E["Moderator terapkan preset<br/>& akses pengurus baru"]
     E --> A
 ```
 
@@ -553,10 +556,10 @@ flowchart TD
 
 *(akses: Moderator)*
 
-- Menetapkan **satu role** per user dan mengatur **Manajemen Akses** (akses di luar role, per orang).
-- Dashboard Moderator menampilkan **"N pengurus menunggu role"** setelah Serah Terima.
-- Pilihan role Moderator **tidak tersedia** untuk akun yang terhubung ke data santri.
-- Setiap perubahan role/akses tercatat di Riwayat Perubahan dan diberitahukan ke pemilik akun lewat email.
+- Mengatur **akses** per akun (langsung atau lewat **preset**) dan mengelola daftar preset.
+- Dashboard Moderator menampilkan **"N akun belum punya akses"** setelah Serah Terima.
+- Status Moderator **tidak tersedia** untuk akun yang terhubung ke data santri.
+- Setiap perubahan akses/preset tercatat di Riwayat Perubahan dan diberitahukan ke pemilik akun lewat email.
 
 ---
 
@@ -628,14 +631,14 @@ flowchart TD
 - Masa khidmat juga menjadi **acuan "tahun" organisasi** untuk statistik dan tampilan Kalender 2 Semester.
 - Jabatan pengurus diambil dari **santri aktif Kelas 5**.
 
-**Alur Serah Terima** — tiga pelaku: **Moderator** (tombol + tunjuk Sekretaris) → **Sekretaris baru** (isi bagian) → **Moderator** (tetapkan role).
+**Alur Serah Terima** — tiga pelaku: **Moderator** (tombol + tunjuk Sekretaris) → **Sekretaris baru** (isi bagian) → **Moderator** (terapkan preset/akses).
 
 1. **Moderator** menekan **Serah Terima Jabatan** dan menunjuk **1–2 Sekretaris baru**. Satu tombol untuk putra **dan** putri sekaligus, satu masa khidmat untuk kedua lingkungan (K-97).
 2. **Peringatan** selalu muncul (jumlah pengurus lama, waktu Serah Terima terakhir), lalu **password Moderator yang sedang login**.
 3. Dalam satu proses: masa khidmat lama & semua jabatan **diarsipkan** (bukan dihapus), akun pengurus lama **dinonaktifkan** (santrinya tetap aktif), masa khidmat baru dibuat, Sekretaris baru langsung aktif.
 4. **Sekretaris baru** mengisi bagian/jabatan pengurus lain — lewat **upload file** (NIS + jabatan) **atau pilih banyak sekaligus**. Hanya santri aktif Kelas 5; baris yang tidak valid **ditolak** dan proses tidak lanjut sampai diperbaiki.
 5. Akun pengurus dibuat otomatis (`NIS@daarululuumlido.com`, password sementara NIS + tanggal lahir).
-6. **Moderator** menetapkan role & Manajemen Akses tiap pengurus.
+6. **Moderator** menerapkan preset & Manajemen Akses tiap pengurus.
 
 Selama menunggu langkah 6, **Absensi tetap berjalan** karena Sekretaris otomatis memiliki akses Absensi. **Perizinan & Gate Pass hanya bisa dibuat Moderator** sampai akses Perizinan diberikan lewat Manajemen Akses (risiko diterima, K-96). Kesehatan & Kedisiplinan juga menunggu akses.
 
@@ -651,8 +654,8 @@ flowchart TD
     Login1 --> Absensi["Absensi tetap berjalan<br/>(Sekretaris otomatis akses Absensi)"]
     Login1 --> Bagian["SEKRETARIS isi bagian pengurus lain:<br/>upload file ATAU pilih banyak sekaligus<br/>(hanya santri aktif Kelas 5)"]
     Bagian --> Akun["Akun pengurus dibuat<br/>NIS@daarululuumlido.com"]
-    Akun --> Badge["Dashboard Moderator:<br/>N pengurus menunggu role"]
-    Badge --> Role["MODERATOR tetapkan role<br/>+ Manajemen Akses"]
+    Akun --> Badge["Dashboard Moderator:<br/>N akun belum punya akses"]
+    Badge --> Role["MODERATOR terapkan preset<br/>+ Manajemen Akses"]
     Role --> Aktif(["Semua pengurus baru bekerja"])
 ```
 
@@ -662,7 +665,7 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
 
 1. Nonaktifkan jabatan satu orang (**alasan wajib**).
 2. Angkat satu santri aktif Kelas 5/6 ke jabatan tersebut.
-3. Tetapkan role.
+3. Terapkan preset / centang akses.
 4. Peringatan + password, tercatat di Riwayat Perubahan.
 
 ### Cari Santri & Cari Guru
@@ -692,10 +695,10 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
 
 ### Notifikasi
 
-**Di dalam aplikasi:** badge di sidebar (pelanggaran menunggu sidang, santri menunggu pemeriksaan, izin overdue, pengurus menunggu role) dan **lonceng notifikasi** untuk pengurus & guru:
+**Di dalam aplikasi:** badge di sidebar (pelanggaran menunggu sidang, santri menunggu pemeriksaan, izin overdue, akun belum punya akses) dan **lonceng notifikasi** untuk pengurus & guru:
 - **Perlu ditindaklanjuti** (dihitung langsung sesuai akses): izin overdue, pelanggaran menunggu sidang, kunjungan belum diperiksa, absensi kamar yang belum diisi per tanggal (sejak absensi mulai dipakai, 7 hari terakhir).
 - **Pengumuman internal** dari Moderator/pemegang akses Pengumuman ke pengurus, guru, atau semua akun (lingkungan sendiri).
-- **Perubahan akun sendiri**: role, lingkungan, akses diberikan/dicabut, password direset, penetapan wali kelas/wali asuh.
+- **Perubahan akun sendiri**: preset diterapkan, status Moderator, lingkungan, akses diberikan/dicabut, password direset, penetapan wali kelas/wali asuh.
 - **Kabar santri binaan** untuk guru wali kelas & wali asuh (tahun ajaran aktif): izin, overdue, sakit dirawat, vonis berat, prestasi — tanpa data sensitif.
 
 **Email** (via Google Workspace pondok, untuk semua user):

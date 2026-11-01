@@ -16,7 +16,8 @@ async function api(path, data) {
 const pergi = (h) => { if (location.hash !== "#" + h) location.hash = h; };
 async function muatMaster() { negara.master = await api("/master"); return negara.master; }
 const hariIni = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
-const LABEL_ROLE = { moderator: "Moderator", sekretaris: "Sekretaris", piket: "Piket", kesehatan: "Kesehatan", kedisiplinan: "Kedisiplinan", asatidz: "Asatidz" };
+// Tanpa role: label akun = Moderator · nama preset terakhir · akses manual · belum ada akses.
+const labelAkun = (me) => !me ? "" : me.role === "moderator" ? "Moderator" : me.preset || (me.akses && me.akses.length ? "Akses manual" : "Belum ada akses");
 const namaKelas = (k) => k ? `${k.tingkat} ${k.rombel} ${k.jenjang || ""}${k.label ? " " + k.label : ""}`.trim() : "";
 
 // ---------------------------------------------------------------- animasi (anime.js) — mati bila "kurangi gerakan" aktif di perangkat
@@ -263,10 +264,10 @@ const Beranda = {
   setup() {
     const d = ref(null), galat = ref("");
     onMounted(async () => { try { d.value = await api("/ringkasan"); } catch (e) { galat.value = e.message; } });
-    return { d, galat, negara, LABEL_ROLE };
+    return { d, galat, negara, labelAkun };
   },
   template: `<section class="sapaan"><span class="jejak">{{ d ? d.waktu + ' WIB' : '' }}</span><h1>Assalamu'alaikum, {{ negara.me.nama }}</h1>
-    <span class="jejak">{{ negara.me.role ? LABEL_ROLE[negara.me.role] : 'Menunggu role' }} · HISADA</span><img src="/img/logo-hisada-256.png" alt=""></section>
+    <span class="jejak">{{ labelAkun(negara.me) }} · HISADA</span><img src="/img/logo-hisada-256.png" alt=""></section>
   <div v-if="galat" class="pesan galat">{{ galat }}</div>
   <div class="kisi" v-if="d">
     <div class="kartu stat"><div class="redup">Santri aktif putra</div><div class="angka" v-hitung="d.santri_putra"></div></div>
@@ -972,47 +973,121 @@ const DataMaster = {
 const Pengguna = {
   components: { Pesan, CariSantri },
   setup() {
-    const f = reactive({ users: [], akses: [], galat: "", ok: "", sel: null, santri: null, role: "", guru_id: "", modNama: "", modEmail: "" });
+    const tab = ref("akun");
+    const f = reactive({ users: [], akses: [], preset: [], galat: "", ok: "", sel: null, santri: null, presetSantri: "", guru_id: "", presetGuru: "", modNama: "", modEmail: "", presetTerapkan: "", q: "" });
     const m = computed(() => negara.master || {});
-    async function muat() { const r = await api("/users"); f.users = r.users; f.akses = r.akses; if (f.sel) f.sel = f.users.find((u) => u.id === f.sel.id) || null; }
-    const jalan = async (fn, pesan) => { f.galat = ""; f.ok = ""; try { const r = await fn(); f.ok = typeof pesan === "function" ? pesan(r) : pesan; await muat(); } catch (e) { f.galat = e.message; } };
-    const buatPengurus = () => jalan(() => api("/users/dari-santri", { santri_id: f.santri.id, role: f.role || null }), (r) => r.tertahan ? "Akun dibuat tetapi TERTAHAN: tanggal lahir santri kosong." : "Akun pengurus dibuat. Password sementara: NIS + tanggal lahir.");
-    const buatGuru = () => jalan(() => api("/users/guru", { guru_id: f.guru_id }), "Akun guru dibuat (masuk dengan Google).");
+    async function muat() {
+      const r = await api("/users"); f.users = r.users; f.akses = r.akses; f.preset = r.preset;
+      if (f.sel) f.sel = f.users.find((u) => u.id === f.sel.id) || null;
+      if (!f.presetGuru) f.presetGuru = (f.preset.find((p) => p.nama === "Asatidz") || {}).id || "";
+    }
+    const jalan = async (fn, pesan) => { f.galat = ""; f.ok = ""; try { const r = await fn(); f.ok = typeof pesan === "function" ? pesan(r) : pesan; await muat(); return true; } catch (e) { f.galat = e.message; return false; } };
+    const buatPengurus = () => jalan(() => api("/users/dari-santri", { santri_id: f.santri.id, preset_id: f.presetSantri || null }), (r) => r.tertahan ? "Akun dibuat tetapi TERTAHAN: tanggal lahir santri kosong." : "Akun pengurus dibuat. Password sementara: NIS + tanggal lahir.");
+    const buatGuru = () => jalan(() => api("/users/guru", { guru_id: f.guru_id, preset_id: f.presetGuru || null }), "Akun guru dibuat (masuk dengan Google).");
     const buatMod = () => jalan(() => api("/users/moderator", { nama: f.modNama, email: f.modEmail }), "Moderator ditambahkan (masuk dengan Google).");
     const ubah = (u, data) => jalan(() => api("/users/" + u.id, data), "Akun diperbarui.");
     const akses = (u, kode, beri) => jalan(() => api(`/users/${u.id}/akses`, { kode, beri }), beri ? "Akses diberikan." : "Akses dicabut.");
     const reset = (u) => confirm("Reset password " + u.email + "?") && jalan(() => api(`/users/${u.id}/reset-password`, {}), (r) => "Password sementara: " + r.password_sementara);
-    const roleUntuk = (u) => u.santri_id ? ["", "piket", "kesehatan", "kedisiplinan", "sekretaris"] : u.guru_id ? ["asatidz"] : ["moderator"];
+    function terapkan(u) {
+      const p = f.preset.find((x) => x.id == f.presetTerapkan);
+      if (!p || !confirm(`Terapkan preset ${p.nama} ke ${u.nama}?\nAkses akun ini DIGANTI dengan isi preset (${p.akses.length} akses). Sesudahnya akses masih bisa diubah satu per satu.`)) return;
+      jalan(() => api(`/users/${u.id}/preset`, { preset_id: p.id }), `Preset ${p.nama} diterapkan.`).then(() => { f.presetTerapkan = ""; });
+    }
+    const jadikanMod = (u, jadi) => confirm(jadi ? `Jadikan ${u.nama} Moderator? Moderator memegang SEMUA akses, termasuk mengelola pengguna dan backup.` : `Cabut status Moderator ${u.nama}?`)
+      && ubah(u, { moderator: jadi });
+    // label akses akun: Moderator · nama preset (+ "diubah" bila aksesnya tidak lagi sama dengan preset) · akses manual · belum ada akses
+    const samaPreset = (u) => { const p = f.preset.find((x) => x.id === u.preset_id); return p && p.akses.length === u.akses.length && p.akses.every((k) => u.akses.includes(k)); };
+    const labelUser = (u) => u.role === "moderator" ? "Moderator" : u.preset ? u.preset + (samaPreset(u) ? "" : " (diubah)") : u.akses.length ? `Akses manual (${u.akses.length})` : "Belum ada akses";
+    const kelasLabel = (u) => u.role === "moderator" ? "hijau" : !u.akses.length ? "kuning" : "";
+    const tampil = computed(() => { const q = f.q.trim().toLowerCase(); return q ? f.users.filter((u) => (u.nama + " " + u.email + " " + (u.nis || "") + " " + (u.nip || "")).toLowerCase().includes(q)) : f.users; });
+    // daftar akses: akses fungsi & lihat, lalu izin mengedit daftar pilihan
+    const aksesUtama = computed(() => f.akses.filter((a) => !a.kode.startsWith("pilihan.")));
+    const aksesPilihan = computed(() => f.akses.filter((a) => a.kode.startsWith("pilihan.")));
+    const namaAkses = (k) => (f.akses.find((a) => a.kode === k) || {}).nama || k;
+
+    // ---- preset
+    const ed = reactive({ id: null, nama: "", keterangan: "", akses: [] });
+    const sunting = (p) => { tab.value = "preset"; ed.id = p ? p.id : "baru"; ed.nama = p ? p.nama : ""; ed.keterangan = p ? p.keterangan || "" : ""; ed.akses = p ? [...p.akses] : []; };
+    const batal = () => { ed.id = null; };
+    async function simpanPreset() {
+      if (await jalan(() => api("/preset", { id: ed.id === "baru" ? null : ed.id, nama: ed.nama, keterangan: ed.keterangan, akses: ed.akses }), "Preset tersimpan. Akun yang sudah memakai preset ini tidak berubah.")) batal();
+    }
+    const hapusPreset = (p) => confirm(`Hapus preset ${p.nama}? Akun yang memakainya tetap memegang aksesnya.`) && jalan(() => api(`/preset/${p.id}/hapus`, {}), "Preset dihapus.");
+    const dipakai = (p) => f.users.filter((u) => u.preset_id === p.id && u.status === "aktif").length;
+
     onMounted(async () => { await muatMaster(); try { await muat(); } catch (e) { f.galat = e.message; } });
-    return { f, m, buatPengurus, buatGuru, buatMod, ubah, akses, reset, roleUntuk, LABEL_ROLE };
+    return { tab, f, m, buatPengurus, buatGuru, buatMod, ubah, akses, reset, terapkan, jadikanMod, labelUser, kelasLabel, tampil, aksesUtama, aksesPilihan, namaAkses,
+      ed, sunting, batal, simpanPreset, hapusPreset, dipakai, samaPreset, negara };
   },
   template: `<div><span class="jejak">Fungsi › Akses</span><h1>Pengguna & Manajemen Akses</h1></div>
   <Pesan :galat="f.galat" :ok="f.ok"/>
+  <div class="tab"><button :class="{aktif: tab==='akun'}" @click="tab='akun'">Akun</button><button :class="{aktif: tab==='preset'}" @click="tab='preset'">Preset akses</button></div>
+
+  <template v-if="tab==='akun'">
   <div class="dua-kolom">
     <div class="kartu" style="display:flex;flex-direction:column;gap:10px"><h2>Akun pengurus (santri)</h2><CariSantri v-model="f.santri"/>
-      <label class="isian">Role<select v-model="f.role"><option value="">Menunggu role</option><option v-for="r in ['piket','kesehatan','kedisiplinan','sekretaris']" :value="r">{{ LABEL_ROLE[r] }}</option></select></label>
+      <label class="isian">Preset akses (opsional)<select v-model="f.presetSantri"><option value="">Tanpa akses dulu</option><option v-for="p in f.preset" :value="p.id">{{ p.nama }}</option></select></label>
       <button :disabled="!f.santri" @click="buatPengurus">Buat akun NIS@daarululuumlido.com</button></div>
     <div class="kartu" style="display:flex;flex-direction:column;gap:10px"><h2>Akun guru</h2>
       <label class="isian">Guru<select v-model="f.guru_id"><option value="">Pilih guru…</option><option v-for="g in m.guru" :value="g.id">{{ g.nama }} ({{ g.nip }})</option></select></label>
+      <label class="isian">Preset akses<select v-model="f.presetGuru"><option value="">Tanpa akses dulu</option><option v-for="p in f.preset" :value="p.id">{{ p.nama }}</option></select></label>
       <button :disabled="!f.guru_id" @click="buatGuru">Buat akun guru</button>
       <h2 style="margin-top:8px">Moderator lain</h2><div class="baris"><input v-model="f.modNama" placeholder="Nama"><input v-model="f.modEmail" placeholder="email@daarululuumlido.com"><button class="kedua" @click="buatMod">Tambah</button></div></div>
   </div>
   <div class="dua-kolom">
-    <div class="tabel" style="flex:1.3 1 420px"><table><thead><tr><th>Nama</th><th>Role</th><th>Status</th><th></th></tr></thead>
-      <tbody><tr v-for="u in f.users" :key="u.id" :style="{background: f.sel && f.sel.id===u.id ? '#EEF5F1' : ''}">
+    <div style="flex:1.3 1 420px;display:flex;flex-direction:column;gap:10px">
+      <label class="isian">Cari akun<input v-model="f.q" placeholder="Nama, email, NIS, atau NIP"></label>
+      <div class="tabel"><table><thead><tr><th>Nama</th><th>Akses</th><th>Status</th><th></th></tr></thead>
+      <tbody><tr v-for="u in tampil" :key="u.id" :style="{background: f.sel && f.sel.id===u.id ? '#EEF5F1' : ''}">
         <td><strong>{{ u.nama }}</strong><div class="redup">{{ u.email }}</div></td>
-        <td><span class="lencana" :class="{kuning: !u.role}">{{ u.role ? LABEL_ROLE[u.role] : 'Menunggu role' }}</span></td>
+        <td><span class="lencana" :class="kelasLabel(u)">{{ labelUser(u) }}</span></td>
         <td><span class="lencana" :class="{hijau: u.status==='aktif', merah: u.status!=='aktif'}">{{ u.status }}</span></td>
-        <td><button class="kedua kecil" @click="f.sel = u">Kelola</button></td></tr></tbody></table></div>
+        <td><button class="kedua kecil" @click="f.sel = u">Kelola</button></td></tr></tbody></table></div></div>
     <div v-if="f.sel" class="kartu" style="display:flex;flex-direction:column;gap:12px">
-      <h2>{{ f.sel.nama }}</h2><span class="redup">{{ f.sel.email }} · lingkungan {{ f.sel.lingkungan }}</span>
-      <label class="isian">Role (satu per akun)<select :value="f.sel.role || ''" @change="ubah(f.sel, {role: $event.target.value})"><option v-for="r in roleUntuk(f.sel)" :value="r">{{ r ? LABEL_ROLE[r] : 'Menunggu role' }}</option></select></label>
-      <label class="isian" v-if="f.sel.guru_id">Lingkungan guru<select :value="f.sel.lingkungan" @change="ubah(f.sel, {lingkungan: $event.target.value})"><option>semua</option><option>putra</option><option>putri</option></select></label>
-      <div><strong style="font-size:13px">Akses di luar role</strong>
-        <label v-for="a in f.akses" :key="a.kode" style="display:flex;gap:10px;align-items:center;padding:6px 0;font-size:14px"><input type="checkbox" :checked="f.sel.akses.includes(a.kode)" @change="akses(f.sel, a.kode, $event.target.checked)"><span><strong>{{ a.nama }}</strong> <span class="redup">{{ a.keterangan }}</span></span></label></div>
-      <div class="baris"><button class="kedua" @click="ubah(f.sel, {status: f.sel.status==='aktif' ? 'nonaktif' : 'aktif'})">{{ f.sel.status==='aktif' ? 'Nonaktifkan' : 'Aktifkan' }}</button><button v-if="f.sel.punya_password || f.sel.santri_id" class="bahaya" @click="reset(f.sel)">Reset password</button></div>
+      <h2>{{ f.sel.nama }}</h2><span class="redup">{{ f.sel.email }} · lingkungan {{ f.sel.lingkungan }}{{ f.sel.santri_id ? ' · akun santri' : f.sel.guru_id ? ' · akun guru' : '' }}</span>
+      <div v-if="f.sel.role === 'moderator'" class="pesan info">Moderator memegang semua akses.
+        <button v-if="f.sel.id !== negara.me.id" class="kedua kecil" style="margin-left:8px" @click="jadikanMod(f.sel, false)">Cabut Moderator</button></div>
+      <template v-else>
+        <div class="baris" style="align-items:flex-end">
+          <label class="isian" style="flex:1 1 180px">Terapkan preset<select v-model="f.presetTerapkan"><option value="">Pilih preset…</option><option v-for="p in f.preset" :value="p.id">{{ p.nama }} ({{ p.akses.length }} akses)</option></select></label>
+          <button class="kedua" :disabled="!f.presetTerapkan" @click="terapkan(f.sel)">Terapkan</button></div>
+        <p class="redup" style="margin:0;font-size:12.5px">Preset disalin: akses akun diganti isi preset, lalu bisa diubah satu per satu di bawah.
+          <template v-if="f.sel.preset"> Preset terakhir: <strong>{{ f.sel.preset }}</strong>{{ samaPreset(f.sel) ? '' : ' (sudah diubah)' }}.</template></p>
+        <div><strong style="font-size:13px">Akses</strong>
+          <label v-for="a in aksesUtama" :key="a.kode" style="display:flex;gap:10px;align-items:center;padding:5px 0;font-size:14px"><input type="checkbox" :checked="f.sel.akses.includes(a.kode)" @change="akses(f.sel, a.kode, $event.target.checked)"><span><strong>{{ a.nama }}</strong> <span class="redup">{{ a.keterangan }}</span></span></label>
+          <details style="margin-top:6px"><summary style="cursor:pointer;font-size:13px"><strong>Edit daftar pilihan</strong> <span class="redup">({{ aksesPilihan.filter(a => f.sel.akses.includes(a.kode)).length }} dipilih)</span></summary>
+            <label v-for="a in aksesPilihan" :key="a.kode" style="display:flex;gap:10px;align-items:center;padding:5px 0;font-size:14px"><input type="checkbox" :checked="f.sel.akses.includes(a.kode)" @change="akses(f.sel, a.kode, $event.target.checked)"><span>{{ a.nama }}</span></label></details></div>
+      </template>
+      <label class="isian" v-if="f.sel.guru_id && f.sel.role !== 'moderator'">Lingkungan guru<select :value="f.sel.lingkungan" @change="ubah(f.sel, {lingkungan: $event.target.value})"><option>semua</option><option>putra</option><option>putri</option></select></label>
+      <div class="baris"><button class="kedua" @click="ubah(f.sel, {status: f.sel.status==='aktif' ? 'nonaktif' : 'aktif'})">{{ f.sel.status==='aktif' ? 'Nonaktifkan' : 'Aktifkan' }}</button>
+        <button v-if="f.sel.role !== 'moderator' && !f.sel.santri_id" class="kedua" @click="jadikanMod(f.sel, true)">Jadikan Moderator</button>
+        <button v-if="f.sel.punya_password || f.sel.santri_id" class="bahaya" @click="reset(f.sel)">Reset password</button></div>
+      <p v-if="f.sel.status === 'aktif'" class="redup" style="margin:0;font-size:12.5px">Menonaktifkan akun juga mencabut semua aksesnya.</p>
     </div>
-  </div>`,
+  </div>
+  </template>
+
+  <template v-if="tab==='preset'">
+    <p class="redup" style="margin:0">Preset adalah templat kumpulan akses. Saat diterapkan, aksesnya <strong>disalin</strong> ke akun; mengubah atau menghapus preset tidak mengubah akun yang sudah memakainya.</p>
+    <div><button @click="sunting(null)">+ Preset baru</button></div>
+    <div v-if="ed.id" class="kartu" style="display:flex;flex-direction:column;gap:10px">
+      <h2>{{ ed.id === 'baru' ? 'Preset baru' : 'Ubah preset' }}</h2>
+      <div class="baris"><label class="isian" style="flex:1 1 180px">Nama<input v-model="ed.nama" maxlength="60"></label><label class="isian" style="flex:2 1 260px">Keterangan<input v-model="ed.keterangan" maxlength="200"></label></div>
+      <div><strong style="font-size:13px">Akses dalam preset ({{ ed.akses.length }})</strong>
+        <label v-for="a in aksesUtama" :key="a.kode" style="display:flex;gap:10px;align-items:center;padding:5px 0;font-size:14px"><input type="checkbox" :value="a.kode" v-model="ed.akses"><span><strong>{{ a.nama }}</strong> <span class="redup">{{ a.keterangan }}</span></span></label>
+        <details style="margin-top:6px"><summary style="cursor:pointer;font-size:13px"><strong>Edit daftar pilihan</strong></summary>
+          <label v-for="a in aksesPilihan" :key="a.kode" style="display:flex;gap:10px;align-items:center;padding:5px 0;font-size:14px"><input type="checkbox" :value="a.kode" v-model="ed.akses"><span>{{ a.nama }}</span></label></details></div>
+      <div class="baris"><button :disabled="!ed.nama.trim()" @click="simpanPreset">Simpan preset</button><button class="kedua" @click="batal">Batal</button></div>
+    </div>
+    <div class="kisi" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">
+      <div v-for="p in f.preset" :key="p.id" class="kartu" style="display:flex;flex-direction:column;gap:8px">
+        <div class="baris" style="justify-content:space-between"><h2 style="margin:0">{{ p.nama }}</h2><span class="redup" style="font-size:12.5px">{{ dipakai(p) }} akun</span></div>
+        <span v-if="p.keterangan" class="redup">{{ p.keterangan }}</span>
+        <div><span v-for="k in p.akses" :key="k" class="lencana" style="margin:0 4px 4px 0">{{ namaAkses(k) }}</span><span v-if="!p.akses.length" class="redup">Belum ada akses</span></div>
+        <div class="baris" style="margin-top:auto"><button class="kedua kecil" @click="sunting(p)">Ubah</button><button class="bahaya kecil" @click="hapusPreset(p)">Hapus</button></div>
+      </div>
+    </div>
+  </template>`,
 };
 
 // ---------------------------------------------------------------- Riwayat
@@ -1123,7 +1198,7 @@ const DetailAkun = {
           <FotoSantri v-if="d.foto_url" :s="{ nama: d.nama, foto_url: d.foto_url }" ukuran="besar" class="foto-akun"/>
           <span v-else class="foto foto-akun inisial" aria-hidden="true">{{ inisial(d.nama) }}</span>
           <div style="min-width:0"><h2 style="margin:0">{{ d.nama }}</h2><div class="redup">{{ d.email }}</div>
-            <div class="baris" style="margin-top:6px;gap:6px"><span class="lencana hijau">{{ d.role_label || 'Menunggu role' }}</span><span class="lencana">{{ LING[d.lingkungan] }}</span>
+            <div class="baris" style="margin-top:6px;gap:6px"><span class="lencana hijau">{{ d.moderator ? 'Moderator' : d.preset || (d.akses.length ? 'Akses manual' : 'Belum ada akses') }}</span><span class="lencana">{{ LING[d.lingkungan] }}</span>
               <span v-if="d.status !== 'aktif'" class="lencana merah">{{ d.status }}</span></div></div>
           <button v-if="modal" class="kedua kecil" style="margin-left:auto;align-self:flex-start" aria-label="Tutup" @click="$emit('tutup')">✕</button>
         </div>
@@ -1133,14 +1208,13 @@ const DetailAkun = {
           <template v-if="d.guru"><dt>NIP</dt><dd>{{ d.guru.nip }}</dd>
             <dt>Wali kelas</dt><dd><template v-if="d.wali_kelas.length"><div v-for="k in d.wali_kelas">{{ k.nama }} <span class="redup">· {{ PERAN[k.peran] }}</span></div></template><span v-else class="redup">—</span></dd>
             <dt>Wali asuh</dt><dd><template v-if="d.wali_asuh.length"><div v-for="k in d.wali_asuh">{{ k.nama }} <span class="redup">· {{ PERAN[k.peran] }}</span></div></template><span v-else class="redup">—</span></dd></template>
-          <dt>Akses</dt><dd><span v-if="d.role === 'moderator'" class="lencana hijau">Semua akses</span>
-            <span v-for="a in d.akses_bawaan" class="lencana" style="margin:0 4px 4px 0">{{ a }}</span>
-            <span v-for="a in d.akses_tambahan" class="lencana biru" style="margin:0 4px 4px 0" :title="'Diberikan ' + a.diberikan_at">{{ a.nama }}</span>
-            <span v-if="d.role !== 'moderator' && !d.akses_bawaan.length && !d.akses_tambahan.length" class="redup">—</span></dd>
+          <dt>Akses</dt><dd><span v-if="d.moderator" class="lencana hijau">Semua akses</span>
+            <template v-else><span v-for="a in d.akses" class="lencana" style="margin:0 4px 4px 0" :title="'Diberikan ' + a.diberikan_at">{{ a.nama }}</span>
+            <span v-if="!d.akses.length" class="redup">Belum ada akses — hubungi Moderator.</span>
+            <div v-if="d.preset" class="redup" style="font-size:12px;margin-top:2px">Dari preset {{ d.preset }}; akses bisa disesuaikan Moderator per akun.</div></template></dd>
           <dt>Login terakhir</dt><dd>{{ d.login_terakhir ? waktuLalu(d.login_terakhir) : '—' }} <span class="redup">· {{ d.sesi_aktif }} sesi aktif</span></dd>
           <dt>Akun dibuat</dt><dd>{{ d.dibuat_at ? d.dibuat_at.slice(0, 10) : '—' }}</dd>
         </dl>
-        <p v-if="d.akses_tambahan.length" class="redup" style="margin:0;font-size:12px">Lencana biru = akses tambahan dari Moderator.</p>
         <div class="baris"><a class="tombol kedua" href="#/ganti-password" @click="$emit('tutup')">{{ d.punya_password ? 'Ganti password' : 'Buat password' }}</a>
           <a class="tombol kedua" href="#/notifikasi" @click="$emit('tutup')">Notifikasi</a>
           <button class="bahaya" style="margin-left:auto" @click="keluar">Keluar</button></div>
@@ -1173,7 +1247,7 @@ const App = {
     const isi = ref(null);
     watch(() => [jalur.value, !!negara.me], () => nextTick(() => gerak.masuk(isi.value)), { immediate: true });
     const ling = computed(() => negara.me && (negara.me.lingkungan === "semua" ? "Putra & Putri" : negara.me.lingkungan === "putra" ? "Putra" : "Putri"));
-    return { negara, jalur, halaman, menu, keluar, LABEL_ROLE, laci, isi, ling, IKON, inisial, lencana, notif, fotoKecil };
+    return { negara, jalur, halaman, menu, keluar, labelAkun, laci, isi, ling, IKON, inisial, lencana, notif, fotoKecil };
   },
   template: `
   <Masuk v-if="jalur === '/masuk' || !negara.me"/>
@@ -1194,7 +1268,7 @@ const App = {
       <div class="akun"><button type="button" class="akun-tombol" aria-haspopup="dialog" @click="notif.akun = true; laci = false" title="Lihat detail akun">
           <img v-if="negara.me.foto_url" class="inisial" :src="fotoKecil(negara.me.foto_url, 96)" alt="" referrerpolicy="no-referrer" @error="negara.me.foto_url = null">
           <span v-else class="inisial" aria-hidden="true">{{ inisial(negara.me.nama) }}</span>
-          <span style="min-width:0;text-align:left"><strong>{{ negara.me.nama }}</strong><span>{{ negara.me.role ? LABEL_ROLE[negara.me.role] : 'Menunggu role' }}</span></span></button>
+          <span style="min-width:0;text-align:left"><strong>{{ negara.me.nama }}</strong><span>{{ labelAkun(negara.me) }}</span></span></button>
         <div class="akun-tautan"><a href="#/ganti-password">Ganti password</a><a href="#" @click.prevent="keluar">Keluar</a></div></div>
     </nav>
     <main class="isi" ref="isi"><component :is="halaman" :key="jalur"/></main>
