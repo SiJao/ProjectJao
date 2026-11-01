@@ -45,7 +45,7 @@ const Komunikasi = {
     const ulangSemua = () => jalan(async () => { const r = await api("/komunikasi/antrean/ulang-semua", {}); f.ok = `${r.jumlah} email gagal masuk antrean lagi.`; await muatAntrean(); });
     const kirimSekarang = () => jalan(async () => {
       const r = await api("/komunikasi/kirim", {});
-      f.ok = r.belum_diatur ? "Pengirim email belum diatur — email tetap di antrean (lihat panduan di bawah)." : `Terkirim ${r.terkirim}, gagal ${r.gagal}${r.sisa ? ", sisa " + r.sisa : ""}.`;
+      f.ok = r.belum_diatur ? "Pengirim email belum diatur — email tetap di antrean." : `Terkirim ${r.terkirim}, gagal ${r.gagal}${r.sisa ? ", sisa " + r.sisa : ""}.`;
       await muatAntrean();
     });
 
@@ -134,17 +134,6 @@ const Komunikasi = {
       <div class="kartu stat"><div class="redup">Mode Uji</div><strong :style="{color: an.konfig.mode_uji ? 'var(--kuning)' : 'var(--hijau)'}">{{ an.konfig.mode_uji ? 'Aktif' : 'Mati' }}</strong></div>
       <div class="kartu stat"><div class="redup">email.alamat_uji</div><strong :style="{color: an.konfig.alamat_uji || !an.konfig.mode_uji ? 'var(--hijau)' : 'var(--merah)'}">{{ an.konfig.alamat_uji ? 'Sudah diisi' : 'Kosong' }}</strong></div>
     </div>
-    <details class="kartu" :open="an.konfig && !(an.konfig.gmail_refresh_token && an.konfig.gmail_pengirim)">
-      <summary><strong>Panduan: mengirim email lewat Google Workspace pondok</strong></summary>
-      <ol style="line-height:1.7;padding-left:18px">
-        <li>Pilih akun pengirim di Google Workspace pondok (mis. <code>hisada@daarululuumlido.com</code>).</li>
-        <li>Dengan klien OAuth yang sudah dipakai untuk login Google HISADA, buat <em>refresh token</em> untuk akun pengirim itu dengan cakupan <code>https://www.googleapis.com/auth/gmail.send</code> saja (mis. lewat OAuth 2.0 Playground: centang "Use your own OAuth credentials", masuk sebagai akun pengirim).</li>
-        <li>Di dashboard Cloudflare → Workers → <strong>hisada</strong> → Settings → Variables and Secrets: tambahkan <strong>Secret</strong> <code>GMAIL_REFRESH_TOKEN</code> (isi refresh token) dan <strong>Variable</strong> <code>GMAIL_PENGIRIM</code> (alamat akun pengirim).</li>
-        <li><strong>Jangan pernah menempelkan token atau secret di chat, email, atau dokumen.</strong> Ketik langsung di dashboard Cloudflare.</li>
-        <li>Selama <strong>Mode Uji</strong> aktif (<code>email.mode_uji</code> = 1), semua email dialihkan ke <code>email.alamat_uji</code>. Isi alamat itu di Data Master → Pengaturan. Matikan Mode Uji (0) hanya di server produksi.</li>
-        <li>Email dikirim otomatis tiap 5 menit (maks. 25 per putaran). Tombol <strong>Kirim sekarang</strong> menjalankan satu putaran segera.</li>
-      </ol>
-    </details>
     <div class="baris">
       <label class="isian">Status<select v-model="an.status"><option value="">Semua</option><option value="antre">Antre ({{ an.hitung.antre || 0 }})</option><option value="terkirim">Terkirim ({{ an.hitung.terkirim || 0 }})</option><option value="gagal">Gagal ({{ an.hitung.gagal || 0 }})</option></select></label>
       <label class="isian" style="flex:1 1 220px">Cari penerima / subjek<input v-model="an.q" placeholder="Ketik untuk menyaring"></label>
