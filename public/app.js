@@ -193,6 +193,35 @@ const SandiSementara = {
     </div></div>`,
 };
 
+// Paginasi tabel: 20 baris per halaman, navigasi di bawah tabel (hanya tampil bila lebih dari 20 baris).
+// Pakai: v-for="x in potong(daftar, hal.k)" lalu <Paginasi v-model="hal.k" :jumlah="daftar.length"/>
+const PER_HALAMAN = 20;
+const potong = (arr, h) => (arr || []).slice((h - 1) * PER_HALAMAN, h * PER_HALAMAN);
+const Paginasi = {
+  props: { modelValue: Number, jumlah: Number },
+  emits: ["update:modelValue"],
+  setup(p, { emit }) {
+    const total = computed(() => Math.max(1, Math.ceil((p.jumlah || 0) / PER_HALAMAN)));
+    watch(total, (t) => { if (p.modelValue > t) emit("update:modelValue", t); }); // daftar menyusut → halaman terakhir yang ada
+    // nomor ringkas: 1 … 4 5 6 … 12
+    const nomor = computed(() => {
+      const t = total.value, h = p.modelValue, r = [];
+      for (let i = 1; i <= t; i++) if (i === 1 || i === t || Math.abs(i - h) <= 1) r.push(i); else if (r[r.length - 1] !== "…") r.push("…");
+      return r;
+    });
+    const ke = (i) => emit("update:modelValue", Math.min(Math.max(1, i), total.value));
+    return { total, nomor, ke, PER_HALAMAN };
+  },
+  template: `<nav v-if="jumlah > PER_HALAMAN" class="paginasi" aria-label="Halaman tabel">
+    <span class="redup">{{ (modelValue - 1) * PER_HALAMAN + 1 }}–{{ Math.min(modelValue * PER_HALAMAN, jumlah) }} dari {{ jumlah }}</span>
+    <div class="paginasi-nomor">
+      <button class="kedua kecil" :disabled="modelValue <= 1" aria-label="Halaman sebelumnya" @click="ke(modelValue - 1)">‹</button>
+      <template v-for="(n, i) in nomor" :key="i"><span v-if="n === '…'" class="redup" aria-hidden="true">…</span>
+        <button v-else class="kecil" :class="{ kedua: n !== modelValue }" :aria-current="n === modelValue ? 'page' : null" :aria-label="'Halaman ' + n" @click="ke(n)">{{ n }}</button></template>
+      <button class="kedua kecil" :disabled="modelValue >= total" aria-label="Halaman berikutnya" @click="ke(modelValue + 1)">›</button>
+    </div></nav>`,
+};
+
 const Pesan ={ props: ["galat", "ok"], template: `<div v-if="galat" class="pesan galat">{{ galat }}</div><div v-if="ok" class="pesan ok">{{ ok }}</div>` };
 
 // ---------------------------------------------------------------- Masuk / setup
@@ -677,7 +706,7 @@ const KELOMPOK = [
 ];
 
 const DataMaster = {
-  components: { Pesan, FotoSantri, SaringSantri },
+  components: { Pesan, FotoSantri, SaringSantri, Paginasi },
   directives: { baris: vBaris },
   setup() {
     const tab = ref("santri");
@@ -711,6 +740,11 @@ const DataMaster = {
     });
     const saranGuru = computed(() => g.saran && g.q.trim().length >= 2 ? guruTersaring.value.slice(0, MAKS_SARAN) : []);
     watch(() => g.q, (v) => { g.saran = v.trim().length >= 2; });
+    // halaman tabel per tab (20 baris); kembali ke halaman 1 saat pencarian / saringan berubah
+    const hal = reactive({ santri: 1, kelas: 1, kamar: 1, guru: 1, ta: 1, pilihan: 1, status: 1, izin: 1, atur: 1 });
+    watch(() => f.santri, () => { hal.santri = 1; });
+    watch(() => [g.q, g.ling, g.aktif], () => { hal.guru = 1; });
+    watch(() => f.kelompok, () => { hal.pilihan = 1; });
     const guruKosong = () => ({ nip: "", nama: "", jenis_kelamin: "L", email: "", no_hp: "", lingkungan: "semua" });
     const isiGuru = (o) => { Object.keys(baru.guru).forEach((k) => delete baru.guru[k]); Object.assign(baru.guru, o); };
     const ubahGuru = (x) => { isiGuru({ id: x.id, nip: x.nip, nama: x.nama, jenis_kelamin: x.jenis_kelamin, email: x.email || "", no_hp: x.no_hp || "", lingkungan: x.lingkungan, aktif: x.aktif }); g.saran = false; };
@@ -844,7 +878,7 @@ const DataMaster = {
       } catch (e) { f.galat = `${e.message} — berhenti pada santri ke-${i + 1}. Klik Impor sekarang lagi; NIS yang sudah masuk hanya diperbarui, tidak dobel.`; } finally { f.sibuk = false; }
     }
     onMounted(async () => { await muatMaster(); cari(); });
-    return { waliDari, guruUntuk, aturWali, hapusWali, PERAN_WALI, tab, f, m, moderator, bisaPilihan, cari, simpanMaster, bukaSantri, simpanSantri, KELOMPOK, isiPilihan, tambahPilihan, ubahPilihan, ed, sunting, batalSunting, sedangSunting, simpanSunting, baru, tambahKamar, bacaFile, jalankanImpor, namaKelas,
+    return { hal, potong, waliDari, guruUntuk, aturWali, hapusWali, PERAN_WALI, tab, f, m, moderator, bisaPilihan, cari, simpanMaster, bukaSantri, simpanSantri, KELOMPOK, isiPilihan, tambahPilihan, ubahPilihan, ed, sunting, batalSunting, sedangSunting, simpanSunting, baru, tambahKamar, bacaFile, jalankanImpor, namaKelas,
       saring, saranSantri, pilihSaran, navS, tutupSaran, g, guruTersaring, saranGuru, ubahGuru, navG, tutupSaranGuru, simpanGuru, guruKosong, isiGuru, bacaGuru, imporGuru, templatGuru };
   },
   template: `<div><span class="jejak">Administrasi</span><h1>Data Master</h1></div>
@@ -882,9 +916,10 @@ const DataMaster = {
       <div class="baris"><button @click="simpanSantri">Simpan</button><button class="kedua" @click="f.edit=null">Batal</button></div>
     </div>
     <div class="tabel"><table><thead><tr><th>Santri</th><th>L/P</th><th>Kelas</th><th>Kamar</th><th>Status</th><th></th></tr></thead>
-      <tbody v-baris><tr v-for="s in f.santri" :key="s.id"><td><div class="santri-sel"><FotoSantri :s="s"/><span><strong>{{ s.nama }}</strong><div class="redup">{{ s.nis }}</div></span></div></td><td>{{ s.jenis_kelamin }}</td><td>{{ s.kelas }}</td><td>{{ s.kamar }}</td><td><span class="lencana" :class="{hijau: s.status==='aktif'}">{{ s.status }}</span></td><td><button v-if="moderator" class="kedua kecil" @click="bukaSantri(s)">Ubah</button></td></tr></tbody></table>
+      <tbody v-baris><tr v-for="s in potong(f.santri, hal.santri)" :key="s.id"><td><div class="santri-sel"><FotoSantri :s="s"/><span><strong>{{ s.nama }}</strong><div class="redup">{{ s.nis }}</div></span></div></td><td>{{ s.jenis_kelamin }}</td><td>{{ s.kelas }}</td><td>{{ s.kamar }}</td><td><span class="lencana" :class="{hijau: s.status==='aktif'}">{{ s.status }}</span></td><td><button v-if="moderator" class="kedua kecil" @click="bukaSantri(s)">Ubah</button></td></tr></tbody></table>
       <p v-if="f.memuat && !f.santri.length" class="redup" style="padding:14px">Memuat…</p>
       <p v-else-if="!f.santri.length" class="redup" style="padding:14px">{{ f.q ? 'Tidak ada santri yang cocok.' : 'Belum ada data. Gunakan tab Impor Santri.' }}</p></div>
+    <Paginasi v-model="hal.santri" :jumlah="f.santri.length"/>
   </template>
 
   <template v-if="tab==='kelas'">
@@ -897,12 +932,13 @@ const DataMaster = {
       <button @click="simpanMaster('kelas', baru.kelas)">Tambah rombel</button>
     </div>
     <div class="tabel"><table><thead><tr><th>Kelas</th><th>Lingkungan</th><th>Santri aktif</th><th>Wali kelas (TA aktif)</th><th>Status</th><th></th></tr></thead>
-      <tbody><tr v-for="k in m.kelas" :key="k.id"><td><strong>{{ namaKelas(k) }}</strong></td><td>{{ k.lingkungan }}</td><td>{{ k.jumlah }}</td>
+      <tbody><tr v-for="k in potong(m.kelas, hal.kelas)" :key="k.id"><td><strong>{{ namaKelas(k) }}</strong></td><td>{{ k.lingkungan }}</td><td>{{ k.jumlah }}</td>
         <td><div class="baris" style="gap:4px"><span v-for="w in waliDari('kelas', k.id)" :key="w.id" class="lencana" :class="w.peran === 'wali' ? 'hijau' : ''">{{ w.nama }} · {{ PERAN_WALI[w.peran] }}
           <button v-if="moderator" class="tanpa-gaya" :aria-label="'Hapus ' + w.nama" @click="hapusWali('kelas', w)">✕</button></span>
           <select v-if="moderator && k.aktif" class="kecil" aria-label="Tetapkan wali kelas" @change="aturWali('kelas', k, $event.target.value); $event.target.value = ''">
             <option value="">+ {{ waliDari('kelas', k.id).length ? 'asisten' : 'wali' }}…</option><option v-for="g in guruUntuk(k.lingkungan, 'kelas', k.id)" :value="g.id">{{ g.nama }}</option></select></div></td>
         <td>{{ k.aktif ? 'Aktif' : 'Nonaktif' }}</td><td><button class="kedua kecil" @click="simpanMaster('kelas', {id: k.id, aktif: k.aktif ? 0 : 1})">{{ k.aktif ? 'Nonaktifkan' : 'Aktifkan' }}</button></td></tr></tbody></table></div>
+    <Paginasi v-model="hal.kelas" :jumlah="(m.kelas || []).length"/>
     <p class="redup">Rombel statis (K-89): yang berubah tiap tahun hanya santri dan wali kelasnya. Wali kelas ditetapkan per tahun ajaran aktif; guru yang punya akun menerima kabar santri binaannya di notifikasi.</p>
   </template>
 
@@ -912,12 +948,13 @@ const DataMaster = {
       <div class="kartu baris"><label class="isian">Asrama<select v-model="baru.kamar.asrama_id"><option v-for="a in m.asrama" :value="a.id">{{ a.nama }}</option></select></label><label class="isian">Nomor kamar<input v-model="baru.kamar.nomor" placeholder="01"></label><button @click="tambahKamar">Tambah kamar</button></div>
     </div>
     <div class="tabel"><table><thead><tr><th>Kamar</th><th>Lingkungan</th><th>Penghuni</th><th>Wali asuh (TA aktif)</th><th>Status</th><th></th></tr></thead>
-      <tbody><tr v-for="k in m.kamar" :key="k.id"><td><strong>{{ k.nama }}</strong></td><td>{{ k.lingkungan }}</td><td>{{ k.jumlah }}</td>
+      <tbody><tr v-for="k in potong(m.kamar, hal.kamar)" :key="k.id"><td><strong>{{ k.nama }}</strong></td><td>{{ k.lingkungan }}</td><td>{{ k.jumlah }}</td>
         <td><div class="baris" style="gap:4px"><span v-for="w in waliDari('kamar', k.id)" :key="w.id" class="lencana" :class="w.peran === 'wali_asuh' ? 'hijau' : ''">{{ w.nama }} · {{ PERAN_WALI[w.peran] }}
           <button v-if="moderator" class="tanpa-gaya" :aria-label="'Hapus ' + w.nama" @click="hapusWali('kamar', w)">✕</button></span>
           <select v-if="moderator && k.aktif" class="kecil" aria-label="Tetapkan wali asuh" @change="aturWali('kamar', k, $event.target.value); $event.target.value = ''">
             <option value="">+ {{ waliDari('kamar', k.id).length ? 'asisten' : 'wali asuh' }}…</option><option v-for="g in guruUntuk(k.lingkungan, 'kamar', k.id)" :value="g.id">{{ g.nama }}</option></select></div></td>
         <td>{{ k.aktif ? 'Aktif' : 'Nonaktif' }}</td><td><button class="kedua kecil" @click="simpanMaster('kamar', {id: k.id, aktif: k.aktif ? 0 : 1})">{{ k.aktif ? 'Nonaktifkan' : 'Aktifkan' }}</button></td></tr></tbody></table></div>
+    <Paginasi v-model="hal.kamar" :jumlah="(m.kamar || []).length"/>
   </template>
 
   <template v-if="tab==='guru'">
@@ -957,15 +994,17 @@ const DataMaster = {
       <span class="redup">{{ guruTersaring.length }} guru</span>
     </div>
     <div class="tabel"><table><thead><tr><th>NIP</th><th>Nama</th><th>L/P</th><th>Email</th><th>No. HP</th><th>Lingkungan</th><th></th></tr></thead>
-      <tbody v-baris><tr v-for="x in guruTersaring" :key="x.id" :style="{color: x.aktif ? '' : '#6B756F'}"><td>{{ x.nip }}</td><td><strong>{{ x.nama }}</strong></td><td>{{ x.jenis_kelamin }}</td><td>{{ x.email }}</td><td>{{ x.no_hp }}</td><td>{{ x.lingkungan }}</td>
+      <tbody v-baris><tr v-for="x in potong(guruTersaring, hal.guru)" :key="x.id" :style="{color: x.aktif ? '' : '#6B756F'}"><td>{{ x.nip }}</td><td><strong>{{ x.nama }}</strong></td><td>{{ x.jenis_kelamin }}</td><td>{{ x.email }}</td><td>{{ x.no_hp }}</td><td>{{ x.lingkungan }}</td>
         <td><button class="kedua kecil" @click="ubahGuru(x)">Ubah</button></td></tr></tbody></table>
       <p v-if="!guruTersaring.length" class="redup" style="padding:14px">{{ g.q || g.ling ? 'Tidak ada guru yang cocok.' : 'Belum ada data guru. Tambah satu per satu atau impor CSV.' }}</p></div>
+    <Paginasi v-model="hal.guru" :jumlah="guruTersaring.length"/>
   </template>
 
   <template v-if="tab==='ta'">
     <div class="kartu baris"><label class="isian">Tahun ajaran<input v-model="baru.ta.nama" placeholder="2027/2028"></label><button @click="simpanMaster('tahun_ajaran', baru.ta)">Tambah (persiapan)</button></div>
     <div class="tabel"><table><thead><tr><th>Tahun ajaran</th><th>Status</th><th>Mulai</th><th></th></tr></thead>
-      <tbody><tr v-for="t in m.tahun_ajaran" :key="t.id"><td><strong>{{ t.nama }}</strong></td><td>{{ t.status }}</td><td>{{ t.mulai || '—' }}</td><td><button v-if="t.status!=='aktif'" class="kedua kecil" @click="simpanMaster('tahun_ajaran', {id: t.id, status: 'aktif'})">Jadikan aktif</button></td></tr></tbody></table></div>
+      <tbody><tr v-for="t in potong(m.tahun_ajaran, hal.ta)" :key="t.id"><td><strong>{{ t.nama }}</strong></td><td>{{ t.status }}</td><td>{{ t.mulai || '—' }}</td><td><button v-if="t.status!=='aktif'" class="kedua kecil" @click="simpanMaster('tahun_ajaran', {id: t.id, status: 'aktif'})">Jadikan aktif</button></td></tr></tbody></table></div>
+    <Paginasi v-model="hal.ta" :jumlah="(m.tahun_ajaran || []).length"/>
   </template>
 
   <template v-if="tab==='pilihan'">
@@ -983,7 +1022,7 @@ const DataMaster = {
           <div class="baris" v-if="moderator && !sedangSunting('_status','baru')"><button class="kedua" @click="sunting('_status')">+ Tambah status</button></div>
           <div class="tabel"><table><thead><tr><th>Kode</th><th>Nama</th><th>Warna</th><th>Dihitung hadir</th><th>Urutan</th><th>Status</th><th></th></tr></thead>
             <tbody>
-              <tr v-for="s in [...(sedangSunting('_status','baru') ? [{id:'baru'}] : []), ...m.status_kehadiran]" :key="s.id">
+              <tr v-for="s in [...(sedangSunting('_status','baru') ? [{id:'baru'}] : []), ...potong(m.status_kehadiran, hal.status)]" :key="s.id">
                 <template v-if="sedangSunting('_status', s.id)">
                   <td><input v-if="s.id==='baru'" v-model="ed.data.kode" maxlength="3" style="width:56px"><strong v-else>{{ s.kode }}</strong></td>
                   <td><input v-model="ed.data.nama" style="min-width:140px"></td>
@@ -999,6 +1038,7 @@ const DataMaster = {
                   <td><button v-if="moderator" class="kedua kecil" @click="sunting('_status', s)">Ubah</button></td>
                 </template>
               </tr></tbody></table></div>
+          <Paginasi v-model="hal.status" :jumlah="(m.status_kehadiran || []).length"/>
           <p class="redup">Kode tidak bisa diubah setelah dibuat karena dipakai aturan otomatis (mis. overdue → A, skorsing → P).</p>
         </template>
         <template v-else-if="f.kelompok==='_izin'">
@@ -1006,7 +1046,7 @@ const DataMaster = {
           <div class="baris" v-if="moderator && !sedangSunting('_izin','baru')"><button class="kedua" @click="sunting('_izin')">+ Tambah jenis izin</button></div>
           <div class="tabel"><table><thead><tr><th>Nama</th><th>Basis waktu</th><th>Jam kembali bawaan</th><th>Wajib wali</th><th>Status absensi</th><th>Urutan</th><th>Status</th><th></th></tr></thead>
             <tbody>
-              <tr v-for="j in [...(sedangSunting('_izin','baru') ? [{id:'baru'}] : []), ...m.jenis_izin]" :key="j.id">
+              <tr v-for="j in [...(sedangSunting('_izin','baru') ? [{id:'baru'}] : []), ...potong(m.jenis_izin, hal.izin)]" :key="j.id">
                 <template v-if="sedangSunting('_izin', j.id)">
                   <td><input v-model="ed.data.nama" style="min-width:140px"></td>
                   <td><select v-model="ed.data.basis_waktu"><option value="jam">jam</option><option value="tanggal_jam">tanggal_jam</option><option value="tanggal">tanggal</option></select></td>
@@ -1023,13 +1063,14 @@ const DataMaster = {
                   <td><button v-if="moderator" class="kedua kecil" @click="sunting('_izin', j)">Ubah</button></td>
                 </template>
               </tr></tbody></table></div>
+          <Paginasi v-model="hal.izin" :jumlah="(m.jenis_izin || []).length"/>
         </template>
         <template v-else>
           <h2>{{ (KELOMPOK.find(k => k[1]===f.kelompok)||[])[2] }}</h2>
           <div class="baris" v-if="bisaPilihan(f.kelompok)"><label class="isian" style="flex:2 1 200px">Pilihan baru<input v-model="f.baru" @keyup.enter="tambahPilihan"></label>
             <label class="isian">Lingkungan<select v-model="f.ling"><option>semua</option><option>putra</option><option>putri</option></select></label><button @click="tambahPilihan">Tambah</button></div>
           <div class="tabel"><table><thead><tr><th>Urutan</th><th>Pilihan</th><th>Lingkungan</th><th>Status</th><th></th></tr></thead>
-            <tbody><tr v-for="p in isiPilihan" :key="p.id" :style="{color: p.aktif ? '' : '#6B756F'}">
+            <tbody><tr v-for="p in potong(isiPilihan, hal.pilihan)" :key="p.id" :style="{color: p.aktif ? '' : '#6B756F'}">
               <template v-if="sedangSunting('pilihan', p.id)">
                 <td><input type="number" v-model.number="ed.data.urutan" style="width:70px"></td>
                 <td><input v-model="ed.data.nama" maxlength="120" style="min-width:160px" @keyup.enter="simpanSunting" @keyup.esc="batalSunting"></td>
@@ -1042,6 +1083,7 @@ const DataMaster = {
                 <td><button v-if="bisaPilihan(p.kelompok)" class="kedua kecil" @click="sunting('pilihan', p)">Ubah</button></td>
               </template></tr></tbody></table>
             <p v-if="!isiPilihan.length" class="redup" style="padding:14px">Belum ada pilihan.</p></div>
+          <Paginasi v-model="hal.pilihan" :jumlah="isiPilihan.length"/>
           <p class="redup">Klik <strong>Ubah</strong> untuk mengganti nama, urutan, atau lingkungan. Mengganti nama juga mengubah tampilan di data lama yang memakai pilihan ini. Pilihan yang sudah dipakai tidak dihapus — cukup dinonaktifkan.</p>
         </template>
       </div>
@@ -1068,7 +1110,8 @@ const DataMaster = {
 
   <template v-if="tab==='atur'">
     <div class="tabel"><table><thead><tr><th>Pengaturan</th><th>Nilai</th><th>Keterangan</th></tr></thead>
-      <tbody><tr v-for="p in m.pengaturan" :key="p.kunci"><td><code>{{ p.kunci }}</code></td><td><input v-model="p.nilai" style="width:120px" @change="simpanMaster('pengaturan', {kunci: p.kunci, nilai: p.nilai})"></td><td class="redup">{{ p.keterangan }}</td></tr></tbody></table></div>
+      <tbody><tr v-for="p in potong(m.pengaturan, hal.atur)" :key="p.kunci"><td><code>{{ p.kunci }}</code></td><td><input v-model="p.nilai" style="width:120px" @change="simpanMaster('pengaturan', {kunci: p.kunci, nilai: p.nilai})"></td><td class="redup">{{ p.keterangan }}</td></tr></tbody></table></div>
+    <Paginasi v-model="hal.atur" :jumlah="(m.pengaturan || []).length"/>
     <p class="redup">Tambahkan <code>login.password_aktif</code> = 0 lewat database bila login password ingin dimatikan setelah semua memakai Google.</p>
   </template>`,
 };
