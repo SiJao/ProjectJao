@@ -19,6 +19,10 @@ const hariIni = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 1
 // Tanpa role: label akun = Moderator · nama preset terakhir · akses manual · belum ada akses.
 const labelAkun = (me) => !me ? "" : me.role === "moderator" ? "Moderator" : me.preset || (me.akses && me.akses.length ? "Akses manual" : "Belum ada akses");
 const namaKelas = (k) => k ? `${k.tingkat} ${k.rombel} ${k.jenjang || ""}${k.label ? " " + k.label : ""}`.trim() : "";
+// Keadaan akun dari server: password sementara tidak disimpan; akun yang belum aktif bisa dibuatkan password sementara baru.
+const LABEL_KEADAAN = { belum_login: "Belum pernah login", belum_ganti: "Belum ganti password", aktif: "Aktif", nonaktif: "Nonaktif" };
+const KELAS_KEADAAN = { belum_login: "kuning", belum_ganti: "kuning", aktif: "hijau", nonaktif: "merah" };
+const belumAktif = (x) => x.keadaan === "belum_login" || x.keadaan === "belum_ganti";
 // Hapus permanen (hanya Moderator, K-114). Item yang sudah dipakai ditolak server dengan rincian pemakaiannya → cukup dinonaktifkan.
 async function hapusData(tabel, id, nama, catatan = "") {
   if (!confirm(`Hapus ${nama} secara permanen?${catatan ? "\n\n" + catatan : ""}\n\nTindakan ini tidak bisa dibatalkan.`)) return false;
@@ -1173,7 +1177,12 @@ const Pengguna = {
     const samaPreset = (u) => { const p = f.preset.find((x) => x.id === u.preset_id); return p && p.akses.length === u.akses.length && p.akses.every((k) => u.akses.includes(k)); };
     const labelUser = (u) => u.role === "moderator" ? "Moderator" : u.preset ? u.preset + (samaPreset(u) ? "" : " (diubah)") : u.akses.length ? `Akses manual (${u.akses.length})` : "Belum ada akses";
     const kelasLabel = (u) => u.role === "moderator" ? "hijau" : !u.akses.length ? "kuning" : "";
-    const tampil = computed(() => { const q = f.q.trim().toLowerCase(); return q ? f.users.filter((u) => (u.nama + " " + u.email + " " + (u.nis || "") + " " + (u.nip || "")).toLowerCase().includes(q)) : f.users; });
+    // dipisah: belum aktif (belum login / belum ganti password) · sudah aktif · nonaktif
+    const KELOMPOK_AKUN = [["belum", "Belum aktif", belumAktif], ["aktif", "Sudah aktif", (x) => x.keadaan === "aktif"], ["nonaktif", "Nonaktif", (x) => x.keadaan === "nonaktif"], ["semua", "Semua", () => true]];
+    const jumlahKelompok = computed(() => Object.fromEntries(KELOMPOK_AKUN.map((k) => [k[0], f.users.filter(k[2]).length])));
+    if (!f.kelompok) f.kelompok = "semua";
+    const tampil = computed(() => { const q = f.q.trim().toLowerCase(); const cocok = KELOMPOK_AKUN.find((k) => k[0] === f.kelompok)[2];
+      return f.users.filter((u) => cocok(u) && (!q || (u.nama + " " + u.email + " " + (u.nis || "") + " " + (u.nip || "")).toLowerCase().includes(q))); });
     // daftar akses: akses fungsi & lihat, lalu izin mengedit daftar pilihan
     const aksesUtama = computed(() => f.akses.filter((a) => !a.kode.startsWith("pilihan.")));
     const aksesPilihan = computed(() => f.akses.filter((a) => a.kode.startsWith("pilihan.")));
@@ -1190,7 +1199,7 @@ const Pengguna = {
     const dipakai = (p) => f.users.filter((u) => u.preset_id === p.id && u.status === "aktif").length;
 
     onMounted(async () => { await muatMaster(); try { await muat(); } catch (e) { f.galat = e.message; } });
-    return { meId: negara.me.id, hapusAkun, tab, f, m, buatPengurus, buatGuru, buatMod, ubah, akses, reset, terapkan, jadikanMod, labelUser, kelasLabel, tampil, aksesUtama, aksesPilihan, namaAkses,
+    return { meId: negara.me.id, hapusAkun, KELOMPOK_AKUN, jumlahKelompok, LABEL_KEADAAN, KELAS_KEADAAN, belumAktif, tab, f, m, buatPengurus, buatGuru, buatMod, ubah, akses, reset, terapkan, jadikanMod, labelUser, kelasLabel, tampil, aksesUtama, aksesPilihan, namaAkses,
       ed, sunting, batal, simpanPreset, hapusPreset, dipakai, samaPreset, negara };
   },
   template: `<div><span class="jejak">Fungsi › Akses</span><h1>Pengguna & Manajemen Akses</h1></div>
@@ -1211,13 +1220,16 @@ const Pengguna = {
   </div>
   <div class="dua-kolom">
     <div style="flex:1.3 1 420px;display:flex;flex-direction:column;gap:10px">
+      <div class="tab"><button v-for="k in KELOMPOK_AKUN" :key="k[0]" :class="{aktif: f.kelompok===k[0]}" @click="f.kelompok=k[0]">{{ k[1] }} ({{ jumlahKelompok[k[0]] }})</button></div>
+      <p v-if="f.kelompok==='belum'" class="redup" style="margin:0">Akun yang belum pernah login atau belum mengganti password sementara. Password tidak disimpan; bila lupa dicatat, klik <strong>Password baru</strong> (password lama langsung tidak berlaku). Akun guru/Moderator masuk dengan Google.</p>
       <label class="isian">Cari akun<input v-model="f.q" placeholder="Nama, email, NIS, atau NIP"></label>
       <div class="tabel"><table><thead><tr><th>Nama</th><th>Akses</th><th>Status</th><th></th></tr></thead>
       <tbody><tr v-for="u in tampil" :key="u.id" :style="{background: f.sel && f.sel.id===u.id ? '#EEF5F1' : ''}">
         <td><strong>{{ u.nama }}</strong><div class="redup">{{ u.email }}</div></td>
         <td><span class="lencana" :class="kelasLabel(u)">{{ labelUser(u) }}</span></td>
-        <td><span class="lencana" :class="{hijau: u.status==='aktif', merah: u.status!=='aktif'}">{{ u.status }}</span></td>
-        <td><button class="kedua kecil" @click="f.sel = u">Kelola</button></td></tr></tbody></table></div></div>
+        <td><span class="lencana" :class="KELAS_KEADAAN[u.keadaan]">{{ LABEL_KEADAAN[u.keadaan] || u.status }}</span></td>
+        <td style="white-space:nowrap"><button v-if="belumAktif(u) && (u.punya_password || u.santri_id)" class="kecil" @click="reset(u)">Password baru</button> <button class="kedua kecil" @click="f.sel = u">Kelola</button></td></tr></tbody></table>
+        <p v-if="!tampil.length" class="redup" style="padding:14px">Tidak ada akun di kelompok ini.</p></div></div>
     <div v-if="f.sel" class="kartu" style="display:flex;flex-direction:column;gap:12px">
       <h2>{{ f.sel.nama }}</h2><span class="redup">{{ f.sel.email }} · lingkungan {{ f.sel.lingkungan }}{{ f.sel.santri_id ? ' · akun santri' : f.sel.guru_id ? ' · akun guru' : '' }}</span>
       <div v-if="f.sel.role === 'moderator'" class="pesan info">Moderator memegang semua akses.

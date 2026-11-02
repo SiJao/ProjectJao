@@ -316,10 +316,15 @@ export default function (H) {
     ? H.stmtTerapkanPreset(db, "(SELECT id FROM users WHERE santri_id = ?)", [s.id], presetSql, presetArgs)
     : [db.prepare("UPDATE users SET preset_id = NULL WHERE santri_id = ?").bind(s.id)];
   // Santri + tingkat kelas + akun + jabatan aktif (untuk pemeriksaan calon pengurus).
+  // Satu santri maksimal 2 jabatan aktif (K-116): jumlah_jabatan, jabatan_ids & jabatan_aktif merangkum semuanya.
+  const MAKS_JABATAN = 2;
   const SQL_CALON = `SELECT s.id, s.nis, s.nama, s.status, s.lingkungan, s.foto_url, k.tingkat,
-      u.id user_id, u.status user_status, u.password_hash, pg.id pengurus_id, jb.nama jabatan_aktif
-    FROM santri s LEFT JOIN kelas k ON k.id = s.kelas_id LEFT JOIN users u ON u.santri_id = s.id
-    LEFT JOIN pengurus pg ON pg.santri_id = s.id AND pg.selesai IS NULL LEFT JOIN jabatan jb ON jb.id = pg.jabatan_id`;
+      u.id user_id, u.status user_status, u.password_hash,
+      (SELECT COUNT(*) FROM pengurus pg WHERE pg.santri_id = s.id AND pg.selesai IS NULL) jumlah_jabatan,
+      (SELECT GROUP_CONCAT(pg.jabatan_id) FROM pengurus pg WHERE pg.santri_id = s.id AND pg.selesai IS NULL) jabatan_ids,
+      (SELECT GROUP_CONCAT(jb.nama, ' + ') FROM pengurus pg JOIN jabatan jb ON jb.id = pg.jabatan_id WHERE pg.santri_id = s.id AND pg.selesai IS NULL) jabatan_aktif
+    FROM santri s LEFT JOIN kelas k ON k.id = s.kelas_id LEFT JOIN users u ON u.santri_id = s.id`;
+  const pegang = (s, jabatanId) => String(s.jabatan_ids || "").split(",").map(Number).includes(jabatanId);
   const jabatanUntuk = (daftar, nama, ling) => {
     const c = daftar.filter((j) => j.aktif && j.nama.toLowerCase() === String(nama || "").trim().toLowerCase() && (j.lingkungan === "semua" || j.lingkungan === ling));
     return c.find((j) => j.lingkungan === ling) || c[0] || null;
@@ -332,6 +337,8 @@ export default function (H) {
     const [pR, jR] = await db.batch([
       db.prepare(`SELECT p.id, p.santri_id, p.lingkungan, p.jabatan_id, p.mulai, jb.nama jabatan, s.nis, s.nama, s.foto_url, k.tingkat,
           u.id user_id, u.status user_status, (SELECT nama FROM preset WHERE id = u.preset_id) preset,
+          CASE WHEN u.id IS NULL THEN NULL WHEN u.status <> 'aktif' THEN 'nonaktif' WHEN u.login_terakhir IS NULL THEN 'belum_login'
+            WHEN u.wajib_ganti_password = 1 AND u.password_hash IS NOT NULL THEN 'belum_ganti' ELSE 'aktif' END keadaan,
           (SELECT COUNT(*) FROM user_akses ua WHERE ua.user_id = u.id) jumlah_akses
         FROM pengurus p JOIN santri s ON s.id = p.santri_id JOIN jabatan jb ON jb.id = p.jabatan_id
         LEFT JOIN kelas k ON k.id = s.kelas_id LEFT JOIN users u ON u.santri_id = s.id
@@ -407,21 +414,28 @@ export default function (H) {
       db.prepare("SELECT * FROM jabatan"),
     ]);
     const santri = Object.fromEntries(cR.results.map((s) => [s.nis, s]));
-    const hitung = {};
-    rows.forEach((r) => { const n = teks(r.nis); if (n) hitung[n] = (hitung[n] || 0) + 1; });
+    // NIS boleh muncul dua kali (dua jabatan berbeda); jumlah baris + jabatan yang sudah dipegang tidak boleh > MAKS_JABATAN.
+    const hitung = {}, pasangan = {};
+    rows.forEach((r) => {
+      const n = teks(r.nis); if (!n) return;
+      hitung[n] = (hitung[n] || 0) + 1;
+      const k = n + "|" + teks(r.jabatan).toLowerCase(); pasangan[k] = (pasangan[k] || 0) + 1;
+    });
     const siap = [], ditolak = [];
     rows.forEach((r, i) => {
       const baris = +r.baris || i + 1, nis = teks(r.nis), jn = teks(r.jabatan);
       const tolak = (alasan, s) => ditolak.push({ baris, nis, nama: s?.nama || "", jabatan: jn, alasan });
       if (!nis) return tolak("NIS kosong");
-      if (hitung[nis] > 1) return tolak("NIS dobel");
+      if (pasangan[nis + "|" + jn.toLowerCase()] > 1) return tolak("NIS dan jabatan yang sama dobel");
       const s = santri[nis];
       if (!s || !u.ling.includes(s.lingkungan)) return tolak("NIS tidak ditemukan di lingkungan Anda");
       if (s.status !== "aktif") return tolak(`Santri tidak aktif (${s.status})`, s);
       if (s.tingkat !== 5) return tolak("Bukan santri Kelas 5", s);
-      if (s.pengurus_id) return tolak(`Sudah memegang jabatan ${s.jabatan_aktif}`, s);
       const j = jabatanUntuk(jR.results, jn, s.lingkungan);
       if (!j) return tolak(jn ? `Jabatan "${jn}" tidak ada / nonaktif` : "Jabatan kosong", s);
+      if (pegang(s, j.id)) return tolak(`Sudah memegang jabatan ${j.nama}`, s);
+      if (s.jumlah_jabatan + hitung[nis] > MAKS_JABATAN)
+        return tolak(`Melebihi ${MAKS_JABATAN} jabatan${s.jumlah_jabatan ? ` (sudah memegang ${s.jabatan_aktif})` : ""}`, s);
       siap.push({ baris, santri_id: s.id, nis: s.nis, nama: s.nama, foto_url: s.foto_url, lingkungan: s.lingkungan,
         jabatan_id: j.id, jabatan: j.nama, akun: !s.user_id ? "baru" : s.user_status === "aktif" && s.password_hash ? "tetap" : "aktifkan" });
     });
@@ -439,14 +453,18 @@ export default function (H) {
     const t = hariIni();
     // Akun: password sementara ACAK per akun baru / diaktifkan lagi (hash di Worker), ditulis berbasis himpunan.
     // Akun yang masih aktif (akun: "tetap") memakai password lamanya. Password sementara dikembalikan sekali ke pengisi.
-    const data = [], sandi = [];
+    // Santri dengan dua jabatan muncul dua kali di p.siap: akun dibuat/diaktifkan sekali (satu password), jabatan dua baris.
+    const data = [], sandi = [], jabatanBaru = [];
     for (const s of p.siap) {
+      jabatanBaru.push({ id: s.santri_id, j: s.jabatan_id, l: s.lingkungan });
+      if (data.some((d) => d.id === s.santri_id)) continue;
       const pw = s.akun === "tetap" ? null : H.passwordSementara();
       if (pw) sandi.push({ nis: s.nis, nama: s.nama, password: pw });
-      data.push({ id: s.santri_id, j: s.jabatan_id, l: s.lingkungan, e: EMAIL(s.nis), n: s.nama, h: pw ? await H.hashPassword(pw) : null });
+      data.push({ id: s.santri_id, l: s.lingkungan, e: EMAIL(s.nis), n: s.nama, h: pw ? await H.hashPassword(pw) : null });
     }
-    const J = JSON.stringify(data);
-    const DATA = `SELECT json_extract(value, '$.id') id, json_extract(value, '$.j') j, json_extract(value, '$.l') l, json_extract(value, '$.e') e, json_extract(value, '$.n') n, json_extract(value, '$.h') h FROM json_each(?)`;
+    const J = JSON.stringify(data), JJ = JSON.stringify(jabatanBaru);
+    const DATA = `SELECT json_extract(value, '$.id') id, json_extract(value, '$.l') l, json_extract(value, '$.e') e, json_extract(value, '$.n') n, json_extract(value, '$.h') h FROM json_each(?)`;
+    const DATA_JAB = `SELECT json_extract(value, '$.id') id, json_extract(value, '$.j') j, json_extract(value, '$.l') l FROM json_each(?)`;
     const st = [
       // akun lama santri diaktifkan lagi (akun yang tadinya nonaktif mulai tanpa akses; Moderator menerapkan preset)
       db.prepare(`DELETE FROM sesi_login WHERE user_id IN (SELECT x.id FROM users x JOIN (${DATA}) j ON x.santri_id = j.id WHERE j.h IS NOT NULL)`).bind(J),
@@ -458,7 +476,7 @@ export default function (H) {
         SELECT j.e, j.h, j.n, j.id, j.l, 'aktif', 1 FROM (${DATA}) j
         WHERE NOT EXISTS (SELECT 1 FROM users x WHERE x.santri_id = j.id)`).bind(J),
       db.prepare(`INSERT INTO pengurus (masa_khidmat_id, santri_id, lingkungan, jabatan_id, user_id, mulai, oleh)
-        SELECT ?, j.id, j.l, j.j, (SELECT x.id FROM users x WHERE x.santri_id = j.id), ?, ? FROM (${DATA}) j`).bind(p.masa.id, t, u.id, J),
+        SELECT ?, j.id, j.l, j.j, (SELECT x.id FROM users x WHERE x.santri_id = j.id), ?, ? FROM (${DATA_JAB}) j`).bind(p.masa.id, t, u.id, JJ),
     ];
     for (const [l, n] of perLing(p.siap)) {
       const di = p.siap.filter((s) => s.lingkungan === l);
@@ -507,7 +525,11 @@ export default function (H) {
     if (!lama || lama.selesai) gagal(400, "Jabatan aktif tidak ditemukan.");
     cekLing(u, lama.lingkungan);
     const t = hariIni();
-    const st = [
+    // Akun santri lama dinonaktifkan hanya bila ia tidak memegang jabatan lain (K-116: maks. 2 jabatan).
+    const lain = await db.prepare(`SELECT GROUP_CONCAT(jb.nama, ' + ') nama FROM pengurus p JOIN jabatan jb ON jb.id = p.jabatan_id
+      WHERE p.santri_id = ? AND p.selesai IS NULL AND p.id <> ?`).bind(lama.santri_id, lama.id).first();
+    const masihMenjabat = !!(lain && lain.nama);
+    const st = masihMenjabat ? [] : [
       db.prepare("DELETE FROM sesi_login WHERE user_id IN (SELECT id FROM users WHERE santri_id = ?)").bind(lama.santri_id),
       db.prepare("UPDATE users SET status = 'nonaktif' WHERE santri_id = ?").bind(lama.santri_id),
     ];
@@ -519,14 +541,15 @@ export default function (H) {
       if (s.id === lama.santri_id) gagal(400, "Pengganti tidak boleh orang yang sama.");
       if (s.lingkungan !== lama.lingkungan) gagal(400, "Pengganti harus dari lingkungan yang sama.");
       if (s.status !== "aktif" || ![5, 6].includes(s.tingkat)) gagal(400, "Pengganti harus santri aktif Kelas 5 atau 6.");
-      if (s.pengurus_id) gagal(400, `${s.nama} sudah memegang jabatan ${s.jabatan_aktif}.`);
+      if (pegang(s, lama.jabatan_id)) gagal(400, `${s.nama} sudah memegang jabatan ${lama.jabatan}.`);
+      if (s.jumlah_jabatan >= MAKS_JABATAN) gagal(400, `${s.nama} sudah memegang ${MAKS_JABATAN} jabatan (${s.jabatan_aktif}).`);
       const a = await stmtAkun(db, s, s.user_id ? { id: s.user_id, password_hash: s.password_hash, status: s.user_status } : null, preset ? "?" : null, preset ? [preset.id] : []);
       ganti = { nis: s.nis, nama: s.nama, status: a.status, password: a.password };
       st.push(...a.st, db.prepare(`INSERT INTO pengurus (masa_khidmat_id, santri_id, lingkungan, jabatan_id, user_id, mulai, oleh)
         VALUES (?, ?, ?, ?, (SELECT id FROM users WHERE santri_id = ?), ?, ?)`).bind(lama.masa_khidmat_id, s.id, s.lingkungan, lama.jabatan_id, s.id, t, u.id));
     }
     st.push(H.stmtCatat(db, u, "jabatan", "paw", "pengurus", lama.id, `PAW ${lama.jabatan}: ${lama.nis} ${lama.nama} diganti${ganti ? " " + ganti.nis + " " + ganti.nama : " (belum ada pengganti)"} — ${alasan}`, lama.lingkungan));
-    st.push(H.stmtCatat(db, u, "akun", "paw", "users", null, `Akun ${lama.nis} nonaktif${ganti ? `; akun ${ganti.nis} ${ganti.status}${preset ? " preset " + preset.nama : " (menunggu akses)"}` : ""}`, lama.lingkungan));
+    st.push(H.stmtCatat(db, u, "akun", "paw", "users", null, `Akun ${lama.nis} ${masihMenjabat ? "tetap aktif (masih " + lain.nama + ")" : "nonaktif"}${ganti ? `; akun ${ganti.nis} ${ganti.status}${preset ? " preset " + preset.nama : " (menunggu akses)"}` : ""}`, lama.lingkungan));
     // Klaim jabatan dulu: dua PAW bersamaan untuk jabatan yang sama → hanya satu yang diproses (tidak ada dua pengganti).
     const klaim = await db.prepare("UPDATE pengurus SET selesai = ?, sebab_selesai = 'paw', alasan_paw = ? WHERE id = ? AND selesai IS NULL").bind(t, alasan, lama.id).run();
     if (!klaim.meta.changes) gagal(409, "Jabatan ini baru saja diproses PAW.");
@@ -539,8 +562,9 @@ export default function (H) {
   on("GET", "/api/updatedata/akun-tertahan", async ({ db, u }) => {
     if (!boleh(u, "isi_pengurus")) gagal(403, "Anda tidak punya akses.");
     const l = H.lingIn(u, "s.lingkungan");
-    const r = await db.prepare(`SELECT u.id, u.email, s.id santri_id, s.nis, s.nama, s.foto_url, s.lingkungan, jb.nama jabatan
-      FROM users u JOIN santri s ON s.id = u.santri_id LEFT JOIN pengurus p ON p.santri_id = s.id AND p.selesai IS NULL LEFT JOIN jabatan jb ON jb.id = p.jabatan_id
+    const r = await db.prepare(`SELECT u.id, u.email, s.id santri_id, s.nis, s.nama, s.foto_url, s.lingkungan,
+        (SELECT GROUP_CONCAT(jb.nama, ' + ') FROM pengurus p JOIN jabatan jb ON jb.id = p.jabatan_id WHERE p.santri_id = s.id AND p.selesai IS NULL) jabatan
+      FROM users u JOIN santri s ON s.id = u.santri_id
       WHERE u.status = 'tertahan' AND ${l.sql} ORDER BY s.lingkungan, s.nama`).bind(...l.args).all();
     return json(r.results);
   });

@@ -555,6 +555,7 @@ flowchart TD
 
 - **Login:** email + password. Pengurus santri memakai `(NIS)@daarululuumlido.com` (kotak surat aktif di Google Workspace pondok).
 - **Password sementara** akun baru **acak** (mis. `k7m2p-x9qbr`), **ditampilkan sekali** kepada yang membuat/mengaktifkan akun (Moderator, Sekretaris lewat Isi Bagian Pengurus, pemegang PAW) untuk diserahkan langsung ke pemiliknya, dan **wajib diganti saat login pertama**. Pola lama NIS + tanggal lahir dihapus karena mudah ditebak (audit keamanan).
+- Password sementara **tidak disimpan**. Pengguna & Akses memisahkan akun **Belum aktif** (belum pernah login / belum mengganti password sementara), **Sudah aktif**, dan **Nonaktif**. Bila password sementara lupa dicatat, klik **Password baru** pada akun yang belum aktif: Moderator untuk semua akun, Sekretaris untuk akun pengurus di lingkungannya (K-117).
 - Akun yang **masih aktif** dan sudah punya password tidak direset saat diangkat lagi (Isi Pengurus, Serah Terima, PAW); hanya akun baru / yang diaktifkan lagi yang mendapat password sementara.
 - Kotak surat Google `NIS@` diatur di Google Workspace (di luar HISADA); password awalnya juga sebaiknya acak, bukan pola NIS + tanggal lahir.
 - Kotak surat `NIS@` dibuat (santri baru) dan ditangguhkan (alumni/keluar) oleh **Moderator**.
@@ -657,7 +658,7 @@ flowchart TD
 1. **Moderator** menekan **Serah Terima Jabatan** dan menunjuk **1–2 Sekretaris baru**. Satu tombol untuk putra **dan** putri sekaligus, satu masa khidmat untuk kedua lingkungan (K-97).
 2. **Peringatan** selalu muncul (jumlah pengurus lama, waktu Serah Terima terakhir), lalu **password Moderator yang sedang login**.
 3. Dalam satu proses: masa khidmat lama & semua jabatan **diarsipkan** (bukan dihapus), akun pengurus lama **dinonaktifkan** (santrinya tetap aktif), masa khidmat baru dibuat, Sekretaris baru langsung aktif.
-4. **Sekretaris baru** mengisi bagian/jabatan pengurus lain (dan boleh **menambah atau menonaktifkan jabatan** di lingkungannya; menghapus jabatan tetap Moderator) — lewat **upload file** (NIS + jabatan) **atau pilih banyak sekaligus**. Hanya santri aktif Kelas 5; baris yang tidak valid **ditolak** dan proses tidak lanjut sampai diperbaiki.
+4. **Sekretaris baru** mengisi bagian/jabatan pengurus lain — satu santri boleh memegang **maksimal 2 jabatan** sekaligus (cukup tulis NIS-nya dua kali dengan jabatan berbeda; K-116) (dan boleh **menambah atau menonaktifkan jabatan** di lingkungannya; menghapus jabatan tetap Moderator) — lewat **upload file** (NIS + jabatan) **atau pilih banyak sekaligus**. Hanya santri aktif Kelas 5; baris yang tidak valid **ditolak** dan proses tidak lanjut sampai diperbaiki.
 5. Akun pengurus dibuat otomatis (`NIS@daarululuumlido.com`, password sementara acak yang ditampilkan sekali ke Sekretaris untuk diserahkan).
 6. **Moderator** menerapkan preset & Manajemen Akses tiap pengurus.
 
@@ -684,8 +685,8 @@ flowchart TD
 
 Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mis. mundur, skorsing).
 
-1. Nonaktifkan jabatan satu orang (**alasan wajib**).
-2. Angkat satu santri aktif Kelas 5/6 ke jabatan tersebut.
+1. Nonaktifkan jabatan satu orang (**alasan wajib**). Bila ia masih memegang jabatan lain, **akunnya tetap aktif**.
+2. Angkat satu santri aktif Kelas 5/6 ke jabatan tersebut (boleh santri yang baru memegang 1 jabatan).
 3. Terapkan preset / centang akses.
 4. Peringatan + password, tercatat di Riwayat Perubahan.
 

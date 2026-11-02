@@ -324,8 +324,9 @@
         f.santri = (await api("/santri?limit=2000" + (f.kelas_id ? "&kelas_id=" + f.kelas_id : ""))).filter((s) => id5.has(s.kelas_id)); f.centang = {};
       });
       watch(() => f.kelas_id, muatSantri);
-      const pemegang = computed(() => new Set(f.pengurus.map((p) => p.santri_id)));
-      const tampil = computed(() => f.santri.filter((s) => !pemegang.value.has(s.id) && cocokTeks(s, f.q)));
+      // satu santri maks. 2 jabatan (K-116): yang sudah 2 disembunyikan, yang baru 1 tetap tampil dengan jabatannya
+      const jabatanDari = computed(() => { const m = {}; for (const p of f.pengurus) (m[p.santri_id] ||= []).push(p.jabatan); return m; });
+      const tampil = computed(() => f.santri.filter((s) => (jabatanDari.value[s.id] || []).length < 2 && cocokTeks(s, f.q)));
       const terpilih = computed(() => f.santri.filter((s) => f.centang[s.id]));
       const jabatanAktif = computed(() => f.jabatan.filter((j) => j.aktif));
       const pengurusTampil = computed(() => f.pengurus.filter((p) => cocokTeks(p, f.qp) || (f.qp.length > 1 && p.jabatan.toLowerCase().includes(f.qp.toLowerCase()))));
@@ -346,9 +347,16 @@
       const ubahJabatan = (j) => coba(f, async () => { await api("/updatedata/jabatan", { id: j.id, aktif: j.aktif ? 0 : 1 }); await muat(); });
       const hapusJabatan = (j) => coba(f, async () => { if (await hapusData("jabatan", j.id, "jabatan " + j.nama)) await muat(); });
       const templat = () => unduhCsv("templat-pengurus.csv", [["NIS", "JABATAN"], ["990101", "Bagian Keamanan"]]);
-      const lencanaAkun = (p) => p.user_status === "aktif" ? "hijau" : p.user_status === "tertahan" ? "kuning" : "merah";
+      const lencanaAkun = (p) => p.user_status === "tertahan" ? "kuning" : KELAS_KEADAAN[p.keadaan] || "merah";
+      const labelAkun = (p) => p.user_status === "tertahan" ? "tertahan" : LABEL_KEADAAN[p.keadaan] || p.user_status || "belum ada";
+      // akun pengurus yang belum aktif: buat password sementara baru untuk diserahkan ulang (password lama tidak disimpan)
+      const sandiBaru = (p) => coba(f, async () => {
+        if (!confirm(`Buat password sementara baru untuk ${p.nama}? Password lama langsung tidak berlaku.`)) return;
+        const r = await api(`/users/${p.user_id}/reset-password`, {});
+        f.sandi = [{ nama: p.nama, nis: p.nis, password: r.password_sementara }]; await muat();
+      });
       onMounted(async () => { await muatMaster(); await muat(); muatSantri(); });
-      return { f, moderator, bisaJabatan, lingJabatan, kelas5, tampil, terpilih, jabatanAktif, pengurusTampil, dariPilihan, pilihFile, simpan, tambahJabatan, ubahJabatan, hapusJabatan, templat, lencanaAkun, namaKelas };
+      return { f, moderator, bisaJabatan, lingJabatan, kelas5, tampil, jabatanDari, terpilih, jabatanAktif, pengurusTampil, dariPilihan, pilihFile, simpan, tambahJabatan, ubahJabatan, hapusJabatan, templat, lencanaAkun, labelAkun, sandiBaru, belumAktif, namaKelas };
     },
     template: `<div v-if="!info.masa_khidmat" class="pesan info">Belum ada masa khidmat aktif. Moderator membuatnya di tab Masa Khidmat & Serah Terima.</div>
     <div class="kartu" style="display:flex;flex-direction:column;gap:12px">
@@ -365,7 +373,7 @@
         </div>
         <div v-if="!f.p" class="tabel" style="max-height:360px;overflow:auto"><table><thead><tr><th></th><th>Santri (Kelas 5, belum menjabat)</th><th>Kelas</th></tr></thead>
           <tbody><tr v-for="s in tampil" :key="s.id"><td><input type="checkbox" v-model="f.centang[s.id]" :aria-label="'Pilih ' + s.nama"></td>
-            <td><div class="santri-sel"><FotoSantri :s="s"/><span><strong>{{ s.nama }}</strong><div class="redup">{{ s.nis }} · {{ s.lingkungan }}</div></span></div></td><td>{{ s.kelas }}</td></tr></tbody></table>
+            <td><div class="santri-sel"><FotoSantri :s="s"/><span><strong>{{ s.nama }}</strong><div class="redup">{{ s.nis }} · {{ s.lingkungan }}<template v-if="jabatanDari[s.id]"> · sudah: {{ jabatanDari[s.id].join(', ') }}</template></div></span></div></td><td>{{ s.kelas }}</td></tr></tbody></table>
           <p v-if="!tampil.length" class="redup" style="padding:14px">Tidak ada santri Kelas 5 yang belum menjabat.</p></div>
       </template>
     </div>
@@ -387,7 +395,7 @@
         <tbody v-baris><tr v-for="p in pengurusTampil" :key="p.id">
           <td><div class="santri-sel"><FotoSantri :s="p"/><span><strong>{{ p.nama }}</strong><div class="redup">{{ p.nis }} · Kelas {{ p.tingkat }}</div></span></div></td>
           <td>{{ p.jabatan }}</td><td>{{ p.lingkungan }}</td>
-          <td><span class="lencana" :class="lencanaAkun(p)">{{ p.user_status || 'belum ada' }}</span></td>
+          <td><span class="lencana" :class="lencanaAkun(p)">{{ labelAkun(p) }}</span><div v-if="p.user_id && belumAktif(p)"><button class="kecil" style="margin-top:4px" @click="sandiBaru(p)">Password baru</button></div></td>
           <td><span class="lencana" :class="{kuning: !p.jumlah_akses}">{{ p.preset || (p.jumlah_akses ? 'Akses manual' : 'Belum ada akses') }}</span></td></tr></tbody></table>
         <p v-if="!pengurusTampil.length" class="redup" style="padding:14px">Belum ada pengurus.</p></div>
     </div>

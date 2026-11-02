@@ -1115,7 +1115,7 @@ on("GET", "/api/users", async ({ db, u }) => {
   wajibModerator(u);
   const r = await db.prepare(
     `SELECT u.id, u.email, u.nama, u.role, u.lingkungan, u.status, u.login_terakhir, u.santri_id, u.guru_id, u.preset_id, pr.nama preset,
-            (u.password_hash IS NOT NULL) punya_password, s.nis, g.nip,
+            (u.password_hash IS NOT NULL) punya_password, s.nis, g.nip, ${SQL_KEADAAN} keadaan,
             (SELECT GROUP_CONCAT(akses_kode) FROM user_akses ua WHERE ua.user_id = u.id) akses
      FROM users u LEFT JOIN santri s ON s.id = u.santri_id LEFT JOIN guru g ON g.id = u.guru_id LEFT JOIN preset pr ON pr.id = u.preset_id
      ORDER BY u.status <> 'aktif', u.role IS NOT NULL, akses IS NOT NULL, u.nama`).all();
@@ -1265,15 +1265,28 @@ on("POST", "/api/preset/:id/hapus", async ({ db, u, p }) => {
   return json({ ok: true });
 });
 
+// Keadaan akun: belum_login (belum pernah masuk) · belum_ganti (masuk dengan password sementara, belum menggantinya) · aktif · nonaktif.
+// Akun yang belum aktif dipisah di daftar Pengguna; passwordnya tidak disimpan — bila hilang, buat password sementara baru.
+const SQL_KEADAAN = `CASE WHEN u.status <> 'aktif' THEN 'nonaktif' WHEN u.login_terakhir IS NULL THEN 'belum_login'
+  WHEN u.wajib_ganti_password = 1 AND u.password_hash IS NOT NULL THEN 'belum_ganti' ELSE 'aktif' END`;
+
+// Moderator: semua akun. Sekretaris (akses isi_pengurus): hanya akun santri pengurus aktif di lingkungannya yang BELUM aktif
+// (belum login / belum ganti password) — untuk menyerahkan ulang password sementara yang lupa dicatat.
 on("POST", "/api/users/:id/reset-password", async ({ db, u, p }) => {
-  wajibModerator(u);
-  const t = await db.prepare("SELECT * FROM users WHERE id = ?").bind(p.id).first();
+  const t = await db.prepare(`SELECT u.*, ${SQL_KEADAAN} keadaan,
+      EXISTS (SELECT 1 FROM pengurus pg WHERE pg.santri_id = u.santri_id AND pg.selesai IS NULL) pengurus FROM users u WHERE u.id = ?`).bind(+p.id || 0).first();
   if (!t) gagal(404, "Akun tidak ditemukan.");
+  if (u.role !== "moderator") {
+    if (!boleh(u, "isi_pengurus")) gagal(403, "Anda tidak punya akses untuk tindakan ini.");
+    if (!t.santri_id || !t.pengurus || t.role === "moderator") gagal(403, "Hanya untuk akun pengurus.");
+    cekLing(u, t.lingkungan);
+    if (!["belum_login", "belum_ganti"].includes(t.keadaan)) gagal(400, "Akun ini sudah aktif dipakai pemiliknya; minta Moderator bila perlu reset.");
+  }
   const pw = passwordSementara();
   await db.batch([
     db.prepare("UPDATE users SET password_hash = ?, wajib_ganti_password = 1, gagal_login = 0, terkunci_sampai = NULL, status = CASE WHEN status = 'tertahan' THEN 'aktif' ELSE status END WHERE id = ?").bind(await hashPassword(pw), t.id),
     db.prepare("DELETE FROM sesi_login WHERE user_id = ?").bind(t.id),
-    stmtNotif(db, t.id, { jenis: "akun", judul: "Password Anda direset oleh Moderator", isi: "Bila Anda tidak memintanya, segera hubungi Moderator.", tautan: "/akun" }),
+    stmtNotif(db, t.id, { jenis: "akun", judul: "Password Anda direset oleh " + (u.role === "moderator" ? "Moderator" : u.nama), isi: "Bila Anda tidak memintanya, segera hubungi Moderator.", tautan: "/akun" }),
   ]);
   await catat(db, u, "akun", "reset_password", "users", t.id, t.email);
   return json({ ok: true, password_sementara: pw });

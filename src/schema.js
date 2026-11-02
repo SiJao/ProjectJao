@@ -827,5 +827,35 @@ export const MIGRATIONS = [
       `INSERT OR IGNORE INTO user_akses (user_id, akses_kode) SELECT u.id, 'jabatan' FROM users u JOIN preset p ON p.id = u.preset_id
         WHERE p.nama = 'Sekretaris' AND u.status = 'aktif'`
     ]
+  },
+  {
+    id: 11,
+    nama: "pengurus-dua-jabatan",
+    sql: [
+      // Satu santri boleh memegang maksimal 2 jabatan sekaligus (K-116). UNIQUE lama (santri_id, aktif) diganti
+      // (santri_id, jabatan_id, aktif): jabatan yang sama tidak dobel; batas 2 dijaga pemicu. Tabel dibangun ulang (SQLite).
+      `CREATE TABLE pengurus_baru (
+        id INTEGER PRIMARY KEY,
+        masa_khidmat_id INTEGER NOT NULL REFERENCES masa_khidmat(id),
+        santri_id INTEGER NOT NULL REFERENCES santri(id),
+        lingkungan TEXT NOT NULL,
+        jabatan_id INTEGER NOT NULL REFERENCES jabatan(id),
+        user_id INTEGER REFERENCES users(id),
+        mulai TEXT NOT NULL, selesai TEXT,
+        sebab_selesai TEXT CHECK (sebab_selesai IN ('serah_terima','paw','status_santri')),
+        alasan_paw TEXT,
+        oleh INTEGER REFERENCES users(id),
+        aktif INTEGER GENERATED ALWAYS AS (CASE WHEN selesai IS NULL THEN 1 END) STORED,
+        UNIQUE (santri_id, jabatan_id, aktif)
+      )`,
+      `INSERT INTO pengurus_baru (id, masa_khidmat_id, santri_id, lingkungan, jabatan_id, user_id, mulai, selesai, sebab_selesai, alasan_paw, oleh)
+        SELECT id, masa_khidmat_id, santri_id, lingkungan, jabatan_id, user_id, mulai, selesai, sebab_selesai, alasan_paw, oleh FROM pengurus`,
+      `DROP TABLE pengurus`,
+      `ALTER TABLE pengurus_baru RENAME TO pengurus`,
+      `CREATE INDEX pengurus_mk ON pengurus (lingkungan, masa_khidmat_id)`,
+      `CREATE TRIGGER pengurus_maks_dua BEFORE INSERT ON pengurus WHEN NEW.selesai IS NULL
+        AND (SELECT COUNT(*) FROM pengurus WHERE santri_id = NEW.santri_id AND selesai IS NULL) >= 2
+        BEGIN SELECT RAISE(ABORT, 'Santri sudah memegang 2 jabatan'); END`
+    ]
   }
 ];
