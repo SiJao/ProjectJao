@@ -58,7 +58,7 @@ export default function (H) {
       db.prepare(`SELECT x.grup_id, MIN(x.mulai) mulai, MAX(COALESCE(x.selesai, '9999-12-31')) selesai, MAX(x.peran) peran, g.nama, pk.nama kegiatan, pe.nama ekstrakurikuler, gr.nama pembimbing
         FROM anggota_grup x JOIN grup_kegiatan g ON g.id = x.grup_id JOIN pilihan pk ON pk.id = g.kegiatan_id
         LEFT JOIN pilihan pe ON pe.id = g.ekstrakurikuler_id LEFT JOIN guru gr ON gr.id = g.pembimbing_guru_id
-        WHERE x.santri_id = ? AND ${overlap} GROUP BY x.grup_id ORDER BY pk.urutan, g.nama`).bind(s.id, sampai, dari),
+        WHERE x.santri_id = ? AND ${overlap} GROUP BY x.grup_id ORDER BY pk.urutan, pe.urutan, pe.nama`).bind(s.id, sampai, dari),
       db.prepare(`SELECT se.target_id grup_id, COUNT(*) total, SUM(sk.dihitung_hadir) hadir FROM absensi a JOIN absensi_sesi se ON se.id = a.sesi_id
         JOIN status_kehadiran sk ON sk.id = a.status_kehadiran_id
         WHERE a.santri_id = ? AND se.jenis = 'kegiatan' AND se.tanggal BETWEEN ? AND ? GROUP BY se.target_id`).bind(s.id, dari, sampai),

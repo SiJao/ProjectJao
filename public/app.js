@@ -699,10 +699,10 @@ const GatePass = {
 
 // ---------------------------------------------------------------- Data Master
 const KELOMPOK = [
-  ["Absensi", "sesi_absensi", "Sesi absensi"], ["Absensi", "kegiatan", "Jenis kegiatan"],
+  ["Absensi", "sesi_absensi", "Sesi absensi"],
   ["Kesehatan", "tindak_lanjut", "Tindak lanjut"], ["Kesehatan", "diagnosa", "Diagnosa"], ["Kesehatan", "obat", "Obat"],
   ["Kedisiplinan", "kategori_pelanggaran", "Kategori pelanggaran"],
-  ["Pengembangan Diri", "ekstrakurikuler", "Ekstrakurikuler"], ["Pengembangan Diri", "tingkat_lomba", "Tingkat lomba"], ["Pengembangan Diri", "hasil_lomba", "Hasil lomba"],
+  ["Pengembangan Diri", "kegiatan", "Kegiatan"], ["Pengembangan Diri", "ekstrakurikuler", "Ekstrakurikuler"], ["Pengembangan Diri", "tingkat_lomba", "Tingkat lomba"], ["Pengembangan Diri", "hasil_lomba", "Hasil lomba"],
 ];
 
 const DataMaster = {
@@ -710,7 +710,7 @@ const DataMaster = {
   directives: { baris: vBaris },
   setup() {
     const tab = ref("santri");
-    const f = reactive({ galat: "", ok: "", q: "", santri: [], memuat: false, edit: null, kelompok: "sesi_absensi", baru: "", ling: negara.me.role === "moderator" || negara.me.lingkungan === "semua" ? "semua" : negara.me.lingkungan, impor: null, imporHasil: null, sibuk: false });
+    const f = reactive({ galat: "", ok: "", q: "", santri: [], memuat: false, edit: null, kelompok: "sesi_absensi", baru: "", induk: "", ling: negara.me.role === "moderator" || negara.me.lingkungan === "semua" ? "semua" : negara.me.lingkungan, impor: null, imporHasil: null, sibuk: false });
     const m = computed(() => negara.master || {});
     const moderator = computed(() => negara.me && negara.me.role === "moderator");
     const bisaPilihan = (k) => moderator.value || (negara.me.akses || []).includes("pilihan." + k);
@@ -801,7 +801,10 @@ const DataMaster = {
     async function bukaSantri(s) { f.edit = s ? await api("/santri/" + s.id) : { nis: "", nama: "", jenis_kelamin: "L", status: "aktif" }; }
     async function simpanSantri() { f.galat = ""; try { await api("/santri", f.edit); f.ok = "Data santri tersimpan."; f.edit = null; cari(); muatMaster(); } catch (e) { f.galat = e.message; } }
     const isiPilihan = computed(() => (m.value.pilihan || []).filter((p) => p.kelompok === f.kelompok));
-    async function tambahPilihan() { f.galat = ""; try { await api("/pilihan", { kelompok: f.kelompok, nama: f.baru, lingkungan: f.ling }); f.baru = ""; await muatMaster(); } catch (e) { f.galat = e.message; } }
+    // Ekskul menunjuk kegiatan kategorinya (mis. Futsal → Olahraga); kegiatan tanpa ekskul dinilai langsung.
+    const kegiatanInduk = computed(() => (m.value.pilihan || []).filter((p) => p.kelompok === "kegiatan"));
+    const namaInduk = (id) => (kegiatanInduk.value.find((p) => p.id == id) || {}).nama || "—";
+    async function tambahPilihan() { f.galat = ""; try { await api("/pilihan", { kelompok: f.kelompok, nama: f.baru, lingkungan: f.ling, ...(f.kelompok === "ekstrakurikuler" ? { induk_id: f.induk } : {}) }); f.baru = ""; await muatMaster(); } catch (e) { f.galat = e.message; } }
     async function ubahPilihan(p, data) { f.galat = ""; try { await api("/pilihan", { id: p.id, kelompok: p.kelompok, ...data }); await muatMaster(); return true; } catch (e) { f.galat = e.message; return false; } }
     // Sunting baris di tempat: ed = salinan baris yang sedang diedit (pilihan / status kehadiran / jenis izin).
     const ed = reactive({ jenis: "", id: null, data: {} });
@@ -810,7 +813,7 @@ const DataMaster = {
     const sedangSunting = (jenis, id) => ed.jenis === jenis && ed.id === id;
     async function simpanSunting() {
       const d = ed.data, baru = ed.id === "baru";
-      if (ed.jenis === "pilihan") { if (await ubahPilihan(d, { nama: d.nama, urutan: d.urutan, lingkungan: d.lingkungan })) batalSunting(); return; }
+      if (ed.jenis === "pilihan") { if (await ubahPilihan(d, { nama: d.nama, urutan: d.urutan, lingkungan: d.lingkungan, ...(d.kelompok === "ekstrakurikuler" ? { induk_id: d.induk_id } : {}) })) batalSunting(); return; }
       const tabel = ed.jenis === "_status" ? "status_kehadiran" : "jenis_izin";
       const kolom = tabel === "status_kehadiran" ? ["kode", "nama", "warna", "dihitung_hadir", "urutan"] : ["nama", "basis_waktu", "wajib_wali", "jam_kembali_bawaan", "status_kehadiran_id", "urutan"];
       const data = Object.fromEntries(kolom.filter((k) => !(k === "kode" && !baru)).map((k) => [k, d[k]]));
@@ -878,7 +881,7 @@ const DataMaster = {
       } catch (e) { f.galat = `${e.message} — berhenti pada santri ke-${i + 1}. Klik Impor sekarang lagi; NIS yang sudah masuk hanya diperbarui, tidak dobel.`; } finally { f.sibuk = false; }
     }
     onMounted(async () => { await muatMaster(); cari(); });
-    return { hal, potong, waliDari, guruUntuk, aturWali, hapusWali, PERAN_WALI, tab, f, m, moderator, bisaPilihan, cari, simpanMaster, bukaSantri, simpanSantri, KELOMPOK, isiPilihan, tambahPilihan, ubahPilihan, ed, sunting, batalSunting, sedangSunting, simpanSunting, baru, tambahKamar, bacaFile, jalankanImpor, namaKelas,
+    return { hal, potong, waliDari, guruUntuk, aturWali, hapusWali, PERAN_WALI, tab, f, m, moderator, bisaPilihan, cari, simpanMaster, bukaSantri, simpanSantri, KELOMPOK, isiPilihan, kegiatanInduk, namaInduk, tambahPilihan, ubahPilihan, ed, sunting, batalSunting, sedangSunting, simpanSunting, baru, tambahKamar, bacaFile, jalankanImpor, namaKelas,
       saring, saranSantri, pilihSaran, navS, tutupSaran, g, guruTersaring, saranGuru, ubahGuru, navG, tutupSaranGuru, simpanGuru, guruKosong, isiGuru, bacaGuru, imporGuru, templatGuru };
   },
   template: `<div><span class="jejak">Administrasi</span><h1>Data Master</h1></div>
@@ -1068,17 +1071,20 @@ const DataMaster = {
         <template v-else>
           <h2>{{ (KELOMPOK.find(k => k[1]===f.kelompok)||[])[2] }}</h2>
           <div class="baris" v-if="bisaPilihan(f.kelompok)"><label class="isian" style="flex:2 1 200px">Pilihan baru<input v-model="f.baru" @keyup.enter="tambahPilihan"></label>
+            <label class="isian" v-if="f.kelompok==='ekstrakurikuler'">Kategori kegiatan<select v-model="f.induk"><option value="" disabled>Pilih…</option><option v-for="k in kegiatanInduk" :value="k.id">{{ k.nama }}</option></select></label>
             <label class="isian">Lingkungan<select v-model="f.ling"><option>semua</option><option>putra</option><option>putri</option></select></label><button @click="tambahPilihan">Tambah</button></div>
-          <div class="tabel"><table><thead><tr><th>Urutan</th><th>Pilihan</th><th>Lingkungan</th><th>Status</th><th></th></tr></thead>
+          <p v-if="f.kelompok==='kegiatan' || f.kelompok==='ekstrakurikuler'" class="redup" style="margin:0">Kegiatan yang punya ekskul (mis. Olahraga, Kesenian) tercetak di rapor dengan nama ekskulnya; kegiatan lain (mis. Pramuka, Halaqah Qur'an, Muhadhoroh) dinilai langsung.</p>
+          <div class="tabel"><table><thead><tr><th>Urutan</th><th>Pilihan</th><th v-if="f.kelompok==='ekstrakurikuler'">Kategori kegiatan</th><th>Lingkungan</th><th>Status</th><th></th></tr></thead>
             <tbody><tr v-for="p in potong(isiPilihan, hal.pilihan)" :key="p.id" :style="{color: p.aktif ? '' : '#6B756F'}">
               <template v-if="sedangSunting('pilihan', p.id)">
                 <td><input type="number" v-model.number="ed.data.urutan" style="width:70px"></td>
                 <td><input v-model="ed.data.nama" maxlength="120" style="min-width:160px" @keyup.enter="simpanSunting" @keyup.esc="batalSunting"></td>
+                <td v-if="f.kelompok==='ekstrakurikuler'"><select v-model="ed.data.induk_id" aria-label="Kategori kegiatan"><option v-for="k in kegiatanInduk" :value="k.id">{{ k.nama }}</option></select></td>
                 <td><select v-model="ed.data.lingkungan"><option>semua</option><option>putra</option><option>putri</option></select></td>
                 <td colspan="2"><div class="baris"><button class="kecil" @click="simpanSunting">Simpan</button><button class="kedua kecil" @click="batalSunting">Batal</button></div></td>
               </template>
               <template v-else>
-                <td>{{ p.urutan }}</td><td><strong>{{ p.nama }}</strong></td><td>{{ p.lingkungan }}</td>
+                <td>{{ p.urutan }}</td><td><strong>{{ p.nama }}</strong></td><td v-if="f.kelompok==='ekstrakurikuler'">{{ namaInduk(p.induk_id) }}</td><td>{{ p.lingkungan }}</td>
                 <td><button class="kecil" :class="p.aktif ? '' : 'kedua'" :disabled="!bisaPilihan(p.kelompok)" @click="ubahPilihan(p, {aktif: p.aktif ? 0 : 1})">{{ p.aktif ? 'Aktif' : 'Nonaktif' }}</button></td>
                 <td><button v-if="bisaPilihan(p.kelompok)" class="kedua kecil" @click="sunting('pilihan', p)">Ubah</button></td>
               </template></tr></tbody></table>

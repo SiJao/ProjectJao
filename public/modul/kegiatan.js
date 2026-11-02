@@ -1,4 +1,5 @@
-// Modul tampilan Pengembangan Diri — grup kegiatan & ekskul, anggota, absensi kegiatan, rekap, prestasi. Lihat src/modul/README.md.
+// Modul tampilan Pengembangan Diri — cabang kegiatan/ekskul & kelompoknya, anggota, absensi kegiatan, rekap, prestasi. Lihat src/modul/README.md.
+// (Di kode, cabang = "grup" mengikuti nama tabel grup_kegiatan.)
 // Dibungkus blok supaya nama pembantu tidak bentrok dengan modul lain (semua skrip modul berbagi lingkup global).
 {
   // Pencarian langsung: tunggu 250 ms setelah berhenti mengetik; teks < 2 huruf dianggap kosong.
@@ -12,7 +13,7 @@
     setup() {
       const me = negara.me;
       const daftarTab = [
-        ["grup", "Grup kegiatan", me.bisa.kegiatan],
+        ["grup", "Kegiatan & ekskul", me.bisa.kegiatan],
         ["anggota", "Anggota", me.bisa.kegiatan],
         ["absensi", "Absensi kegiatan", me.bisa.absensi || me.bisa.lihat_absensi],
         ["rekap", "Rekap kehadiran", me.bisa.absensi || me.bisa.lihat_absensi],
@@ -26,34 +27,53 @@
       const pilihan = (kel, ling) => (m.value.pilihan || []).filter((p) => p.kelompok === kel && p.aktif && (!ling || p.lingkungan === "semua" || p.lingkungan === ling));
       const lingSaya = computed(() => (me.lingkungan === "semua" ? ["putra", "putri"] : [me.lingkungan]));
 
-      // ------------------------------------------------ grup
+      // ------------------------------------------------ cabang kegiatan / ekskul
+      // Kegiatan kategori (punya ekskul ber-induk kegiatan itu, mis. Olahraga) → cabangnya per ekskul; kegiatan lain dinilai langsung.
       const grup = ref([]);
-      const g = reactive({ q: "", qLive: "", kegiatan_id: "", lingkungan: "", status: "aktif", edit: null });
+      const g = reactive({ q: "", qLive: "", kegiatan_id: "", lingkungan: "", status: "aktif", edit: null, kelompok: null, kelompokBaru: "", ubahKel: {} });
       const muatGrup = async () => { try { grup.value = await api("/grup"); } catch (e) { f.galat = e.message; } };
       watch(() => g.q, tunda(() => { g.qLive = kataCari(g.q); }));
+      const ekskulDari = (kegiatanId, ling) => pilihan("ekstrakurikuler", ling).filter((p) => p.induk_id == kegiatanId);
+      const punyaEkskul = (kegiatanId) => (m.value.pilihan || []).some((p) => p.kelompok === "ekstrakurikuler" && p.induk_id == kegiatanId);
       const grupTersaring = computed(() => grup.value.filter((x) =>
         (!g.kegiatan_id || x.kegiatan_id == g.kegiatan_id) && (!g.lingkungan || x.lingkungan === g.lingkungan)
         && (g.status === "semua" || (g.status === "aktif" ? x.aktif : !x.aktif))
-        && (!g.qLive || [x.nama, x.kegiatan, x.ekstrakurikuler, x.pembimbing].some((v) => v && v.toLowerCase().includes(g.qLive)))));
+        && (!g.qLive || [x.nama, x.pembimbing, ...x.kelompok.map((k) => k.nama)].some((v) => v && v.toLowerCase().includes(g.qLive)))));
       const grupAktif = computed(() => grup.value.filter((x) => x.aktif));
-      const labelGrup = (x) => `${x.kegiatan}${x.ekstrakurikuler ? " · " + x.ekstrakurikuler : ""} — ${x.nama}${lingSaya.value.length > 1 ? " (" + x.lingkungan + ")" : ""}`;
+      const labelGrup = (x) => `${x.nama}${lingSaya.value.length > 1 ? " (" + x.lingkungan + ")" : ""}`;
       function bukaGrup(x) {
-        bersihPesan();
-        g.edit = x ? { id: x.id, kegiatan_id: x.kegiatan_id, ekstrakurikuler_id: x.ekstrakurikuler_id || "", nama: x.nama, lingkungan: x.lingkungan, aktif: !!x.aktif, guru: x.pembimbing_guru_id ? { id: x.pembimbing_guru_id, nama: x.pembimbing, nip: x.pembimbing_nip, lingkungan: x.pembimbing_ling } : null }
-          : { kegiatan_id: (pilihan("kegiatan")[0] || {}).id || "", ekstrakurikuler_id: "", nama: "", lingkungan: lingSaya.value[0], aktif: true, guru: null };
+        bersihPesan(); g.kelompok = null;
+        g.edit = x ? { id: x.id, kegiatan_id: x.kegiatan_id, ekstrakurikuler_id: x.ekstrakurikuler_id || "", lingkungan: x.lingkungan, aktif: !!x.aktif, guru: x.pembimbing_guru_id ? { id: x.pembimbing_guru_id, nama: x.pembimbing, nip: x.pembimbing_nip, lingkungan: x.pembimbing_ling } : null }
+          : { kegiatan_id: (pilihan("kegiatan")[0] || {}).id || "", ekstrakurikuler_id: "", lingkungan: lingSaya.value[0], aktif: true, guru: null };
       }
+      // ganti kegiatan → ekskul lama tidak berlaku lagi
+      watch(() => g.edit && [g.edit.kegiatan_id, g.edit.lingkungan], () => {
+        if (g.edit && g.edit.ekstrakurikuler_id && !ekskulDari(g.edit.kegiatan_id, g.edit.lingkungan).some((p) => p.id == g.edit.ekstrakurikuler_id)) g.edit.ekstrakurikuler_id = "";
+      });
       async function simpanGrup() {
         const e = g.edit;
-        if (e.id && !e.aktif && grup.value.find((x) => x.id === e.id)?.aktif && !confirm("Menonaktifkan grup akan mengakhiri keanggotaan semua anggotanya hari ini (riwayat tetap tersimpan). Lanjutkan?")) return;
+        if (e.id && !e.aktif && grup.value.find((x) => x.id === e.id)?.aktif && !confirm("Menonaktifkan cabang akan mengakhiri keanggotaan semua anggotanya hari ini (riwayat tetap tersimpan). Lanjutkan?")) return;
         const guruId = e.guru ? e.guru.id : null;
-        const r = await jalan(() => api("/grup", { id: e.id, kegiatan_id: e.kegiatan_id, ekstrakurikuler_id: e.ekstrakurikuler_id || null, nama: e.nama, lingkungan: e.lingkungan, pembimbing_guru_id: guruId, aktif: e.aktif ? 1 : 0 }), "Grup tersimpan.");
+        const r = await jalan(() => api("/grup", { id: e.id, kegiatan_id: e.kegiatan_id, ekstrakurikuler_id: e.ekstrakurikuler_id || null, lingkungan: e.lingkungan, pembimbing_guru_id: guruId, aktif: e.aktif ? 1 : 0 }), "Cabang tersimpan.");
         if (r) { g.edit = null; muatGrup(); }
+      }
+      // kelompok dalam cabang (panel di bawah tabel)
+      const grupKel = computed(() => grup.value.find((x) => x.id === g.kelompok));
+      function bukaKelompok(x) { bersihPesan(); g.edit = null; g.kelompokBaru = ""; g.ubahKel = {}; g.kelompok = g.kelompok === x.id ? null : x.id; }
+      async function tambahKelompok() {
+        if (await jalan(() => api("/kelompok", { grup_id: g.kelompok, nama: g.kelompokBaru }), "Kelompok ditambahkan.")) { g.kelompokBaru = ""; muatGrup(); }
+      }
+      const batalUbahKel = (k) => { delete g.ubahKel[k.id]; };
+      async function ubahKelompok(k, data, pesan) {
+        if (await jalan(() => api("/kelompok", { id: k.id, ...data }), pesan)) { delete g.ubahKel[k.id]; muatGrup(); }
       }
 
       // ------------------------------------------------ anggota
-      const a = reactive({ grup_id: "", data: null, riwayat: false, q: "", qLive: "", cara: "cari", peran: "anggota", santri: null,
+      const a = reactive({ grup_id: "", data: null, riwayat: false, q: "", qLive: "", cara: "cari", peran: "anggota", kelompok_id: "", santri: null,
         kelas_id: "", kamar_id: "", calon: [], terpilih: {}, qCalon: "", qCalonLive: "", csv: null, hasil: null, pindah: {} });
       const grupA = computed(() => grup.value.find((x) => x.id == a.grup_id));
+      const kelompokA = computed(() => (grupA.value ? grupA.value.kelompok.filter((k) => k.aktif) : []));
+      watch(() => a.grup_id, () => { a.kelompok_id = ""; });
       async function muatAnggota() {
         a.data = null; a.hasil = null;
         if (!a.grup_id) return;
@@ -86,7 +106,7 @@
         try { const r = await bacaCsv(file, ["NIS"]); a.csv = { nama: file.name, nis: r.baris.map((b) => b.NIS).filter(Boolean) }; } catch (e) { f.galat = e.message; }
       }
       async function tambah(data) {
-        const r = await jalan(() => api(`/grup/${a.grup_id}/anggota`, { ...data, peran: a.peran }), (r) => `${r.ditambah} santri ditambahkan${r.ditolak.length ? ", " + r.ditolak.length + " ditolak" : ""}.`);
+        const r = await jalan(() => api(`/grup/${a.grup_id}/anggota`, { ...data, peran: a.peran, kelompok_id: a.kelompok_id || null }), (r) => `${r.ditambah} santri ditambahkan${r.ditolak.length ? ", " + r.ditolak.length + " ditolak" : ""}.`);
         if (!r) return;
         a.santri = null; a.csv = null; a.terpilih = {};
         await muatAnggota(); a.hasil = r; muatGrup();
@@ -96,38 +116,48 @@
       const tambahBanyak = () => tambah({ santri_ids: Object.keys(a.terpilih).filter((k) => a.terpilih[k]).map(Number) });
       const tambahCsv = () => a.csv && tambah({ nis: a.csv.nis });
       async function keluarkan(x) {
-        if (!confirm(`Keluarkan ${x.nama} dari grup ${grupA.value.nama}? Riwayat tetap tersimpan.`)) return;
-        if (await jalan(() => api(`/anggota/${x.id}/keluar`, {}), "Santri dikeluarkan dari grup.")) { muatAnggota(); muatGrup(); }
+        if (!confirm(`Keluarkan ${x.nama} dari ${grupA.value.nama}? Riwayat tetap tersimpan.`)) return;
+        if (await jalan(() => api(`/anggota/${x.id}/keluar`, {}), "Santri dikeluarkan.")) { muatAnggota(); muatGrup(); }
       }
       async function pindahkan(x) {
         const tujuan = a.pindah[x.id];
-        if (!tujuan) { f.galat = "Pilih grup tujuan."; return; }
+        if (!tujuan) { f.galat = "Pilih cabang tujuan."; return; }
         if (await jalan(() => api(`/anggota/${x.id}/pindah`, { grup_id: +tujuan }), "Santri dipindahkan.")) { muatAnggota(); muatGrup(); }
+      }
+      // ganti kelompok di cabang yang sama (kosong = tanpa kelompok); tercatat sebagai riwayat keanggotaan
+      async function gantiKelompok(x, kelompokId) {
+        if (await jalan(() => api(`/anggota/${x.id}/pindah`, { kelompok_id: kelompokId ? +kelompokId : null }), "Kelompok diperbarui.")) { muatAnggota(); muatGrup(); }
+        else muatAnggota();
       }
       async function ubahPeran(x, peran) { if (await jalan(() => api(`/anggota/${x.id}/peran`, { peran }), "Peran diperbarui.")) muatAnggota(); }
       const grupTujuan = computed(() => grupAktif.value.filter((x) => grupA.value && x.id !== grupA.value.id && x.lingkungan === grupA.value.lingkungan));
 
       // ------------------------------------------------ absensi kegiatan
-      const ab = reactive({ grup_id: "", tanggal: hariIni(), sesi_id: "", data: null });
+      const ab = reactive({ grup_id: "", kelompok_id: "", tanggal: hariIni(), sesi_id: "", data: null });
+      const grupAb = computed(() => grup.value.find((x) => x.id == ab.grup_id));
+      watch(() => ab.grup_id, () => { ab.kelompok_id = ""; });
       const sesiList = computed(() => pilihan("sesi_absensi"));
       const statusList = computed(() => (m.value.status_kehadiran || []).filter((s) => s.aktif));
       const warna = (id) => (statusList.value.find((s) => s.id == id) || {}).warna || "#55605A";
       async function muatAbsensi() {
         ab.data = null;
         if (!ab.grup_id || !ab.sesi_id) return;
-        try { ab.data = await api(`/absensi-kegiatan?grup_id=${ab.grup_id}&tanggal=${ab.tanggal}&sesi_id=${ab.sesi_id}`); } catch (e) { f.galat = e.message; }
+        try { ab.data = await api(`/absensi-kegiatan?grup_id=${ab.grup_id}&kelompok_id=${ab.kelompok_id}&tanggal=${ab.tanggal}&sesi_id=${ab.sesi_id}`); } catch (e) { f.galat = e.message; }
       }
-      watch(() => [ab.grup_id, ab.tanggal, ab.sesi_id], () => { bersihPesan(); muatAbsensi(); });
+      watch(() => [ab.grup_id, ab.kelompok_id, ab.tanggal, ab.sesi_id], () => { bersihPesan(); muatAbsensi(); });
       function semuaHadir() { const h = statusList.value.find((s) => s.kode === "H"); if (h) ab.data.santri.forEach((s) => { if (!s.otomatis) s.status_kehadiran_id = h.id; }); }
       const belumDiisi = computed(() => ab.data ? ab.data.santri.filter((s) => !s.status_kehadiran_id).length : 0);
       async function simpanAbsensi() {
         if (belumDiisi.value) { f.galat = `${belumDiisi.value} anggota belum diberi status.`; return; }
-        const r = await jalan(() => api("/absensi-kegiatan", { grup_id: +ab.grup_id, tanggal: ab.tanggal, sesi_id: +ab.sesi_id, items: ab.data.santri.map((s) => ({ santri_id: s.id, status_kehadiran_id: s.status_kehadiran_id })) }), "Absensi kegiatan tersimpan.");
+        const r = await jalan(() => api("/absensi-kegiatan", { grup_id: +ab.grup_id, kelompok_id: ab.kelompok_id, tanggal: ab.tanggal, sesi_id: +ab.sesi_id, items: ab.data.santri.map((s) => ({ santri_id: s.id, status_kehadiran_id: s.status_kehadiran_id })) }), "Absensi kegiatan tersimpan.");
         if (r) { const ok = f.ok; await muatAbsensi(); f.ok = ok; }
       }
 
       // ------------------------------------------------ rekap
-      const rk = reactive({ grup_id: "", dari: awalBulan(), sampai: hariIni(), data: null });
+      const rk = reactive({ grup_id: "", kelompok: "", dari: awalBulan(), sampai: hariIni(), data: null });
+      watch(() => rk.grup_id, () => { rk.kelompok = ""; });
+      const kelompokRk = computed(() => (rk.data ? [...new Set(rk.data.santri.map((s) => s.kelompok).filter(Boolean))].sort() : []));
+      const rekapTersaring = computed(() => (rk.data ? rk.data.santri.filter((s) => !rk.kelompok || (rk.kelompok === "-" ? !s.kelompok : s.kelompok === rk.kelompok)) : []));
       async function muatRekap() {
         rk.data = null;
         if (!rk.grup_id) return;
@@ -136,9 +166,9 @@
       watch(() => [rk.grup_id, rk.dari, rk.sampai], muatRekap);
       function eksporRekap() {
         const d = rk.data, st = statusList.value;
-        unduhXlsx(`rekap-kegiatan-${d.grup.nama}-${d.dari}_${d.sampai}.xlsx`.replace(/\s+/g, "-"), [{ nama: "Rekap", baris: [
-          ["NIS", "Nama", ...st.map((s) => s.nama), "Jumlah", "% hadir"],
-          ...d.santri.map((s) => [s.nis, s.nama, ...st.map((x) => s.status[x.id] || 0), s.total, s.persen == null ? "" : s.persen]),
+        unduhXlsx(`rekap-kegiatan-${d.grup.nama}${rk.kelompok && rk.kelompok !== "-" ? "-" + rk.kelompok : ""}-${d.dari}_${d.sampai}.xlsx`.replace(/[\s—]+/g, "-"), [{ nama: "Rekap", baris: [
+          ["NIS", "Nama", "Kelompok", ...st.map((s) => s.nama), "Jumlah", "% hadir"],
+          ...rekapTersaring.value.map((s) => [s.nis, s.nama, s.kelompok || "", ...st.map((x) => s.status[x.id] || 0), s.total, s.persen == null ? "" : s.persen]),
         ] }]);
       }
 
@@ -180,10 +210,10 @@
       watch(tab, bersihPesan);
 
       return { kini: hariIni(), me, daftarTab, tab, f, m, pilihan, lingSaya,
-        grup, g, grupTersaring, grupAktif, labelGrup, bukaGrup, simpanGrup,
-        a, grupA, anggotaTersaring, kelasA, kamarA, calonTersaring, jumlahTerpilih, pilihSemua, bacaCsvNis, tambahCari, tambahBanyak, tambahCsv, keluarkan, pindahkan, ubahPeran, grupTujuan, namaKelas,
-        ab, sesiList, statusList, warna, semuaHadir, belumDiisi, simpanAbsensi,
-        rk, eksporRekap, pr, bukaPrestasi, simpanPrestasi, eksporPrestasi };
+        grup, g, grupTersaring, grupAktif, labelGrup, bukaGrup, simpanGrup, ekskulDari, punyaEkskul, grupKel, bukaKelompok, tambahKelompok, ubahKelompok, batalUbahKel,
+        a, grupA, kelompokA, anggotaTersaring, kelasA, kamarA, calonTersaring, jumlahTerpilih, pilihSemua, bacaCsvNis, tambahCari, tambahBanyak, tambahCsv, keluarkan, pindahkan, gantiKelompok, ubahPeran, grupTujuan, namaKelas,
+        ab, grupAb, sesiList, statusList, warna, semuaHadir, belumDiisi, simpanAbsensi,
+        rk, kelompokRk, rekapTersaring, eksporRekap, pr, bukaPrestasi, simpanPrestasi, eksporPrestasi };
     },
     template: `<div><span class="jejak">Administrasi › Kesantrian</span><h1>Pengembangan Diri</h1></div>
   <div class="tab"><button v-for="t in daftarTab" :key="t[0]" :class="{aktif: tab===t[0]}" @click="tab=t[0]">{{ t[1] }}</button></div>
@@ -191,43 +221,61 @@
 
   <template v-if="tab==='grup'">
     <div class="kartu baris">
-      <label class="isian" style="flex:2 1 220px">Cari grup<input v-model="g.q" placeholder="Nama grup, ekskul, atau pembimbing (min. 2 huruf)"></label>
+      <label class="isian" style="flex:2 1 220px">Cari<input v-model="g.q" placeholder="Kegiatan, ekskul, kelompok, atau pembimbing (min. 2 huruf)"></label>
       <label class="isian">Kegiatan<select v-model="g.kegiatan_id"><option value="">Semua</option><option v-for="p in pilihan('kegiatan')" :value="p.id">{{ p.nama }}</option></select></label>
       <label class="isian" v-if="lingSaya.length > 1">Lingkungan<select v-model="g.lingkungan"><option value="">Semua</option><option>putra</option><option>putri</option></select></label>
       <label class="isian">Status<select v-model="g.status"><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option><option value="semua">Semua</option></select></label>
-      <button @click="bukaGrup(null)">Tambah grup</button>
+      <button @click="bukaGrup(null)">Tambah kegiatan / ekskul</button>
     </div>
     <div v-if="g.edit" class="kartu" style="display:flex;flex-direction:column;gap:12px">
-      <h2>{{ g.edit.id ? 'Ubah grup' : 'Grup baru' }}</h2>
+      <h2>{{ g.edit.id ? 'Ubah kegiatan / ekskul' : 'Kegiatan / ekskul baru' }}</h2>
       <div class="baris">
         <label class="isian">Kegiatan<select v-model="g.edit.kegiatan_id"><option v-for="p in pilihan('kegiatan', g.edit.lingkungan)" :value="p.id">{{ p.nama }}</option></select></label>
-        <label class="isian">Ekstrakurikuler (opsional)<select v-model="g.edit.ekstrakurikuler_id"><option value="">—</option><option v-for="p in pilihan('ekstrakurikuler', g.edit.lingkungan)" :value="p.id">{{ p.nama }}</option></select></label>
-        <label class="isian" style="flex:1 1 180px">Nama grup<input v-model="g.edit.nama" maxlength="80" placeholder="mis. DLT 1, Grup 1"></label>
+        <label class="isian" v-if="punyaEkskul(g.edit.kegiatan_id)">Ekskul<select v-model="g.edit.ekstrakurikuler_id"><option value="" disabled>Pilih…</option><option v-for="p in ekskulDari(g.edit.kegiatan_id, g.edit.lingkungan)" :value="p.id">{{ p.nama }}</option></select></label>
         <label class="isian">Lingkungan<select v-model="g.edit.lingkungan" :disabled="!!g.edit.id"><option v-for="l in lingSaya" :value="l">{{ l }}</option></select></label>
       </div>
+      <p class="redup" style="margin:0">{{ punyaEkskul(g.edit.kegiatan_id) ? 'Kegiatan ini berisi ekskul: rapor mencetak nama ekskulnya. Daftar ekskul diatur di Data Master › Ekstrakurikuler.' : 'Kegiatan ini dinilai langsung (tanpa ekskul).' }}</p>
       <div class="baris" style="align-items:flex-end">
-        <label class="isian" style="flex:1 1 300px">Pembimbing / pelatih (guru)
+        <label class="isian" style="flex:1 1 300px">Pembimbing / pelatih (satu guru)
           <CariGuru v-model="g.edit.guru"/>
         </label>
-        <label class="redup" style="display:flex;gap:8px;align-items:center;min-height:42px"><input type="checkbox" v-model="g.edit.aktif"> Grup aktif</label>
+        <label class="redup" style="display:flex;gap:8px;align-items:center;min-height:42px"><input type="checkbox" v-model="g.edit.aktif"> Aktif</label>
       </div>
-      <p v-if="g.edit.id && !g.edit.aktif" class="pesan info">Grup nonaktif tidak bisa diabsen atau ditambah anggota. Grup tidak dihapus; riwayat tetap tersimpan.</p>
+      <p v-if="g.edit.id && !g.edit.aktif" class="pesan info">Kegiatan/ekskul nonaktif tidak bisa diabsen atau ditambah anggota. Tidak dihapus; riwayat tetap tersimpan.</p>
       <div class="baris"><button @click="simpanGrup">Simpan</button><button class="kedua" @click="g.edit = null">Batal</button></div>
     </div>
+    <div v-if="grupKel" class="kartu" style="display:flex;flex-direction:column;gap:12px;max-width:760px">
+      <h2>Kelompok {{ labelGrup(grupKel) }}</h2>
+      <p class="redup" style="margin:0">Kelompok opsional (mis. Futsal A, Regu Elang). Pembimbing tetap satu untuk seluruh {{ grupKel.nama }}. Kelompok tidak tercetak di rapor.</p>
+      <div class="baris" v-if="grupKel.aktif"><label class="isian" style="flex:1 1 220px">Kelompok baru<input v-model="g.kelompokBaru" maxlength="60" @keyup.enter="tambahKelompok"></label><button @click="tambahKelompok">Tambah</button></div>
+      <div class="tabel"><table>
+        <thead><tr><th>Kelompok</th><th>Anggota aktif</th><th>Status</th><th></th></tr></thead>
+        <tbody v-baris><tr v-for="k in grupKel.kelompok" :key="k.id" :style="{color: k.aktif ? '' : '#6B756F'}">
+          <td><input v-if="g.ubahKel[k.id] !== undefined" v-model="g.ubahKel[k.id]" maxlength="60" @keyup.enter="ubahKelompok(k, {nama: g.ubahKel[k.id]}, 'Nama kelompok diperbarui.')" :aria-label="'Nama baru ' + k.nama"><strong v-else>{{ k.nama }}</strong></td>
+          <td>{{ k.jumlah }}</td>
+          <td><button class="kecil" :class="k.aktif ? '' : 'kedua'" @click="ubahKelompok(k, {aktif: k.aktif ? 0 : 1}, k.aktif ? 'Kelompok dinonaktifkan.' : 'Kelompok diaktifkan.')">{{ k.aktif ? 'Aktif' : 'Nonaktif' }}</button></td>
+          <td style="white-space:nowrap"><template v-if="g.ubahKel[k.id] !== undefined"><button class="kecil" @click="ubahKelompok(k, {nama: g.ubahKel[k.id]}, 'Nama kelompok diperbarui.')">Simpan</button> <button class="kedua kecil" @click="batalUbahKel(k)">Batal</button></template>
+            <button v-else class="kedua kecil" @click="g.ubahKel[k.id] = k.nama">Ubah nama</button></td>
+        </tr></tbody></table>
+        <p v-if="!grupKel.kelompok.length" class="redup" style="padding:14px">Belum ada kelompok. Anggota tetap bisa ditambahkan tanpa kelompok.</p></div>
+      <div><button class="kedua" @click="g.kelompok = null">Tutup</button></div>
+    </div>
     <div class="tabel"><table>
-      <thead><tr><th>Grup</th><th>Kegiatan</th><th>Pembimbing</th><th v-if="lingSaya.length > 1">Lingkungan</th><th>Anggota</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Kegiatan / ekskul</th><th>Pembimbing</th><th v-if="lingSaya.length > 1">Lingkungan</th><th>Kelompok</th><th>Anggota</th><th>Status</th><th></th></tr></thead>
       <tbody v-baris><tr v-for="x in grupTersaring" :key="x.id">
-        <td><strong>{{ x.nama }}</strong></td><td>{{ x.kegiatan }}<div v-if="x.ekstrakurikuler" class="redup">{{ x.ekstrakurikuler }}</div></td>
-        <td>{{ x.pembimbing || '—' }}</td><td v-if="lingSaya.length > 1">{{ x.lingkungan }}</td><td>{{ x.jumlah }}</td>
+        <td><strong>{{ x.ekstrakurikuler || x.kegiatan }}</strong><div v-if="x.ekstrakurikuler" class="redup">{{ x.kegiatan }}</div></td>
+        <td>{{ x.pembimbing || '—' }}</td><td v-if="lingSaya.length > 1">{{ x.lingkungan }}</td>
+        <td><span v-if="x.kelompok.some(k => k.aktif)">{{ x.kelompok.filter(k => k.aktif).map(k => k.nama).join(', ') }}</span><span v-else class="redup">—</span></td>
+        <td>{{ x.jumlah }}</td>
         <td><span class="lencana" :class="{hijau: x.aktif}">{{ x.aktif ? 'Aktif' : 'Nonaktif' }}</span></td>
-        <td style="white-space:nowrap"><button class="kedua kecil" @click="bukaGrup(x)">Ubah</button> <button v-if="x.aktif" class="kecil" @click="a.grup_id = x.id; tab = 'anggota'">Anggota</button></td>
+        <td style="white-space:nowrap"><button class="kedua kecil" @click="bukaGrup(x)">Ubah</button> <button class="kedua kecil" @click="bukaKelompok(x)">Kelompok</button> <button v-if="x.aktif" class="kecil" @click="a.grup_id = x.id; tab = 'anggota'">Anggota</button></td>
       </tr></tbody></table>
-      <p v-if="!grupTersaring.length" class="redup" style="padding:14px">{{ grup.length ? 'Tidak ada grup yang cocok.' : 'Belum ada grup. Klik Tambah grup.' }}</p></div>
+      <p v-if="!grupTersaring.length" class="redup" style="padding:14px">{{ grup.length ? 'Tidak ada yang cocok.' : 'Belum ada kegiatan/ekskul. Klik Tambah kegiatan / ekskul.' }}</p></div>
   </template>
 
   <template v-if="tab==='anggota'">
     <div class="kartu baris">
-      <label class="isian" style="flex:2 1 280px">Grup<select v-model="a.grup_id"><option value="">Pilih grup…</option><option v-for="x in grupAktif" :value="x.id">{{ labelGrup(x) }} · {{ x.jumlah }}</option></select></label>
+      <label class="isian" style="flex:2 1 280px">Kegiatan / ekskul<select v-model="a.grup_id"><option value="">Pilih…</option><option v-for="x in grupAktif" :value="x.id">{{ labelGrup(x) }} · {{ x.jumlah }}</option></select></label>
       <label class="isian" style="flex:1 1 200px" v-if="a.data">Cari anggota<input v-model="a.q" placeholder="Nama atau NIS (min. 2 huruf)"></label>
       <label class="redup" v-if="a.data" style="display:flex;gap:8px;align-items:center"><input type="checkbox" v-model="a.riwayat"> Tampilkan riwayat</label>
     </div>
@@ -237,6 +285,7 @@
         <div class="baris">
           <div class="tab"><button v-for="c in [['cari','Cari santri'],['banyak','Pilih banyak'],['csv','File CSV']]" :class="{aktif: a.cara===c[0]}" @click="a.cara=c[0]">{{ c[1] }}</button></div>
           <label class="isian">Peran<select v-model="a.peran"><option value="anggota">Anggota</option><option value="pengurus">Pengurus</option></select></label>
+          <label class="isian" v-if="kelompokA.length">Kelompok<select v-model="a.kelompok_id"><option value="">Tanpa kelompok</option><option v-for="k in kelompokA" :value="k.id">{{ k.nama }}</option></select></label>
         </div>
         <div v-if="a.cara==='cari'" class="baris" style="align-items:flex-start">
           <div style="flex:1 1 320px"><CariSantri v-model="a.santri"/></div><button :disabled="!a.santri" @click="tambahCari">Tambahkan</button></div>
@@ -258,7 +307,7 @@
           </template>
         </template>
         <template v-if="a.cara==='csv'">
-          <p class="redup" style="margin:0">File CSV dengan kolom <strong>NIS</strong> (kolom lain diabaikan). Santri harus aktif dan selingkungan dengan grup.</p>
+          <p class="redup" style="margin:0">File CSV dengan kolom <strong>NIS</strong> (kolom lain diabaikan). Santri harus aktif dan selingkungan.</p>
           <input type="file" accept=".csv,text/csv" @change="bacaCsvNis">
           <div v-if="a.csv" class="pesan info">{{ a.csv.nama }}: <strong>{{ a.csv.nis.length }}</strong> NIS terbaca. <button @click="tambahCsv" style="margin-left:8px">Tambahkan</button></div>
         </template>
@@ -266,22 +315,25 @@
           <tbody><tr v-for="d in a.hasil.ditolak"><td>{{ d.nis }}</td><td>{{ d.nama }}</td><td>{{ d.alasan }}</td></tr></tbody></table></div>
       </div>
       <div class="tabel"><table>
-        <thead><tr><th>Santri</th><th>Peran</th><th>Mulai</th><th>{{ a.riwayat ? 'Selesai' : '' }}</th><th>Pindah ke grup</th><th></th></tr></thead>
+        <thead><tr><th style="min-width:220px">Santri</th><th>Peran</th><th>{{ a.riwayat ? 'Mulai – selesai' : 'Mulai' }}</th><th v-if="grupA && grupA.kelompok.length">Kelompok</th><th>Pindah ke</th><th></th></tr></thead>
         <tbody v-baris><tr v-for="x in anggotaTersaring" :key="x.id" :style="{opacity: x.selesai ? .6 : 1}">
           <td><div class="santri-sel"><FotoSantri :s="x"/><span><strong>{{ x.nama }}</strong><div class="redup">{{ x.nis }} · {{ x.kelas }} · {{ x.kamar }}</div></span></div></td>
-          <td><select v-if="!x.selesai" :value="x.peran" @change="ubahPeran(x, $event.target.value)" :aria-label="'Peran ' + x.nama"><option value="anggota">Anggota</option><option value="pengurus">Pengurus</option></select><span v-else>{{ x.peran }}</span></td>
-          <td>{{ x.mulai }}</td><td>{{ x.selesai || '' }}</td>
-          <td><select v-if="!x.selesai" v-model="a.pindah[x.id]" :aria-label="'Grup tujuan ' + x.nama"><option :value="undefined">—</option><option v-for="t in grupTujuan" :value="t.id">{{ labelGrup(t) }}</option></select></td>
-          <td style="white-space:nowrap"><template v-if="!x.selesai"><button class="kecil" :disabled="!a.pindah[x.id]" @click="pindahkan(x)">Pindah</button> <button class="bahaya kecil" @click="keluarkan(x)">Keluarkan</button></template></td>
+          <td><select v-if="!x.selesai" :value="x.peran" @change="ubahPeran(x, $event.target.value)" :aria-label="'Peran ' + x.nama" style="max-width:120px"><option value="anggota">Anggota</option><option value="pengurus">Pengurus</option></select><span v-else>{{ x.peran }}</span></td>
+          <td style="white-space:nowrap">{{ x.mulai }}<template v-if="x.selesai"> – {{ x.selesai }}</template></td>
+          <td v-if="grupA && grupA.kelompok.length"><select v-if="!x.selesai" :value="x.kelompok_id || ''" @change="gantiKelompok(x, $event.target.value)" :aria-label="'Kelompok ' + x.nama" style="max-width:175px">
+            <option value="">Tanpa kelompok</option><option v-for="k in kelompokA" :value="k.id">{{ k.nama }}</option></select><span v-else>{{ x.kelompok || '—' }}</span></td>
+          <td><select v-if="!x.selesai" v-model="a.pindah[x.id]" :aria-label="'Tujuan pindah ' + x.nama" style="max-width:150px"><option :value="undefined">—</option><option v-for="t in grupTujuan" :value="t.id">{{ labelGrup(t) }}</option></select></td>
+          <td><div v-if="!x.selesai" style="display:flex;flex-direction:column;gap:6px"><button class="kecil" :disabled="!a.pindah[x.id]" @click="pindahkan(x)">Pindah</button><button class="bahaya kecil" @click="keluarkan(x)">Keluarkan</button></div></td>
         </tr></tbody></table>
-        <p v-if="!anggotaTersaring.length" class="redup" style="padding:14px">{{ a.data.anggota.length ? 'Tidak ada anggota yang cocok.' : 'Grup ini belum punya anggota.' }}</p></div>
-      <p class="redup">Santri boleh ikut dua ekskul atau lebih. Keluarkan dan pindah tidak menghapus riwayat keanggotaan.</p>
+        <p v-if="!anggotaTersaring.length" class="redup" style="padding:14px">{{ a.data.anggota.length ? 'Tidak ada anggota yang cocok.' : 'Belum ada anggota.' }}</p></div>
+      <p class="redup">Santri boleh ikut dua kegiatan/ekskul atau lebih. Keluarkan, pindah, dan ganti kelompok tidak menghapus riwayat keanggotaan.</p>
     </template>
   </template>
 
   <template v-if="tab==='absensi'">
     <div class="kartu baris">
-      <label class="isian" style="flex:2 1 280px">Grup<select v-model="ab.grup_id"><option value="">Pilih grup…</option><option v-for="x in grupAktif" :value="x.id">{{ labelGrup(x) }}</option></select></label>
+      <label class="isian" style="flex:2 1 280px">Kegiatan / ekskul<select v-model="ab.grup_id"><option value="">Pilih…</option><option v-for="x in grupAktif" :value="x.id">{{ labelGrup(x) }}</option></select></label>
+      <label class="isian" v-if="grupAb && grupAb.kelompok.length">Kelompok<select v-model="ab.kelompok_id"><option value="">Semua anggota</option><option v-for="k in grupAb.kelompok.filter(k => k.aktif)" :value="k.id">{{ k.nama }}</option><option value="0">Tanpa kelompok</option></select></label>
       <label class="isian">Tanggal<input type="date" v-model="ab.tanggal" :max="kini"></label>
       <label class="isian" v-if="sesiList.length > 1">Sesi<select v-model="ab.sesi_id"><option v-for="s in sesiList" :value="s.id">{{ s.nama }}</option></select></label>
     </div>
@@ -291,31 +343,32 @@
       <div class="tabel"><table>
         <thead><tr><th>Santri</th><th>Status</th><th>Keterangan</th></tr></thead>
         <tbody v-baris><tr v-for="s in ab.data.santri" :key="s.id">
-          <td><div class="santri-sel"><FotoSantri :s="s"/><span><strong>{{ s.nama }}</strong><div class="redup">{{ s.nis }}{{ s.peran === 'pengurus' ? ' · pengurus' : '' }}</div></span></div></td>
+          <td><div class="santri-sel"><FotoSantri :s="s"/><span><strong>{{ s.nama }}</strong><div class="redup">{{ s.nis }}{{ s.kelompok && !ab.kelompok_id ? ' · ' + s.kelompok : '' }}{{ s.peran === 'pengurus' ? ' · pengurus' : '' }}</div></span></div></td>
           <td><select v-model="s.status_kehadiran_id" :disabled="!!s.otomatis || !ab.data.bisa_isi" :aria-label="'Status ' + s.nama" :style="{borderColor: warna(s.status_kehadiran_id), color: warna(s.status_kehadiran_id), fontWeight: 700}">
             <option :value="null" disabled>— pilih —</option><option v-for="st in statusList" :value="st.id">{{ st.nama }}</option></select></td>
           <td class="redup">{{ s.otomatis ? 'Otomatis: ' + s.keterangan : '' }}</td>
         </tr></tbody></table>
-        <p v-if="!ab.data.santri.length" class="redup" style="padding:14px">Grup ini belum punya anggota pada tanggal tersebut.</p></div>
+        <p v-if="!ab.data.santri.length" class="redup" style="padding:14px">Belum ada anggota{{ ab.kelompok_id ? ' di kelompok ini' : '' }} pada tanggal tersebut.</p></div>
       <div v-if="ab.data.bisa_isi && ab.data.santri.length" class="baris"><button @click="simpanAbsensi">Simpan absensi</button><span v-if="belumDiisi" class="redup">{{ belumDiisi }} anggota belum diberi status.</span></div>
     </template>
   </template>
 
   <template v-if="tab==='rekap'">
     <div class="kartu baris">
-      <label class="isian" style="flex:2 1 280px">Grup<select v-model="rk.grup_id"><option value="">Pilih grup…</option><option v-for="x in grup" :value="x.id">{{ labelGrup(x) }}{{ x.aktif ? '' : ' · nonaktif' }}</option></select></label>
+      <label class="isian" style="flex:2 1 280px">Kegiatan / ekskul<select v-model="rk.grup_id"><option value="">Pilih…</option><option v-for="x in grup" :value="x.id">{{ labelGrup(x) }}{{ x.aktif ? '' : ' · nonaktif' }}</option></select></label>
+      <label class="isian" v-if="kelompokRk.length">Kelompok<select v-model="rk.kelompok"><option value="">Semua</option><option v-for="k in kelompokRk" :value="k">{{ k }}</option><option value="-">Tanpa kelompok</option></select></label>
       <label class="isian">Dari<input type="date" v-model="rk.dari"></label><label class="isian">Sampai<input type="date" v-model="rk.sampai"></label>
-      <button v-if="rk.data && rk.data.santri.length" class="kedua" @click="eksporRekap">Unduh Excel</button>
+      <button v-if="rekapTersaring.length" class="kedua" @click="eksporRekap">Unduh Excel</button>
     </div>
     <template v-if="rk.data">
       <p class="redup">{{ rk.data.jumlah_sesi }} sesi absensi tercatat dalam rentang ini. % hadir = status yang dihitung hadir dibagi jumlah status tercatat.</p>
       <div class="tabel"><table>
-        <thead><tr><th>Santri</th><th v-for="st in statusList" :key="st.id" :style="{color: st.warna}">{{ st.nama }}</th><th>Jumlah</th><th>% hadir</th></tr></thead>
-        <tbody v-baris><tr v-for="s in rk.data.santri" :key="s.id">
-          <td><div class="santri-sel"><FotoSantri :s="s" ukuran="kecil"/><span><strong>{{ s.nama }}</strong><div class="redup">{{ s.nis }}</div></span></div></td>
+        <thead><tr><th>Santri</th><th v-if="kelompokRk.length">Kelompok</th><th v-for="st in statusList" :key="st.id" :style="{color: st.warna}">{{ st.nama }}</th><th>Jumlah</th><th>% hadir</th></tr></thead>
+        <tbody v-baris><tr v-for="s in rekapTersaring" :key="s.id">
+          <td><div class="santri-sel"><FotoSantri :s="s" ukuran="kecil"/><span><strong>{{ s.nama }}</strong><div class="redup">{{ s.nis }}</div></span></div></td><td v-if="kelompokRk.length">{{ s.kelompok || '—' }}</td>
           <td v-for="st in statusList" :key="st.id">{{ s.status[st.id] || 0 }}</td><td>{{ s.total }}</td>
           <td><strong>{{ s.persen == null ? '—' : s.persen + '%' }}</strong></td></tr></tbody></table>
-        <p v-if="!rk.data.santri.length" class="redup" style="padding:14px">Belum ada anggota atau absensi dalam rentang ini.</p></div>
+        <p v-if="!rekapTersaring.length" class="redup" style="padding:14px">Belum ada anggota atau absensi dalam rentang ini.</p></div>
     </template>
   </template>
 

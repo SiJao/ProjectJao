@@ -48,10 +48,10 @@
     <p v-else style="margin:0">Belum ada prestasi tercatat pada periode ini.</p>
 
     <h3 style="margin:16px 0 6px">D. Kegiatan & ekstrakurikuler</h3>
-    <table v-if="r.grup.length" style="width:100%;border-collapse:collapse"><thead><tr style="text-align:left;border-bottom:1px solid #000"><th>Kegiatan</th><th>Grup</th><th>Pembimbing</th><th>Peran</th><th style="text-align:right">Kehadiran</th></tr></thead>
-      <tbody><tr v-for="g in r.grup" :key="g.grup_id" style="border-bottom:1px solid #DDE3DF"><td>{{ g.kegiatan }}<span v-if="g.ekstrakurikuler"> · {{ g.ekstrakurikuler }}</span></td><td>{{ g.nama }}</td><td>{{ g.pembimbing || '—' }}</td><td>{{ g.peran }}</td>
+    <table v-if="r.grup.length" style="width:100%;border-collapse:collapse"><thead><tr style="text-align:left;border-bottom:1px solid #000"><th>Kegiatan / ekskul</th><th>Pembimbing</th><th>Peran</th><th style="text-align:right">Kehadiran</th></tr></thead>
+      <tbody><tr v-for="g in r.grup" :key="g.grup_id" style="border-bottom:1px solid #DDE3DF"><td>{{ g.kegiatan }}<span v-if="g.ekstrakurikuler"> — {{ g.ekstrakurikuler }}</span></td><td>{{ g.pembimbing || '—' }}</td><td>{{ g.peran }}</td>
         <td style="text-align:right">{{ g.persen == null ? 'belum diabsen' : g.persen + '% (' + g.hadir + '/' + g.total + ')' }}</td></tr></tbody></table>
-    <p v-else style="margin:0">Tidak mengikuti grup kegiatan pada periode ini.</p>
+    <p v-else style="margin:0">Tidak mengikuti kegiatan atau ekskul pada periode ini.</p>
 
     <div style="display:flex;justify-content:space-between;margin-top:40px;font-size:13px">
       <span class="redup">Dicetak {{ r.dicetak }} WIB</span>

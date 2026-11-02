@@ -37,7 +37,7 @@ Administrasi HISADA
 ├── Kesantrian
 │   ├── Absensi
 │   │   ├── Absensi Harian (per kamar)
-│   │   └── Absensi Kegiatan (per grup)
+│   │   └── Absensi Kegiatan (per kegiatan/ekskul, bisa per kelompok)
 │   ├── Perizinan
 │   │   ├── Keluar Sementara · Izin Dinas · Pulang
 │   │   ├── Gate Pass
@@ -53,7 +53,9 @@ Administrasi HISADA
 │   ├── Pengembangan Diri
 │   │   ├── Prestasi Santri
 │   │   └── Kegiatan & Ekstrakurikuler
-│   │       └── Pramuka · Muhadhoroh · Halaqah Qur'an · Olahraga · Kesenian
+│   │       ├── Dinilai langsung: Pramuka · Muhadhoroh · Halaqah Qur'an
+│   │       ├── Berisi ekskul: Olahraga (Futsal, Basket, …) · Kesenian (Hadroh, Kaligrafi, …)
+│   │       └── Kelompok (opsional) per kegiatan/ekskul
 │   └── Laporan Santri
 │       └── Rapor Kesantrian: 90 hari · 1 tahun ajaran
 └── Tata Warkat
@@ -388,7 +390,7 @@ flowchart LR
 | **Wali kelas** | Ditetapkan **per tahun ajaran** |
 | **Asrama & kamar** | Asrama (rayon, dengan jenis kelamin) → kamar. Wali asuh + asisten ditetapkan **per tahun ajaran** |
 | **Keluarga & kontak wali** | Nama ayah/ibu, no. HP. **No. HP wali hanya diubah Moderator** (no. HP adalah kunci penautan Portal Wali). Nomor WA ayah/ibu dari data 2026-2027 menjadi bahan pencocokan |
-| **Daftar pilihan** | Isi dropdown di modul lain disimpan sebagai data, bukan kode: jenis izin, status kehadiran, sesi absensi, jenis kunjungan, tindak lanjut, obat, diagnosa, kategori pelanggaran, tingkat vonis, ekstrakurikuler, tingkat & hasil lomba. Pilihan > 2 tampil sebagai dropdown, 2 pilihan sebagai tombol. Pilihan yang sudah dipakai **dinonaktifkan, tidak dihapus** |
+| **Daftar pilihan** | Isi dropdown di modul lain disimpan sebagai data, bukan kode: jenis izin, status kehadiran, sesi absensi, jenis kunjungan, tindak lanjut, obat, diagnosa, kategori pelanggaran, tingkat vonis, kegiatan, ekstrakurikuler (ber-kategori kegiatan), tingkat & hasil lomba. Pilihan > 2 tampil sebagai dropdown, 2 pilihan sebagai tombol. Pilihan yang sudah dipakai **dinonaktifkan, tidak dihapus** |
 
 **Riwayat yang tidak pernah ditimpa:**
 - **Riwayat kelas** — setiap masa tinggal di sebuah kelas, termasuk **pindah rombel** di tengah tahun (dicatat setiap kali + masuk Riwayat Perubahan).
@@ -410,7 +412,7 @@ flowchart LR
 *(akses: Piket otomatis · Sekretaris & Moderator otomatis · Kesehatan & Kedisiplinan jika dicentang)*
 
 - **Absensi Harian** berbasis **kamar**: pilih kamar + tanggal (+ **sesi**, opsional; umumnya sekali sehari), isi status semua penghuni sekaligus.
-- **Absensi Kegiatan**: Pramuka, Muhadhoroh, Halaqah Qur'an, Olahraga, Kesenian — berbasis anggota **grup** dari modul [Kegiatan & Ekstrakurikuler](#kegiatan--ekstrakurikuler). Santri boleh ikut **dua ekskul atau lebih**; tiap grup diabsen sendiri.
+- **Absensi Kegiatan**: berbasis anggota tiap **kegiatan/ekskul** dari modul [Kegiatan & Ekstrakurikuler](#kegiatan--ekstrakurikuler) (Pramuka, Muhadhoroh, Halaqah Qur'an, Futsal, Hadroh, …). Santri boleh ikut **dua ekskul atau lebih**; tiap kegiatan/ekskul diabsen sendiri dan bisa **disaring per kelompok** — kelompok yang latihannya terpisah diabsen terpisah pada sesi yang sama.
 - Status **terisi otomatis** dari modul lain dan **terkunci** di form absensi:
   - Kesehatan (Perawatan) → **Sakit**, selama santri masih dirawat (bisa beberapa hari)
   - Perizinan → **Izin / Pulang**, overdue → **Alpha**
@@ -499,8 +501,12 @@ flowchart TD
 
 *(akses: Sekretaris · Moderator)*
 
-- Kelola grup **Pramuka, Muhadhoroh, Halaqah Qur'an, Olahraga, Kesenian**: cabang/grup, **pembimbing/pelatih** (guru), dan **anggota**.
-- Menjadi dasar **Absensi Kegiatan** dan bagian ekskul di **Rapor**.
+- **Kegiatan dinilai langsung**: Pramuka, Muhadhoroh, Halaqah Qur'an.
+- **Kegiatan berisi ekskul**: Olahraga (Futsal, Basket, Pencak silat, …) dan Kesenian (Hadroh, Kaligrafi, …). Daftar ekskul di Data Master, masing-masing dengan **kategori kegiatan**.
+- Tiap kegiatan atau ekskul dibuka per lingkungan (putra/putri), dengan **satu pembimbing/pelatih** (guru).
+- **Kelompok** opsional di dalam tiap kegiatan/ekskul (mis. Futsal A, Regu Elang). Kelompok tidak punya pembimbing sendiri.
+- **Anggota**: santri boleh ikut beberapa kegiatan/ekskul; di tiap kegiatan/ekskul boleh tanpa kelompok. Pindah kelompok, pindah ekskul, dan keluar tetap tercatat di riwayat.
+- Menjadi dasar **Absensi Kegiatan** dan bagian D **Rapor**. Rapor mencetak nama kegiatan (mis. "Pramuka") atau ekskulnya (mis. "Olahraga — Futsal"), pembimbing, peran, dan % hadir; kelompok tidak tercetak.
 
 ### Rapor Kesantrian
 
@@ -822,7 +828,7 @@ Kode PHP lama sudah dihapus dari repo (27 Oktober 2026); masih bisa dilihat di r
 | Kesehatan & Kedisiplinan Santri (masing-masing satu modul) | Poskestren (Asisten + Dokter) & Mahkamah (Sekretaris + Hakim) terpisah |
 | Serah Terima 3 langkah (Moderator → Sekretaris → Moderator) | Serah Terima hanya mengganti periode |
 | Tahun Ajaran, Update Kelas Tahunan, riwayat kelas, PAW, Update Kamar | Belum ada |
-| Kegiatan & Ekstrakurikuler (kelola grup) | Tabel ada, layar kelola belum ada |
+| Kegiatan & Ekstrakurikuler (kegiatan/ekskul + kelompok) | Tabel ada, layar kelola belum ada |
 | Notifikasi email & kabar wali per kejadian | Belum ada (hanya badge polling) |
 | Portal Wali dengan akun mandiri | Akun wali dibuat admin per keluarga |
 | Cakupan data putra/putri, role Asatidz | Belum ada |

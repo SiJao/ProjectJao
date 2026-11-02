@@ -719,6 +719,12 @@ on("POST", "/api/pilihan", async ({ db, u, body }) => {
   // Selain Moderator: hanya lingkungan sendiri ('semua' hanya bila memegang kedua lingkungan).
   const bolehLing = (l) => u.role === "moderator" || (l === "semua" ? u.ling.length === 2 : u.ling.includes(l));
   if (lingSah && !bolehLing(lingSah)) gagal(403, "Anda hanya bisa mengatur pilihan untuk lingkungan Anda.");
+  // Ekskul wajib punya kegiatan kategori (mis. Futsal → Olahraga); kelompok lain tanpa induk.
+  let induk = null;
+  if (kelompok === "ekstrakurikuler" && (!body.id || "induk_id" in body)) {
+    induk = await db.prepare("SELECT id, nama FROM pilihan WHERE id = ? AND kelompok = 'kegiatan'").bind(+body.induk_id || 0).first();
+    if (!induk) gagal(400, "Pilih kegiatan kategori ekskul ini (mis. Olahraga atau Kesenian).");
+  }
   if (body.id) {
     const lama = await db.prepare("SELECT * FROM pilihan WHERE id = ? AND kelompok = ?").bind(body.id, kelompok).first();
     if (!lama) gagal(404, "Pilihan tidak ditemukan.");
@@ -726,10 +732,13 @@ on("POST", "/api/pilihan", async ({ db, u, body }) => {
     if ("nama" in body && !nama) gagal(400, "Nama pilihan wajib diisi.");
     const urutan = body.urutan === undefined || body.urutan === "" ? null : Math.trunc(+body.urutan);
     if (Number.isNaN(urutan)) gagal(400, "Urutan harus angka.");
-    await db.prepare("UPDATE pilihan SET nama = COALESCE(?, nama), urutan = COALESCE(?, urutan), aktif = COALESCE(?, aktif), lingkungan = COALESCE(?, lingkungan) WHERE id = ?")
-      .bind(nama, urutan, body.aktif ?? null, lingSah, lama.id).run();
+    const gantiInduk = induk && induk.id !== lama.induk_id;
+    if (gantiInduk && await db.prepare("SELECT 1 FROM grup_kegiatan WHERE ekstrakurikuler_id = ? LIMIT 1").bind(lama.id).first())
+      gagal(400, "Ekskul ini sudah dipakai cabang kegiatan; kategorinya tidak bisa diganti.");
+    await db.prepare("UPDATE pilihan SET nama = COALESCE(?, nama), urutan = COALESCE(?, urutan), aktif = COALESCE(?, aktif), lingkungan = COALESCE(?, lingkungan), induk_id = COALESCE(?, induk_id) WHERE id = ?")
+      .bind(nama, urutan, body.aktif ?? null, lingSah, induk ? induk.id : null, lama.id).run();
     const beda = [nama && nama !== lama.nama ? `"${lama.nama}" → "${nama}"` : lama.nama, urutan != null && urutan !== lama.urutan ? `urutan ${urutan}` : "",
-      lingSah && lingSah !== lama.lingkungan ? lingSah : "", body.aktif != null ? (+body.aktif ? "aktif" : "nonaktif") : ""].filter(Boolean).join(", ");
+      lingSah && lingSah !== lama.lingkungan ? lingSah : "", body.aktif != null ? (+body.aktif ? "aktif" : "nonaktif") : "", gantiInduk ? "kategori " + induk.nama : ""].filter(Boolean).join(", ");
     await catat(db, u, "pilihan", "ubah", "pilihan", lama.id, `${kelompok}: ${beda}`);
     return json({ ok: true, id: lama.id });
   }
@@ -738,8 +747,8 @@ on("POST", "/api/pilihan", async ({ db, u, body }) => {
   if (!bolehLing(ling)) gagal(403, "Anda hanya bisa mengatur pilihan untuk lingkungan Anda.");
   if (!nama) gagal(400, "Nama pilihan wajib diisi.");
   const urut = await db.prepare("SELECT COALESCE(MAX(urutan),0)+1 n FROM pilihan WHERE kelompok = ?").bind(kelompok).first();
-  const r = await db.prepare("INSERT INTO pilihan (kelompok, nama, urutan, lingkungan) VALUES (?,?,?,?)").bind(kelompok, nama, urut.n, ling).run();
-  await catat(db, u, "pilihan", "tambah", "pilihan", r.meta.last_row_id, `${kelompok}: ${nama}`);
+  const r = await db.prepare("INSERT INTO pilihan (kelompok, nama, urutan, lingkungan, induk_id) VALUES (?,?,?,?,?)").bind(kelompok, nama, urut.n, ling, induk ? induk.id : null).run();
+  await catat(db, u, "pilihan", "tambah", "pilihan", r.meta.last_row_id, `${kelompok}: ${nama}${induk ? " (" + induk.nama + ")" : ""}`);
   return json({ ok: true, id: r.meta.last_row_id });
 });
 

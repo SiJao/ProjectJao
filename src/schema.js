@@ -780,5 +780,30 @@ export const MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS riwayat_user ON riwayat_perubahan (user_id, aksi)`,
       `CREATE INDEX IF NOT EXISTS skorsing_status ON skorsing (status, selesai)`
     ]
+  },
+  {
+    id: 8,
+    nama: "kegiatan-ekskul-kelompok",
+    sql: [
+      // Kegiatan (Halaqah Qur'an, Pramuka, Muhadhoroh) dinilai langsung; kegiatan kategori (Olahraga, Kesenian) berisi ekskul.
+      // Ekskul menunjuk kegiatan kategorinya lewat induk_id. Cabang = grup_kegiatan (satu per kegiatan/ekskul per lingkungan, satu pembimbing).
+      `ALTER TABLE pilihan ADD COLUMN induk_id INTEGER REFERENCES pilihan(id)`,
+      `UPDATE pilihan SET induk_id = (SELECT k.id FROM pilihan k WHERE k.kelompok = 'kegiatan' AND k.nama = 'Olahraga' ORDER BY k.id LIMIT 1)
+        WHERE kelompok = 'ekstrakurikuler' AND nama IN ('Futsal','Basket','Pencak silat')`,
+      `UPDATE pilihan SET induk_id = (SELECT k.id FROM pilihan k WHERE k.kelompok = 'kegiatan' AND k.nama = 'Kesenian' ORDER BY k.id LIMIT 1)
+        WHERE kelompok = 'ekstrakurikuler' AND nama IN ('Hadroh','Kaligrafi')`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS grup_kegiatan_cabang ON grup_kegiatan (kegiatan_id, COALESCE(ekstrakurikuler_id, 0), lingkungan)`,
+      // Kelompok milik satu cabang (mis. Futsal A, Regu Elang). Anggota boleh tanpa kelompok.
+      `CREATE TABLE kelompok_kegiatan (
+        id INTEGER PRIMARY KEY,
+        grup_id INTEGER NOT NULL REFERENCES grup_kegiatan(id),
+        nama TEXT NOT NULL,
+        aktif INTEGER NOT NULL DEFAULT 1,
+        dibuat_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (grup_id, nama)
+      )`,
+      `ALTER TABLE anggota_grup ADD COLUMN kelompok_id INTEGER REFERENCES kelompok_kegiatan(id)`,
+      `CREATE INDEX IF NOT EXISTS anggota_grup_kelompok ON anggota_grup (kelompok_id) WHERE kelompok_id IS NOT NULL`
+    ]
   }
 ];
