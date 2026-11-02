@@ -753,5 +753,32 @@ export const MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS santri_kelas ON santri (kelas_id, status)`,
       `CREATE INDEX IF NOT EXISTS santri_menunggu ON santri (menunggu_penempatan, status)`
     ]
+  },
+  {
+    id: 7,
+    nama: "indeks-hemat-baca",
+    sql: [
+      // Hasil audit EXPLAIN QUERY PLAN atas semua kueri yang dijalankan aplikasi: pemindaian penuh di tabel yang terus tumbuh.
+      // absensi: per santri (Portal Wali, rapor, rekap), hapus/koreksi otomatis per izin & kunjungan
+      `CREATE INDEX IF NOT EXISTS absensi_santri ON absensi (santri_id)`,
+      `CREATE INDEX IF NOT EXISTS absensi_izin ON absensi (izin_id) WHERE izin_id IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS absensi_kunjungan ON absensi (kunjungan_id) WHERE kunjungan_id IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS absensi_sesi_tanggal ON absensi_sesi (tanggal, lingkungan)`,
+      // cron overdue tiap 5 menit: izin berjalan yang lewat batas kembali
+      `CREATE INDEX IF NOT EXISTS izin_overdue ON izin (status, rencana_kembali)`,
+      // sesi & token: hapus per akun dan yang kedaluwarsa (setiap login / ganti password)
+      `CREATE INDEX IF NOT EXISTS sesi_login_user ON sesi_login (user_id)`,
+      `CREATE INDEX IF NOT EXISTS sesi_login_habis ON sesi_login (kedaluwarsa)`,
+      `CREATE INDEX IF NOT EXISTS sesi_wali_akun ON sesi_wali (akun_wali_id)`,
+      `CREATE INDEX IF NOT EXISTS sesi_wali_habis ON sesi_wali (kedaluwarsa)`,
+      `CREATE INDEX IF NOT EXISTS token_akun_wali ON token_akun (akun_wali_id, jenis)`,
+      // Portal Wali: kabar per akun & jeda kirim ulang
+      `CREATE INDEX IF NOT EXISTS email_akun_wali ON email_antrean (akun_wali_id, jenis) WHERE akun_wali_id IS NOT NULL`,
+      // kolom foreign key ke dirinya sendiri: tanpa indeks, setiap INSERT email & cek ralat vonis memindai seluruh antrean
+      `CREATE INDEX IF NOT EXISTS email_koreksi ON email_antrean (koreksi_dari_id) WHERE koreksi_dari_id IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS santri_wali_wali ON santri_wali (wali_id)`,
+      `CREATE INDEX IF NOT EXISTS riwayat_user ON riwayat_perubahan (user_id, aksi)`,
+      `CREATE INDEX IF NOT EXISTS skorsing_status ON skorsing (status, selesai)`
+    ]
   }
 ];

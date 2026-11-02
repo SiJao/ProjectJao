@@ -1388,11 +1388,19 @@ const App = {
       return GRUP_MENU.map((g) => [g, MENU.filter((m) => m.grup === g && m.syarat(me)).sort((a, b) => a.urutan - b.urutan).map((m) => [m.jalur, m.label])])
         .filter(([, i]) => i.length);
     });
-    // badge sidebar: dimuat ulang saat pindah halaman dan tiap menit
+    // badge sidebar + lonceng: tiap menit selama tab terlihat; pindah halaman memuat ulang bila data > 15 detik.
+    // Tab tersembunyi tidak memuat (hemat baca D1); saat tab dilihat lagi langsung diperbarui bila sudah lewat 1 menit.
     const lencana = ref({});
-    const muatLencana = async () => { if (negara.me && !negara.me.wajib_ganti_password) { lencana.value = await api("/lencana").catch(() => ({})); muatNotif(); } };
-    watch(() => [negara.rute, !!negara.me], muatLencana, { immediate: true });
-    setInterval(muatLencana, 60e3);
+    let terakhirLencana = 0;
+    const muatLencana = async (umur = 0) => {
+      if (document.hidden || !negara.me || negara.me.wajib_ganti_password || Date.now() - terakhirLencana < umur) return;
+      terakhirLencana = Date.now();
+      lencana.value = await api("/lencana").catch(() => ({})); muatNotif();
+    };
+    watch(() => negara.rute, () => muatLencana(15e3));
+    watch(() => !!negara.me, () => muatLencana(), { immediate: true });
+    setInterval(() => muatLencana(55e3), 60e3);
+    document.addEventListener("visibilitychange", () => muatLencana(60e3));
     async function keluar() { await api("/logout", {}); negara.me = null; pergi("/masuk"); }
     // menu laci (HP/tablet): tertutup saat pindah halaman atau tekan Esc
     const laci = ref(false);
