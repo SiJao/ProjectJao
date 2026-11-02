@@ -61,37 +61,81 @@ export default function (H) {
 
   // ---------------------------------------------------------------- pengumuman ke kelompok (Sekretaris & Moderator)
   // Penerima selalu di lingkungan pengguna; dobel dibuang (satu email per akun wali / per alamat pengurus).
-  async function penerima(db, u, body) {
-    const l = lingIn(u, "s.lingkungan");
-    const target = String(body.target || "");
-    if (target === "pengurus") {
-      return (await db.prepare(
-        `SELECT MIN(us.id) id, LOWER(us.email) email, MIN(us.nama) nama, MIN(s.lingkungan) lingkungan FROM users us JOIN santri s ON s.id = us.santri_id
-         WHERE us.status = 'aktif' AND s.status = 'aktif' AND us.email LIKE '%@%' AND ${l.sql} GROUP BY LOWER(us.email) ORDER BY nama`).bind(...l.args).all()).results;
+  // Saringan bisa digabung (K-118): lingkungan, kelas, kamar, jabatan (santri pemegang jabatan aktif) — atau daftar santri
+  // pilihan (santri_ids) yang menggantikan saringan kelas/kamar/jabatan. Sasaran: wali santri tsb. atau akun pengurus santri tsb.
+  const ID_JSON = "SELECT value FROM json_each(?)";
+  const angkaList = (x) => [...new Set((Array.isArray(x) ? x : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  const sasaranWali = (t) => ["wali", "semua_wali", "wali_kelas", "wali_kamar"].includes(t);
+  async function saringSantri(db, u, body) {
+    const w = [], a = [], uraian = [];
+    if (["putra", "putri"].includes(body.ling)) { cekLing(u, body.ling); w.push("s.lingkungan = ?"); a.push(body.ling); uraian.push(body.ling); }
+    else { const l = lingIn(u, "s.lingkungan"); w.push(l.sql); a.push(...l.args); }
+    const pilih = angkaList(body.santri_ids);
+    if (Array.isArray(body.santri_ids)) {
+      if (!pilih.length) gagal(400, "Belum ada santri yang dipilih.");
+      if (pilih.length > 3000) gagal(400, "Pilihan santri terlalu banyak.");
+      w.push(`s.id IN (${ID_JSON})`); a.push(JSON.stringify(pilih)); uraian.push(pilih.length + " santri dipilih");
+      return { w, a, uraian };
     }
-    const w = [l.sql], a = [...l.args];
-    if (target === "wali_kelas") {
-      const k = await db.prepare("SELECT lingkungan FROM kelas WHERE id = ?").bind(+body.kelas_id || 0).first();
-      if (!k) gagal(400, "Pilih kelas.");
-      cekLing(u, k.lingkungan);
-      w.push("s.kelas_id = ?"); a.push(+body.kelas_id);
-    } else if (target === "wali_kamar") {
-      const k = await db.prepare("SELECT lingkungan FROM kamar WHERE id = ?").bind(+body.kamar_id || 0).first();
-      if (!k) gagal(400, "Pilih kamar.");
-      cekLing(u, k.lingkungan);
-      w.push("s.kamar_id = ?"); a.push(+body.kamar_id);
-    } else if (target !== "semua_wali") gagal(400, "Sasaran pengumuman tidak dikenal.");
-    return (await db.prepare(
+    if (+body.kelas_id) {
+      const k = await db.prepare("SELECT tingkat, rombel, lingkungan FROM kelas WHERE id = ?").bind(+body.kelas_id).first();
+      if (!k) gagal(400, "Kelas tidak ditemukan.");
+      cekLing(u, k.lingkungan); w.push("s.kelas_id = ?"); a.push(+body.kelas_id); uraian.push(`kelas ${k.tingkat} ${k.rombel}`);
+    } else if (body.target === "wali_kelas") gagal(400, "Pilih kelas.");
+    if (+body.kamar_id) {
+      const k = await db.prepare("SELECT nama, lingkungan FROM kamar WHERE id = ?").bind(+body.kamar_id).first();
+      if (!k) gagal(400, "Kamar tidak ditemukan.");
+      cekLing(u, k.lingkungan); w.push("s.kamar_id = ?"); a.push(+body.kamar_id); uraian.push("kamar " + k.nama);
+    } else if (body.target === "wali_kamar") gagal(400, "Pilih kamar.");
+    const jab = angkaList(body.jabatan_ids);
+    if (jab.length) {
+      w.push(`EXISTS (SELECT 1 FROM pengurus pg WHERE pg.santri_id = s.id AND pg.selesai IS NULL AND pg.jabatan_id IN (${ID_JSON}))`); a.push(JSON.stringify(jab));
+      const nm = (await db.prepare(`SELECT nama FROM jabatan WHERE id IN (${ID_JSON}) ORDER BY urutan`).bind(JSON.stringify(jab)).all()).results.map((r) => r.nama);
+      uraian.push("jabatan " + nm.join(", "));
+    }
+    return { w, a, uraian };
+  }
+  async function penerima(db, u, body) {
+    const target = String(body.target || "");
+    if (target !== "pengurus" && !sasaranWali(target)) gagal(400, "Sasaran pengumuman tidak dikenal.");
+    const { w, a, uraian } = await saringSantri(db, u, body);
+    const label = (target === "pengurus" ? "pengurus" : "wali") + (uraian.length ? " (" + uraian.join(" · ") + ")" : "");
+    if (target === "pengurus") {
+      return { label, daftar: (await db.prepare(
+        `SELECT MIN(us.id) id, LOWER(us.email) email, MIN(us.nama) nama, MIN(s.lingkungan) lingkungan FROM users us JOIN santri s ON s.id = us.santri_id
+         WHERE us.status = 'aktif' AND s.status = 'aktif' AND us.email LIKE '%@%' AND ${w.join(" AND ")} GROUP BY LOWER(us.email) ORDER BY nama`).bind(...a).all()).results };
+    }
+    return { label, daftar: (await db.prepare(
       `SELECT a.id, a.email, a.nama, MIN(s.lingkungan) lingkungan FROM akun_wali a JOIN tautan_wali t ON t.akun_wali_id = a.id AND t.dicabut_at IS NULL
        JOIN santri s ON s.id = t.santri_id AND s.status IN ('aktif','skorsing')
-       WHERE a.status = 'aktif' AND ${w.join(" AND ")} GROUP BY a.id ORDER BY a.nama`).bind(...a).all()).results;
+       WHERE a.status = 'aktif' AND ${w.join(" AND ")} GROUP BY a.id ORDER BY a.nama`).bind(...a).all()).results };
   }
-  const LABEL_TARGET = { semua_wali: "semua wali", wali_kelas: "wali per kelas", wali_kamar: "wali per kamar", pengurus: "semua pengurus" };
+
+  // Calon untuk dicentang: santri hasil saringan (tanpa santri_ids) + jumlah penerima per santri, dan daftar jabatan untuk saringan.
+  on("POST", "/api/komunikasi/pengumuman/calon", async ({ db, u, body }) => {
+    if (!bolehUmumkan(u)) gagal(403, "Anda tidak punya akses untuk tindakan ini.");
+    const lj = lingIn(u, "lingkungan");
+    const SQL_JAB = `SELECT id, nama, lingkungan FROM jabatan WHERE aktif = 1 AND (lingkungan = 'semua' OR ${lj.sql}) ORDER BY urutan, nama`;
+    if (body.hanya_jabatan) return json({ jabatan: (await db.prepare(SQL_JAB).bind(...lj.args).all()).results });
+    const pengurus = body.target === "pengurus";
+    const { w, a } = await saringSantri(db, u, { ...body, santri_ids: undefined });
+    const [sR, jR] = await db.batch([
+      db.prepare(`SELECT s.id, s.nis, s.nama, s.lingkungan, s.foto_url, km.nama kamar, (k.tingkat || ' ' || k.rombel) kelas,
+          (SELECT GROUP_CONCAT(jb.nama, ', ') FROM pengurus pg JOIN jabatan jb ON jb.id = pg.jabatan_id WHERE pg.santri_id = s.id AND pg.selesai IS NULL) jabatan,
+          ${pengurus ? "(SELECT COUNT(*) FROM users us WHERE us.santri_id = s.id AND us.status = 'aktif')"
+            : "(SELECT COUNT(*) FROM tautan_wali t JOIN akun_wali aw ON aw.id = t.akun_wali_id WHERE t.santri_id = s.id AND t.dicabut_at IS NULL AND aw.status = 'aktif')"} penerima
+        FROM santri s LEFT JOIN kelas k ON k.id = s.kelas_id LEFT JOIN kamar km ON km.id = s.kamar_id
+        WHERE s.status IN ('aktif','skorsing') AND ${w.join(" AND ")} ORDER BY s.lingkungan, s.nama LIMIT 3001`).bind(...a),
+      db.prepare(SQL_JAB).bind(...lj.args),
+    ]);
+    if (sR.results.length > 3000) gagal(400, "Hasil saringan lebih dari 3.000 santri; persempit saringan.");
+    return json({ santri: sR.results, jabatan: jR.results });
+  });
 
   // Tanpa {konfirmasi:true} → pratinjau (jumlah + contoh); dengan konfirmasi → masuk antrean.
   on("POST", "/api/komunikasi/pengumuman", async ({ db, u, body }) => {
     if (!bolehUmumkan(u)) gagal(403, "Anda tidak punya akses untuk tindakan ini.");
-    const daftar = await penerima(db, u, body);
+    const { daftar, label } = await penerima(db, u, body);
     if (!body.konfirmasi) return json({ jumlah: daftar.length, contoh: daftar.slice(0, 5).map((r) => ({ nama: r.nama, email: r.email })) });
     const subjek = bersih(body.subjek, 150), isi = bersih(body.isi, 4000);
     if (!subjek || !isi) gagal(400, "Subjek dan isi pengumuman wajib diisi.");
@@ -99,7 +143,7 @@ export default function (H) {
     if (daftar.length > 3000) gagal(400, "Penerima terlalu banyak; persempit sasaran.");
     const wali = body.target !== "pengurus";
     const ling = lingTeks(u);
-    const ringkas = `Pengumuman "${subjek}" ke ${LABEL_TARGET[body.target]}: ${daftar.length} penerima`;
+    const ringkas = `Pengumuman "${subjek}" ke ${label}: ${daftar.length} penerima`.slice(0, 900);
     // Cegah ganda: catat dulu, lalu periksa catatan SEBELUMNYA yang sama (2 menit) — dua klik bersamaan → hanya yang pertama lanjut.
     const rw = await stmtCatat(db, u, "komunikasi", "pengumuman", "email_antrean", null, ringkas, ling).run();
     const rid = rw.meta.last_row_id;

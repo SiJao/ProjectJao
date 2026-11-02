@@ -84,7 +84,18 @@ export default function (H) {
     }
     // akun berlingkungan 'semua' (mis. guru umum) ikut menerima pengumuman lingkungan mana pun
     w.push(`us.lingkungan IN (SELECT value FROM json_each(?) UNION SELECT 'semua')`); a.push(JSON.stringify(ling));
-    return { where: w.join(" AND "), args: a, ling: ling.length === 2 ? "semua" : ling[0] };
+    // K-118: saring per jabatan (akun santri pemegang jabatan aktif) dan/atau akun pilihan (user_ids) di dalam sasaran yang sama
+    const angka = (x) => [...new Set((Array.isArray(x) ? x : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+    const jab = angka(body.jabatan_ids), pilih = angka(body.user_ids), uraian = [];
+    if (jab.length) {
+      w.push("us.santri_id IN (SELECT pg.santri_id FROM pengurus pg WHERE pg.selesai IS NULL AND pg.jabatan_id IN (SELECT value FROM json_each(?)))"); a.push(JSON.stringify(jab));
+      uraian.push(jab.length + " jabatan");
+    }
+    if (Array.isArray(body.user_ids)) {
+      if (!pilih.length) gagal(400, "Belum ada akun yang dipilih.");
+      w.push("us.id IN (SELECT value FROM json_each(?))"); a.push(JSON.stringify(pilih)); uraian.push(pilih.length + " akun dipilih");
+    }
+    return { where: w.join(" AND "), args: a, ling: ling.length === 2 ? "semua" : ling[0], uraian: uraian.join(" · ") };
   }
   on("POST", "/api/notifikasi/pengumuman", async ({ db, u, body }) => {
     if (!bolehUmumkan(u)) gagal(403, "Anda tidak punya akses untuk tindakan ini.");
@@ -94,7 +105,7 @@ export default function (H) {
     const judul = bersih(body.judul, 150), isi = bersih(body.isi, 2000);
     if (!judul || !isi) gagal(400, "Judul dan isi pengumuman wajib diisi.");
     if (!n) gagal(400, "Tidak ada penerima untuk sasaran ini.");
-    const ringkas = `Pengumuman internal "${judul}" ke ${body.sasaran} (${p.ling}): ${n} akun`;
+    const ringkas = `Pengumuman internal "${judul}" ke ${body.sasaran} (${p.ling}${p.uraian ? " · " + p.uraian : ""}): ${n} akun`;
     if (await db.prepare("SELECT 1 FROM riwayat_perubahan WHERE user_id = ? AND aksi = 'pengumuman_internal' AND ringkasan = ? AND waktu > datetime('now', '-2 minutes')").bind(u.id, ringkas).first())
       gagal(409, "Pengumuman yang sama baru saja dikirim.");
     const [ins] = await db.batch([
@@ -103,6 +114,22 @@ export default function (H) {
       stmtCatat(db, u, "komunikasi", "pengumuman_internal", "notifikasi", null, ringkas, p.ling),
     ]);
     return json({ ok: true, jumlah: ins.meta.changes });
+  });
+
+  // Calon penerima untuk dicentang (sasaran + lingkungan + jabatan, tanpa user_ids) dan daftar jabatan untuk saringan.
+  on("POST", "/api/notifikasi/pengumuman/calon", async ({ db, u, body }) => {
+    if (!bolehUmumkan(u)) gagal(403, "Anda tidak punya akses untuk tindakan ini.");
+    const lj = lingIn(u, "lingkungan");
+    const SQL_JAB = `SELECT id, nama, lingkungan FROM jabatan WHERE aktif = 1 AND (lingkungan = 'semua' OR ${lj.sql}) ORDER BY urutan, nama`;
+    if (body.hanya_jabatan) return json({ jabatan: (await db.prepare(SQL_JAB).bind(...lj.args).all()).results });
+    const p = penerima(u, { ...body, user_ids: undefined });
+    const [aR, jR] = await db.batch([
+      db.prepare(`SELECT us.id, us.nama, us.email, us.lingkungan, CASE WHEN us.role = 'moderator' THEN 'Moderator' WHEN us.guru_id IS NOT NULL THEN 'Guru' ELSE 'Pengurus' END jenis,
+          (SELECT GROUP_CONCAT(jb.nama, ', ') FROM pengurus pg JOIN jabatan jb ON jb.id = pg.jabatan_id WHERE pg.santri_id = us.santri_id AND pg.selesai IS NULL) jabatan
+        FROM users us WHERE ${p.where} ORDER BY jenis, us.lingkungan, us.nama LIMIT 3000`).bind(...p.args),
+      db.prepare(SQL_JAB).bind(...lj.args),
+    ]);
+    return json({ akun: aR.results, jabatan: jR.results });
   });
 
   // ---------------------------------------------------------------- detail akun saya

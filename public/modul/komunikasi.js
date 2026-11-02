@@ -12,8 +12,29 @@ const Komunikasi = {
     const jalan = async (fn) => { f.galat = ""; f.ok = ""; try { await fn(); } catch (e) { f.galat = e.message; } };
 
     // ---- pengumuman
-    const pg = reactive({ target: "semua_wali", kelas_id: "", kamar_id: "", subjek: "", isi: "", pratinjau: null, riwayat: [] });
-    const dataPg = () => ({ target: pg.target, kelas_id: +pg.kelas_id || null, kamar_id: +pg.kamar_id || null, subjek: pg.subjek, isi: pg.isi });
+    // Saringan bisa digabung (K-118): lingkungan, kelas, kamar, jabatan. "Tampilkan daftar" → santri hasil saringan bisa dicentang/dihapus
+    // dan ditambah lewat cari; bila daftar dibuka, yang dikirim adalah santri yang dicentang (santri_ids).
+    const pg = reactive({ target: "wali", ling: "", kelas_id: "", kamar_id: "", jabatan_ids: [], jabatan: [], calon: null, centang: {}, qCalon: "", tambah: null,
+      subjek: "", isi: "", pratinjau: null, riwayat: [] });
+    const lingPg = computed(() => (moderator.value || negara.me.lingkungan === "semua" ? ["putra", "putri"] : []));
+    const saringPg = () => ({ target: pg.target, ling: pg.ling || null, kelas_id: +pg.kelas_id || null, kamar_id: +pg.kamar_id || null, jabatan_ids: pg.jabatan_ids.map(Number) });
+    const dipilihPg = computed(() => (pg.calon || []).filter((s) => pg.centang[s.id]));
+    const dataPg = () => ({ ...saringPg(), ...(pg.calon ? { santri_ids: dipilihPg.value.map((s) => s.id) } : {}), subjek: pg.subjek, isi: pg.isi });
+    const kelasPg = computed(() => (m.value.kelas || []).filter((k) => k.aktif && (!pg.ling || k.lingkungan === pg.ling)));
+    const kamarPg = computed(() => (m.value.kamar || []).filter((k) => k.aktif && (!pg.ling || k.lingkungan === pg.ling)));
+    const calonTampil = computed(() => { const q = pg.qCalon.trim().toLowerCase(); return (pg.calon || []).filter((s) => !q || s.nama.toLowerCase().includes(q) || s.nis.startsWith(q)); });
+    const muatJabatanPg = () => jalan(async () => { pg.jabatan = (await api("/komunikasi/pengumuman/calon", { hanya_jabatan: true })).jabatan; });
+    const tampilkanCalon = () => jalan(async () => {
+      const r = await api("/komunikasi/pengumuman/calon", saringPg());
+      pg.calon = r.santri; pg.centang = Object.fromEntries(r.santri.map((s) => [s.id, true])); pg.pratinjau = null;
+    });
+    const centangSemua = (v) => calonTampil.value.forEach((s) => { pg.centang[s.id] = v; });
+    watch(() => pg.tambah, (s) => {
+      if (!s || !pg.calon) return;
+      if (!pg.calon.some((x) => x.id === s.id)) pg.calon.unshift({ id: s.id, nis: s.nis, nama: s.nama, lingkungan: s.lingkungan, foto_url: s.foto_url, kelas: s.kelas, kamar: s.kamar, penerima: null });
+      pg.centang[s.id] = true; pg.tambah = null; pg.pratinjau = null;
+    });
+    watch(() => pg.centang, () => { pg.pratinjau = null; }, { deep: true });
     const muatRiwayatPg = async () => { pg.riwayat = await api("/komunikasi/pengumuman"); };
     const pratinjauPg = () => jalan(async () => { pg.pratinjau = await api("/komunikasi/pengumuman", dataPg()); });
     const kirimPg = () => jalan(async () => {
@@ -21,7 +42,8 @@ const Komunikasi = {
       const r = await api("/komunikasi/pengumuman", { ...dataPg(), konfirmasi: true });
       f.ok = `${r.jumlah} email masuk antrean.`; pg.pratinjau = null; pg.subjek = ""; pg.isi = ""; await muatRiwayatPg();
     });
-    watch(() => [pg.target, pg.kelas_id, pg.kamar_id], () => { pg.pratinjau = null; });
+    // saringan berubah → daftar centang lama tidak berlaku
+    watch(() => [pg.target, pg.ling, pg.kelas_id, pg.kamar_id, pg.jabatan_ids.join()], () => { pg.pratinjau = null; pg.calon = null; pg.centang = {}; });
 
     // ---- email ke wali tertentu (Moderator)
     const ew = reactive({ santri: null, data: null, pilih: {}, subjek: "", isi: "" });
@@ -89,7 +111,8 @@ const Komunikasi = {
     }), { immediate: true });
     onMounted(() => muatMaster());
     const lencanaSt = (s) => ({ antre: "kuning", terkirim: "hijau", gagal: "merah", aktif: "hijau", belum_verifikasi: "kuning", nonaktif: "merah" }[s] || "");
-    return { moderator, m, tab, tabTampil, f, pg, pratinjauPg, kirimPg, ew, kirimWali, an, ulang, ulangSemua, kirimSekarang,
+    onMounted(muatJabatanPg);
+    return { moderator, m, tab, tabTampil, f, pg, pratinjauPg, kirimPg, lingPg, kelasPg, kamarPg, calonTampil, dipilihPg, tampilkanCalon, centangSemua, ew, kirimWali, an, ulang, ulangSemua, kirimSekarang,
       pw, aksiAkun, hapusAkunWali, cabut, tautkan, simpanHp, lencanaSt, namaKelas };
   },
   template: `<div><span class="jejak">Fungsi › Komunikasi</span><h1>Komunikasi</h1></div>
@@ -101,15 +124,33 @@ const Komunikasi = {
     <div class="kartu" style="display:flex;flex-direction:column;gap:12px;max-width:820px">
       <h2>Pengumuman ke kelompok</h2>
       <div class="baris">
-        <label class="isian">Sasaran<select v-model="pg.target"><option value="semua_wali">Semua wali</option><option value="wali_kelas">Wali per kelas</option><option value="wali_kamar">Wali per kamar</option><option value="pengurus">Semua pengurus</option></select></label>
-        <label class="isian" v-if="pg.target==='wali_kelas'">Kelas<select v-model="pg.kelas_id"><option value="">Pilih kelas…</option><option v-for="k in (m.kelas || []).filter(k => k.aktif)" :value="k.id">{{ namaKelas(k) }} ({{ k.lingkungan }})</option></select></label>
-        <label class="isian" v-if="pg.target==='wali_kamar'">Kamar<select v-model="pg.kamar_id"><option value="">Pilih kamar…</option><option v-for="k in (m.kamar || []).filter(k => k.aktif)" :value="k.id">{{ k.nama }}</option></select></label>
+        <label class="isian">Sasaran<select v-model="pg.target"><option value="wali">Wali santri</option><option value="pengurus">Pengurus (akun santri)</option></select></label>
+        <label class="isian" v-if="lingPg.length">Lingkungan<select v-model="pg.ling"><option value="">Putra & putri</option><option v-for="l in lingPg" :value="l">{{ l }}</option></select></label>
+        <label class="isian">Kelas<select v-model="pg.kelas_id"><option value="">Semua kelas</option><option v-for="k in kelasPg" :value="k.id">{{ namaKelas(k) }}{{ lingPg.length ? ' (' + k.lingkungan + ')' : '' }}</option></select></label>
+        <label class="isian">Kamar<select v-model="pg.kamar_id"><option value="">Semua kamar</option><option v-for="k in kamarPg" :value="k.id">{{ k.nama }}</option></select></label>
       </div>
-      <p class="redup" style="margin:0">Wali = akun Portal Wali aktif yang tertaut ke santri aktif di lingkungan Anda. Pengurus = akun pengurus santri yang aktif. Setiap penerima hanya mendapat satu email.</p>
+      <details class="kartu" style="padding:10px 14px;box-shadow:none"><summary style="cursor:pointer"><strong>Jabatan / bagian</strong> <span class="redup">— {{ pg.jabatan_ids.length ? pg.jabatan_ids.length + ' dipilih (hanya santri pemegang jabatan itu)' : 'semua (tanpa saringan jabatan)' }}</span></summary>
+        <div style="display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;max-height:220px;overflow:auto">
+          <label v-for="j in pg.jabatan" :key="j.id" style="display:flex;gap:6px;align-items:center;font-size:13.5px;flex:1 1 260px"><input type="checkbox" :value="j.id" v-model="pg.jabatan_ids">{{ j.nama }}</label></div>
+        <button v-if="pg.jabatan_ids.length" class="kedua kecil" style="margin-top:6px" @click="pg.jabatan_ids = []">Kosongkan</button></details>
+      <div class="baris"><button class="kedua" @click="tampilkanCalon">{{ pg.calon ? 'Muat ulang daftar santri' : 'Tampilkan daftar santri (pilih satu per satu)' }}</button>
+        <button v-if="pg.calon" class="kedua" @click="pg.calon = null; pg.centang = {}; pg.pratinjau = null">Pakai saringan saja</button></div>
+      <template v-if="pg.calon">
+        <div class="baris"><label class="isian" style="flex:1 1 200px">Saring daftar<input v-model="pg.qCalon" placeholder="Nama atau NIS"></label>
+          <div style="flex:1 1 280px"><span class="redup" style="font-size:13px">Tambah santri di luar saringan</span><CariSantri v-model="pg.tambah"/></div></div>
+        <div class="baris"><button class="kedua kecil" @click="centangSemua(true)">Centang semua</button><button class="kedua kecil" @click="centangSemua(false)">Kosongkan</button>
+          <span class="redup">{{ dipilihPg.length }} dari {{ pg.calon.length }} santri dipilih</span></div>
+        <div class="tabel" style="max-height:360px;overflow:auto"><table><thead><tr><th></th><th>Santri</th><th>Jabatan</th><th>{{ pg.target === 'pengurus' ? 'Akun' : 'Akun wali' }}</th></tr></thead>
+          <tbody v-baris><tr v-for="s in calonTampil" :key="s.id" :style="{opacity: pg.centang[s.id] ? 1 : .55}"><td style="width:36px"><input type="checkbox" v-model="pg.centang[s.id]" :aria-label="'Pilih ' + s.nama"></td>
+            <td><div class="santri-sel"><FotoSantri :s="s" ukuran="kecil"/><span><strong>{{ s.nama }}</strong><div class="redup">{{ s.nis }}{{ s.kelas ? ' · ' + s.kelas : '' }}{{ s.kamar ? ' · ' + s.kamar : '' }}</div></span></div></td>
+            <td class="redup">{{ s.jabatan || '—' }}</td><td><span v-if="s.penerima === null" class="redup">?</span><span v-else class="lencana" :class="s.penerima ? 'hijau' : 'kuning'">{{ s.penerima || 'tidak ada' }}</span></td></tr></tbody></table>
+          <p v-if="!calonTampil.length" class="redup" style="padding:14px">Tidak ada santri.</p></div>
+      </template>
+      <p class="redup" style="margin:0">Wali = akun Portal Wali aktif yang tertaut ke santri terpilih. Pengurus = akun santri yang aktif. Santri tanpa akun (wali) tidak menerima email. Setiap penerima hanya mendapat satu email.</p>
       <label class="isian">Subjek<input v-model="pg.subjek" maxlength="150"></label>
       <label class="isian">Isi<textarea v-model="pg.isi" rows="6" maxlength="4000"></textarea></label>
       <p class="redup" style="margin:0">Jangan menulis data sensitif (diagnosa, isi vonis) di email.</p>
-      <div class="baris"><button class="kedua" @click="pratinjauPg">Pratinjau penerima</button>
+      <div class="baris"><button class="kedua" :disabled="pg.calon && !dipilihPg.length" @click="pratinjauPg">Pratinjau penerima</button>
         <button v-if="pg.pratinjau" :disabled="!pg.pratinjau.jumlah || !pg.subjek || !pg.isi" @click="kirimPg">Kirim ke {{ pg.pratinjau.jumlah }} penerima</button></div>
       <div v-if="pg.pratinjau" class="pesan info"><strong>{{ pg.pratinjau.jumlah }}</strong> penerima.
         <span v-if="pg.pratinjau.contoh.length"> Contoh: <span v-for="(c, i) in pg.pratinjau.contoh">{{ i ? ', ' : '' }}{{ c.nama }} &lt;{{ c.email }}&gt;</span></span></div>

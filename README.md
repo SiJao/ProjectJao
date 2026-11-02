@@ -728,7 +728,7 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
 
 **Di dalam aplikasi:** badge di sidebar (pelanggaran menunggu sidang, santri menunggu pemeriksaan, izin overdue, akun belum punya akses) dan **lonceng notifikasi** untuk pengurus & guru:
 - **Perlu ditindaklanjuti** (dihitung langsung sesuai akses): izin overdue, pelanggaran menunggu sidang, kunjungan belum diperiksa, absensi kamar yang belum diisi per tanggal (sejak absensi mulai dipakai, 7 hari terakhir).
-- **Pengumuman internal** dari Moderator/pemegang akses Pengumuman ke pengurus, guru, atau semua akun (lingkungan sendiri).
+- **Pengumuman internal** dari Moderator/pemegang akses Pengumuman ke pengurus, guru, atau semua akun (lingkungan sendiri) — bisa disaring per **jabatan/bagian** dan **dicentang per akun** (K-118).
 - **Perubahan akun sendiri**: preset diterapkan, status Moderator, lingkungan, akses diberikan/dicabut, password direset, penetapan wali kelas/wali asuh.
 - **Kabar santri binaan** untuk guru wali kelas & wali asuh (tahun ajaran aktif): izin, overdue, sakit dirawat, vonis berat, prestasi — tanpa data sensitif.
 
@@ -746,7 +746,7 @@ Mengganti **satu** pengurus di tengah masa khidmat tanpa Serah Terima massal (mi
 - Kabar yang ternyata salah input diikuti **email koreksi**.
 
 **Email manual:**
-- **Pengumuman ke kelompok** (semua wali, wali per kelas/kamar, semua pengurus, dll.) — dengan pratinjau & konfirmasi.
+- **Pengumuman ke kelompok** (wali santri atau akun pengurus) — saringan bisa digabung: **lingkungan**, **kelas**, **kamar**, **jabatan/bagian** (wali/akun santri pemegang jabatan itu); daftar santri hasil saringan bisa **dicentang satu per satu** dan ditambah lewat cari (K-118). Dengan pratinjau & konfirmasi.
 - **Email ke wali tertentu** — **hanya Moderator** (mis. surat pemanggilan).
 - **Kirim ulang** email yang gagal (Moderator).
 
