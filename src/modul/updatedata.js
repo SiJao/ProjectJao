@@ -303,7 +303,7 @@ export default function (H) {
   async function stmtAkun(db, s, lama, presetSql = null, presetArgs = []) {
     if (lama && lama.status === "aktif" && lama.password_hash)
       return { status: "aktif", password: null, st: [db.prepare("UPDATE users SET role = NULL, status = 'aktif', lingkungan = ? WHERE id = ?").bind(s.lingkungan, lama.id), ...presetAkun(db, s, presetSql, presetArgs)] };
-    const pw = H.passwordSementara(), hash = await H.hashPassword(pw);
+    const pw = H.passwordSementara(), hash = await H.hashSementara(pw);
     if (lama) {
       return { status: "aktif", password: pw, st: [db.prepare(`UPDATE users SET role = NULL, status = 'aktif', password_hash = ?, wajib_ganti_password = 1,
         lingkungan = ?, gagal_login = 0, terkunci_sampai = NULL WHERE id = ?`).bind(hash, s.lingkungan, lama.id),
@@ -460,7 +460,7 @@ export default function (H) {
       if (data.some((d) => d.id === s.santri_id)) continue;
       const pw = s.akun === "tetap" ? null : H.passwordSementara();
       if (pw) sandi.push({ nis: s.nis, nama: s.nama, password: pw });
-      data.push({ id: s.santri_id, l: s.lingkungan, e: EMAIL(s.nis), n: s.nama, h: pw ? await H.hashPassword(pw) : null });
+      data.push({ id: s.santri_id, l: s.lingkungan, e: EMAIL(s.nis), n: s.nama, h: pw ? await H.hashSementara(pw) : null });
     }
     const J = JSON.stringify(data), JJ = JSON.stringify(jabatanBaru);
     const DATA = `SELECT json_extract(value, '$.id') id, json_extract(value, '$.l') l, json_extract(value, '$.e') e, json_extract(value, '$.n') n, json_extract(value, '$.h') h FROM json_each(?)`;
@@ -577,7 +577,7 @@ export default function (H) {
       WHERE u.status = 'tertahan' AND s.status = 'aktif' AND ${l.sql} LIMIT 30`).bind(...l.args).all()).results;
     if (!r.length) return json({ ok: true, jumlah: 0, sandi: [] });
     const data = [], sandi = [];
-    for (const x of r) { const pw = H.passwordSementara(); sandi.push({ nis: x.nis, nama: x.nama, password: pw }); data.push({ id: x.id, h: await H.hashPassword(pw) }); }
+    for (const x of r) { const pw = H.passwordSementara(); sandi.push({ nis: x.nis, nama: x.nama, password: pw }); data.push({ id: x.id, h: await H.hashSementara(pw) }); }
     await db.batch([
       db.prepare(`UPDATE users SET status = 'aktif', password_hash = j.h, wajib_ganti_password = 1
         FROM (SELECT json_extract(value, '$.id') id, json_extract(value, '$.h') h FROM json_each(?)) j WHERE users.id = j.id AND users.status = 'tertahan'`).bind(JSON.stringify(data)),

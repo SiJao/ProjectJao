@@ -1181,6 +1181,24 @@ const Pengguna = {
     const KELOMPOK_AKUN = [["belum", "Belum aktif", belumAktif], ["aktif", "Sudah aktif", (x) => x.keadaan === "aktif"], ["nonaktif", "Nonaktif", (x) => x.keadaan === "nonaktif"], ["semua", "Semua", () => true]];
     const jumlahKelompok = computed(() => Object.fromEntries(KELOMPOK_AKUN.map((k) => [k[0], f.users.filter(k[2]).length])));
     if (!f.kelompok) f.kelompok = "semua";
+    // password baru massal untuk akun belum aktif yang dicentang (maks. 100 per kiriman; dipecah otomatis)
+    const centangAkun = reactive({});
+    const bisaMassal = (x) => belumAktif(x) && x.punya_password;
+    const dicentang = computed(() => f.users.filter((x) => centangAkun[x.id] && bisaMassal(x)));
+    const centangSemuaAkun = (v) => tampil.value.filter(bisaMassal).forEach((x) => { centangAkun[x.id] = v; });
+    async function sandiMassal() {
+      const ids = dicentang.value.map((x) => x.id);
+      if (!ids.length || !confirm(`Buat password sementara baru untuk ${ids.length} akun? Password lama mereka langsung tidak berlaku.`)) return;
+      f.galat = ""; f.ok = "";
+      const hasil = [];
+      try {
+        for (let i = 0; i < ids.length; i += 100) hasil.push(...(await api("/akun/password-baru-massal", { ids: ids.slice(i, i + 100) })).sandi);
+        f.ok = `Password baru dibuat untuk ${hasil.length} akun.`;
+      } catch (e) { f.galat = e.message; }
+      if (hasil.length) f.sandi = hasil;
+      Object.keys(centangAkun).forEach((k) => delete centangAkun[k]);
+      await muat();
+    }
     const tampil = computed(() => { const q = f.q.trim().toLowerCase(); const cocok = KELOMPOK_AKUN.find((k) => k[0] === f.kelompok)[2];
       return f.users.filter((u) => cocok(u) && (!q || (u.nama + " " + u.email + " " + (u.nis || "") + " " + (u.nip || "")).toLowerCase().includes(q))); });
     // daftar akses: akses fungsi & lihat, lalu izin mengedit daftar pilihan
@@ -1199,7 +1217,7 @@ const Pengguna = {
     const dipakai = (p) => f.users.filter((u) => u.preset_id === p.id && u.status === "aktif").length;
 
     onMounted(async () => { await muatMaster(); try { await muat(); } catch (e) { f.galat = e.message; } });
-    return { meId: negara.me.id, hapusAkun, KELOMPOK_AKUN, jumlahKelompok, LABEL_KEADAAN, KELAS_KEADAAN, belumAktif, tab, f, m, buatPengurus, buatGuru, buatMod, ubah, akses, reset, terapkan, jadikanMod, labelUser, kelasLabel, tampil, aksesUtama, aksesPilihan, namaAkses,
+    return { meId: negara.me.id, hapusAkun, centangAkun, bisaMassal, dicentang, centangSemuaAkun, sandiMassal, KELOMPOK_AKUN, jumlahKelompok, LABEL_KEADAAN, KELAS_KEADAAN, belumAktif, tab, f, m, buatPengurus, buatGuru, buatMod, ubah, akses, reset, terapkan, jadikanMod, labelUser, kelasLabel, tampil, aksesUtama, aksesPilihan, namaAkses,
       ed, sunting, batal, simpanPreset, hapusPreset, dipakai, samaPreset, negara };
   },
   template: `<div><span class="jejak">Fungsi › Akses</span><h1>Pengguna & Manajemen Akses</h1></div>
@@ -1223,8 +1241,11 @@ const Pengguna = {
       <div class="tab"><button v-for="k in KELOMPOK_AKUN" :key="k[0]" :class="{aktif: f.kelompok===k[0]}" @click="f.kelompok=k[0]">{{ k[1] }} ({{ jumlahKelompok[k[0]] }})</button></div>
       <p v-if="f.kelompok==='belum'" class="redup" style="margin:0">Akun yang belum pernah login atau belum mengganti password sementara. Password tidak disimpan; bila lupa dicatat, klik <strong>Password baru</strong> (password lama langsung tidak berlaku). Akun guru/Moderator masuk dengan Google.</p>
       <label class="isian">Cari akun<input v-model="f.q" placeholder="Nama, email, NIS, atau NIP"></label>
-      <div class="tabel"><table><thead><tr><th>Nama</th><th>Akses</th><th>Status</th><th></th></tr></thead>
+      <div v-if="f.kelompok==='belum'" class="baris"><button class="kedua kecil" @click="centangSemuaAkun(true)">Centang semua</button><button class="kedua kecil" @click="centangSemuaAkun(false)">Kosongkan</button>
+        <button class="kecil" :disabled="!dicentang.length" @click="sandiMassal">Password baru untuk {{ dicentang.length }} akun dicentang</button></div>
+      <div class="tabel"><table><thead><tr><th v-if="f.kelompok==='belum'"></th><th>Nama</th><th>Akses</th><th>Status</th><th></th></tr></thead>
       <tbody><tr v-for="u in tampil" :key="u.id" :style="{background: f.sel && f.sel.id===u.id ? '#EEF5F1' : ''}">
+        <td v-if="f.kelompok==='belum'" style="width:36px"><input v-if="bisaMassal(u)" type="checkbox" v-model="centangAkun[u.id]" :aria-label="'Pilih ' + u.nama"></td>
         <td><strong>{{ u.nama }}</strong><div class="redup">{{ u.email }}</div></td>
         <td><span class="lencana" :class="kelasLabel(u)">{{ labelUser(u) }}</span></td>
         <td><span class="lencana" :class="KELAS_KEADAAN[u.keadaan]">{{ LABEL_KEADAAN[u.keadaan] || u.status }}</span></td>

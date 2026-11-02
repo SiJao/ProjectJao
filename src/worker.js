@@ -34,12 +34,15 @@ const normalHp = (s) => {
 const bersih = (s, max = 200) => (s == null ? null : String(s).trim().slice(0, max) || null);
 
 // ---------------------------------------------------------------- password (PBKDF2-SHA256)
-async function hashPassword(pw) {
+async function hashPassword(pw, iterasi = 100000) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 100000 }, key, 256);
-  return `pbkdf2$100000$${hex(salt)}$${hex(bits)}`;
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: iterasi }, key, 256);
+  return `pbkdf2$${iterasi}$${hex(salt)}$${hex(bits)}`;
 }
+// Password sementara akun santri/pengurus: acak (~50 bit) dan wajib diganti saat masuk pertama → cukup di-hash ringan, supaya
+// impor/isi pengurus massal tidak melewati batas CPU Worker (K-119). Password pilihan pengguna tetap 100.000 putaran.
+const hashSementara = (pw) => hashPassword(pw, 2000);
 async function cekPassword(pw, stored) {
   if (!stored) return false;
   const [alg, iter, saltHex, hashHex] = stored.split("$");
@@ -1135,7 +1138,7 @@ on("POST", "/api/users/dari-santri", async ({ db, u, body }) => {
   const preset = await cariPreset(db, body);
   const pw = passwordSementara();
   const r = await db.prepare("INSERT INTO users (email, password_hash, nama, santri_id, lingkungan, status, wajib_ganti_password) VALUES (?,?,?,?,?,'aktif',1)")
-    .bind(`${s.nis}@daarululuumlido.com`, await hashPassword(pw), s.nama, s.id, s.lingkungan).run();
+    .bind(`${s.nis}@daarululuumlido.com`, await hashSementara(pw), s.nama, s.id, s.lingkungan).run();
   if (preset) await db.batch(stmtTerapkanPreset(db, "?", [r.meta.last_row_id], "?", [preset.id], u.id));
   await catat(db, u, "akun", "buat", "users", r.meta.last_row_id, `Akun pengurus ${s.nis}${preset ? " · preset " + preset.nama : ""}`, s.lingkungan);
   return json({ ok: true, id: r.meta.last_row_id, password_sementara: pw });
@@ -1284,12 +1287,34 @@ on("POST", "/api/users/:id/reset-password", async ({ db, u, p }) => {
   }
   const pw = passwordSementara();
   await db.batch([
-    db.prepare("UPDATE users SET password_hash = ?, wajib_ganti_password = 1, gagal_login = 0, terkunci_sampai = NULL, status = CASE WHEN status = 'tertahan' THEN 'aktif' ELSE status END WHERE id = ?").bind(await hashPassword(pw), t.id),
+    db.prepare("UPDATE users SET password_hash = ?, wajib_ganti_password = 1, gagal_login = 0, terkunci_sampai = NULL, status = CASE WHEN status = 'tertahan' THEN 'aktif' ELSE status END WHERE id = ?").bind(await hashSementara(pw), t.id),
     db.prepare("DELETE FROM sesi_login WHERE user_id = ?").bind(t.id),
     stmtNotif(db, t.id, { jenis: "akun", judul: "Password Anda direset oleh " + (u.role === "moderator" ? "Moderator" : u.nama), isi: "Bila Anda tidak memintanya, segera hubungi Moderator.", tautan: "/akun" }),
   ]);
   await catat(db, u, "akun", "reset_password", "users", t.id, t.email);
   return json({ ok: true, password_sementara: pw });
+});
+
+// Password baru massal (Moderator, K-119): hanya akun BELUM aktif yang berpassword; maks. 100 per permintaan. Hasil dikembalikan sekali.
+on("POST", "/api/akun/password-baru-massal", async ({ db, u, body }) => {
+  wajibModerator(u);
+  const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  if (!ids.length) gagal(400, "Pilih akun.");
+  if (ids.length > 100) gagal(400, "Maksimal 100 akun per kiriman.");
+  const r = (await db.prepare(`SELECT u.id, u.nama, u.email, s.nis, ${SQL_KEADAAN} keadaan FROM users u LEFT JOIN santri s ON s.id = u.santri_id
+    WHERE u.id IN (SELECT value FROM json_each(?)) AND u.password_hash IS NOT NULL`).bind(JSON.stringify(ids)).all()).results
+    .filter((x) => x.keadaan === "belum_login" || x.keadaan === "belum_ganti");
+  if (!r.length) gagal(400, "Tidak ada akun belum aktif (berpassword) yang dipilih.");
+  const data = [], sandi = [];
+  for (const x of r) { const pw = passwordSementara(); sandi.push({ nama: x.nama, nis: x.nis, email: x.email, password: pw }); data.push({ id: x.id, h: await hashSementara(pw) }); }
+  const J = JSON.stringify(data);
+  await db.batch([
+    db.prepare(`UPDATE users SET password_hash = j.h, wajib_ganti_password = 1, gagal_login = 0, terkunci_sampai = NULL
+      FROM (SELECT json_extract(value, '$.id') id, json_extract(value, '$.h') h FROM json_each(?)) j WHERE users.id = j.id`).bind(J),
+    db.prepare("DELETE FROM sesi_login WHERE user_id IN (SELECT json_extract(value, '$.id') FROM json_each(?))").bind(J),
+    stmtCatat(db, u, "akun", "reset_password", "users", null, `Password baru massal: ${r.length} akun belum aktif (${r.map((x) => x.nis || x.email).join(", ")})`.slice(0, 900)),
+  ]);
+  return json({ ok: true, jumlah: r.length, dilewati: ids.length - r.length, sandi });
 });
 
 // ---------------------------------------------------------------- perizinan
@@ -1547,7 +1572,7 @@ on("GET", "/api/riwayat", async ({ db, u, url }) => {
 // Setiap modul: export default function (H) { H.on(...); H.migrasi([...]); H.berkala(nama, fn); }
 import modul from "./modul/index.js";
 const H = {
-  on, json, gagal, Galat, wib, hariIni, keMs, bersih, normalHp, randomHex, sha256, hashPassword, cekPassword, passwordSementara, batasIp, catatGagalIp, cekTurnstile,
+  on, json, gagal, Galat, wib, hariIni, keMs, bersih, normalHp, randomHex, sha256, hashPassword, hashSementara, cekPassword, passwordSementara, batasIp, catatGagalIp, cekTurnstile,
   pengaturan, boleh, wajib, wajibModerator, adaAkses, wajibAdaAkses, lingIn, cekLing, catat, stmtCatat, tanda, cekSandi, taAktif, masaKhidmatAktif,
   TUTUP_STATUS, stmtUbahStatus, pindahRiwayat, bacaKelas, statusOtomatis, perbaruiOverdue, keadaanIzin, buatSesi,
   stmtNotif, stmtNotifGuru, GURU_BINAAN, stmtTerapkanPreset, cariPreset,
