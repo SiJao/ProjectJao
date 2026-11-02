@@ -19,6 +19,12 @@ const hariIni = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 1
 // Tanpa role: label akun = Moderator · nama preset terakhir · akses manual · belum ada akses.
 const labelAkun = (me) => !me ? "" : me.role === "moderator" ? "Moderator" : me.preset || (me.akses && me.akses.length ? "Akses manual" : "Belum ada akses");
 const namaKelas = (k) => k ? `${k.tingkat} ${k.rombel} ${k.jenjang || ""}${k.label ? " " + k.label : ""}`.trim() : "";
+// Hapus permanen (hanya Moderator, K-114). Item yang sudah dipakai ditolak server dengan rincian pemakaiannya → cukup dinonaktifkan.
+async function hapusData(tabel, id, nama, catatan = "") {
+  if (!confirm(`Hapus ${nama} secara permanen?${catatan ? "\n\n" + catatan : ""}\n\nTindakan ini tidak bisa dibatalkan.`)) return false;
+  await api("/hapus", { tabel, id });
+  return true;
+}
 
 // ---------------------------------------------------------------- animasi (anime.js) — mati bila "kurangi gerakan" aktif di perangkat
 const A = window.anime;
@@ -798,6 +804,7 @@ const DataMaster = {
     }
     const PERAN_WALI = { wali: "wali", asisten: "asisten", wali_asuh: "wali asuh" };
     async function simpanMaster(tabel, data) { f.galat = ""; f.ok = ""; try { await api("/master/" + tabel, data); f.ok = "Tersimpan."; await muatMaster(); } catch (e) { f.galat = e.message; } }
+    async function hapus(tabel, id, nama) { f.galat = ""; f.ok = ""; try { if (await hapusData(tabel, id, nama)) { f.ok = nama + " dihapus."; await muatMaster(); } } catch (e) { f.galat = e.message; } }
     async function bukaSantri(s) { f.edit = s ? await api("/santri/" + s.id) : { nis: "", nama: "", jenis_kelamin: "L", status: "aktif" }; }
     async function simpanSantri() { f.galat = ""; try { await api("/santri", f.edit); f.ok = "Data santri tersimpan."; f.edit = null; cari(); muatMaster(); } catch (e) { f.galat = e.message; } }
     const isiPilihan = computed(() => (m.value.pilihan || []).filter((p) => p.kelompok === f.kelompok));
@@ -881,7 +888,7 @@ const DataMaster = {
       } catch (e) { f.galat = `${e.message} — berhenti pada santri ke-${i + 1}. Klik Impor sekarang lagi; NIS yang sudah masuk hanya diperbarui, tidak dobel.`; } finally { f.sibuk = false; }
     }
     onMounted(async () => { await muatMaster(); cari(); });
-    return { hal, potong, waliDari, guruUntuk, aturWali, hapusWali, PERAN_WALI, tab, f, m, moderator, bisaPilihan, cari, simpanMaster, bukaSantri, simpanSantri, KELOMPOK, isiPilihan, kegiatanInduk, namaInduk, tambahPilihan, ubahPilihan, ed, sunting, batalSunting, sedangSunting, simpanSunting, baru, tambahKamar, bacaFile, jalankanImpor, namaKelas,
+    return { hapus, hal, potong, waliDari, guruUntuk, aturWali, hapusWali, PERAN_WALI, tab, f, m, moderator, bisaPilihan, cari, simpanMaster, bukaSantri, simpanSantri, KELOMPOK, isiPilihan, kegiatanInduk, namaInduk, tambahPilihan, ubahPilihan, ed, sunting, batalSunting, sedangSunting, simpanSunting, baru, tambahKamar, bacaFile, jalankanImpor, namaKelas,
       saring, saranSantri, pilihSaran, navS, tutupSaran, g, guruTersaring, saranGuru, ubahGuru, navG, tutupSaranGuru, simpanGuru, guruKosong, isiGuru, bacaGuru, imporGuru, templatGuru };
   },
   template: `<div><span class="jejak">Administrasi</span><h1>Data Master</h1></div>
@@ -940,7 +947,7 @@ const DataMaster = {
           <button v-if="moderator" class="tanpa-gaya" :aria-label="'Hapus ' + w.nama" @click="hapusWali('kelas', w)">✕</button></span>
           <select v-if="moderator && k.aktif" class="kecil" aria-label="Tetapkan wali kelas" @change="aturWali('kelas', k, $event.target.value); $event.target.value = ''">
             <option value="">+ {{ waliDari('kelas', k.id).length ? 'asisten' : 'wali' }}…</option><option v-for="g in guruUntuk(k.lingkungan, 'kelas', k.id)" :value="g.id">{{ g.nama }}</option></select></div></td>
-        <td>{{ k.aktif ? 'Aktif' : 'Nonaktif' }}</td><td><button class="kedua kecil" @click="simpanMaster('kelas', {id: k.id, aktif: k.aktif ? 0 : 1})">{{ k.aktif ? 'Nonaktifkan' : 'Aktifkan' }}</button></td></tr></tbody></table></div>
+        <td>{{ k.aktif ? 'Aktif' : 'Nonaktif' }}</td><td><div class="baris" style="gap:6px;flex-wrap:nowrap"><button class="kedua kecil" @click="simpanMaster('kelas', {id: k.id, aktif: k.aktif ? 0 : 1})">{{ k.aktif ? 'Nonaktifkan' : 'Aktifkan' }}</button><button v-if="moderator" class="bahaya kecil" @click="hapus('kelas', k.id, 'kelas ' + namaKelas(k))">Hapus</button></div></td></tr></tbody></table></div>
     <Paginasi v-model="hal.kelas" :jumlah="(m.kelas || []).length"/>
     <p class="redup">Rombel statis (K-89): yang berubah tiap tahun hanya santri dan wali kelasnya. Wali kelas ditetapkan per tahun ajaran aktif; guru yang punya akun menerima kabar santri binaannya di notifikasi.</p>
   </template>
@@ -950,13 +957,14 @@ const DataMaster = {
       <div class="kartu baris"><label class="isian">Asrama baru<input v-model="baru.asrama.nama"></label><label class="isian">Lingkungan<select v-model="baru.asrama.lingkungan"><option>putra</option><option>putri</option></select></label><button @click="simpanMaster('asrama', baru.asrama)">Tambah</button></div>
       <div class="kartu baris"><label class="isian">Asrama<select v-model="baru.kamar.asrama_id"><option v-for="a in m.asrama" :value="a.id">{{ a.nama }}</option></select></label><label class="isian">Nomor kamar<input v-model="baru.kamar.nomor" placeholder="01"></label><button @click="tambahKamar">Tambah kamar</button></div>
     </div>
+    <div v-if="moderator && (m.asrama || []).length" class="baris" style="gap:6px"><span class="redup">Asrama:</span><span v-for="a in m.asrama" :key="a.id" class="lencana">{{ a.nama }} · {{ a.lingkungan }} <button class="tanpa-gaya" :aria-label="'Hapus asrama ' + a.nama" @click="hapus('asrama', a.id, 'asrama ' + a.nama)">✕</button></span></div>
     <div class="tabel"><table><thead><tr><th>Kamar</th><th>Lingkungan</th><th>Penghuni</th><th>Wali asuh (TA aktif)</th><th>Status</th><th></th></tr></thead>
       <tbody><tr v-for="k in potong(m.kamar, hal.kamar)" :key="k.id"><td><strong>{{ k.nama }}</strong></td><td>{{ k.lingkungan }}</td><td>{{ k.jumlah }}</td>
         <td><div class="baris" style="gap:4px"><span v-for="w in waliDari('kamar', k.id)" :key="w.id" class="lencana" :class="w.peran === 'wali_asuh' ? 'hijau' : ''">{{ w.nama }} · {{ PERAN_WALI[w.peran] }}
           <button v-if="moderator" class="tanpa-gaya" :aria-label="'Hapus ' + w.nama" @click="hapusWali('kamar', w)">✕</button></span>
           <select v-if="moderator && k.aktif" class="kecil" aria-label="Tetapkan wali asuh" @change="aturWali('kamar', k, $event.target.value); $event.target.value = ''">
             <option value="">+ {{ waliDari('kamar', k.id).length ? 'asisten' : 'wali asuh' }}…</option><option v-for="g in guruUntuk(k.lingkungan, 'kamar', k.id)" :value="g.id">{{ g.nama }}</option></select></div></td>
-        <td>{{ k.aktif ? 'Aktif' : 'Nonaktif' }}</td><td><button class="kedua kecil" @click="simpanMaster('kamar', {id: k.id, aktif: k.aktif ? 0 : 1})">{{ k.aktif ? 'Nonaktifkan' : 'Aktifkan' }}</button></td></tr></tbody></table></div>
+        <td>{{ k.aktif ? 'Aktif' : 'Nonaktif' }}</td><td><div class="baris" style="gap:6px;flex-wrap:nowrap"><button class="kedua kecil" @click="simpanMaster('kamar', {id: k.id, aktif: k.aktif ? 0 : 1})">{{ k.aktif ? 'Nonaktifkan' : 'Aktifkan' }}</button><button v-if="moderator" class="bahaya kecil" @click="hapus('kamar', k.id, 'kamar ' + k.nama)">Hapus</button></div></td></tr></tbody></table></div>
     <Paginasi v-model="hal.kamar" :jumlah="(m.kamar || []).length"/>
   </template>
 
@@ -998,7 +1006,7 @@ const DataMaster = {
     </div>
     <div class="tabel"><table><thead><tr><th>NIP</th><th>Nama</th><th>L/P</th><th>Email</th><th>No. HP</th><th>Lingkungan</th><th></th></tr></thead>
       <tbody v-baris><tr v-for="x in potong(guruTersaring, hal.guru)" :key="x.id" :style="{color: x.aktif ? '' : '#6B756F'}"><td>{{ x.nip }}</td><td><strong>{{ x.nama }}</strong></td><td>{{ x.jenis_kelamin }}</td><td>{{ x.email }}</td><td>{{ x.no_hp }}</td><td>{{ x.lingkungan }}</td>
-        <td><button class="kedua kecil" @click="ubahGuru(x)">Ubah</button></td></tr></tbody></table>
+        <td style="white-space:nowrap"><button class="kedua kecil" @click="ubahGuru(x)">Ubah</button> <button v-if="moderator" class="bahaya kecil" @click="hapus('guru', x.id, 'guru ' + x.nama)">Hapus</button></td></tr></tbody></table>
       <p v-if="!guruTersaring.length" class="redup" style="padding:14px">{{ g.q || g.ling ? 'Tidak ada guru yang cocok.' : 'Belum ada data guru. Tambah satu per satu atau impor CSV.' }}</p></div>
     <Paginasi v-model="hal.guru" :jumlah="guruTersaring.length"/>
   </template>
@@ -1037,7 +1045,7 @@ const DataMaster = {
                 <template v-else>
                   <td>{{ s.kode }}</td><td :style="{color: s.warna, fontWeight: 700}">{{ s.nama }}</td><td><span :style="{display:'inline-block',width:'18px',height:'18px',borderRadius:'4px',background:s.warna}"></span></td>
                   <td>{{ s.dihitung_hadir ? 'Ya' : 'Tidak' }}</td><td>{{ s.urutan }}</td>
-                  <td><button v-if="moderator" class="kedua kecil" @click="simpanMaster('status_kehadiran', {id: s.id, aktif: s.aktif ? 0 : 1})">{{ s.aktif ? 'Aktif' : 'Nonaktif' }}</button></td>
+                  <td style="white-space:nowrap"><button v-if="moderator" class="kedua kecil" @click="simpanMaster('status_kehadiran', {id: s.id, aktif: s.aktif ? 0 : 1})">{{ s.aktif ? 'Aktif' : 'Nonaktif' }}</button> <button v-if="moderator" class="bahaya kecil" @click="hapus('status_kehadiran', s.id, 'status ' + s.nama)">Hapus</button></td>
                   <td><button v-if="moderator" class="kedua kecil" @click="sunting('_status', s)">Ubah</button></td>
                 </template>
               </tr></tbody></table></div>
@@ -1062,7 +1070,7 @@ const DataMaster = {
                 <template v-else>
                   <td><strong>{{ j.nama }}</strong></td><td>{{ j.basis_waktu }}</td><td>{{ j.jam_kembali_bawaan || '—' }}</td><td>{{ j.wajib_wali ? 'Ya' : 'Tidak' }}</td>
                   <td>{{ (m.status_kehadiran.find(s => s.id===j.status_kehadiran_id)||{}).nama }}</td><td>{{ j.urutan }}</td>
-                  <td><button v-if="moderator" class="kedua kecil" @click="simpanMaster('jenis_izin', {id: j.id, aktif: j.aktif ? 0 : 1})">{{ j.aktif ? 'Aktif' : 'Nonaktif' }}</button></td>
+                  <td style="white-space:nowrap"><button v-if="moderator" class="kedua kecil" @click="simpanMaster('jenis_izin', {id: j.id, aktif: j.aktif ? 0 : 1})">{{ j.aktif ? 'Aktif' : 'Nonaktif' }}</button> <button v-if="moderator" class="bahaya kecil" @click="hapus('jenis_izin', j.id, 'jenis izin ' + j.nama)">Hapus</button></td>
                   <td><button v-if="moderator" class="kedua kecil" @click="sunting('_izin', j)">Ubah</button></td>
                 </template>
               </tr></tbody></table></div>
@@ -1086,11 +1094,11 @@ const DataMaster = {
               <template v-else>
                 <td>{{ p.urutan }}</td><td><strong>{{ p.nama }}</strong></td><td v-if="f.kelompok==='ekstrakurikuler'">{{ namaInduk(p.induk_id) }}</td><td>{{ p.lingkungan }}</td>
                 <td><button class="kecil" :class="p.aktif ? '' : 'kedua'" :disabled="!bisaPilihan(p.kelompok)" @click="ubahPilihan(p, {aktif: p.aktif ? 0 : 1})">{{ p.aktif ? 'Aktif' : 'Nonaktif' }}</button></td>
-                <td><button v-if="bisaPilihan(p.kelompok)" class="kedua kecil" @click="sunting('pilihan', p)">Ubah</button></td>
+                <td style="white-space:nowrap"><button v-if="bisaPilihan(p.kelompok)" class="kedua kecil" @click="sunting('pilihan', p)">Ubah</button> <button v-if="moderator" class="bahaya kecil" @click="hapus('pilihan', p.id, p.nama)">Hapus</button></td>
               </template></tr></tbody></table>
             <p v-if="!isiPilihan.length" class="redup" style="padding:14px">Belum ada pilihan.</p></div>
           <Paginasi v-model="hal.pilihan" :jumlah="isiPilihan.length"/>
-          <p class="redup">Klik <strong>Ubah</strong> untuk mengganti nama, urutan, atau lingkungan. Mengganti nama juga mengubah tampilan di data lama yang memakai pilihan ini. Pilihan yang sudah dipakai tidak dihapus — cukup dinonaktifkan.</p>
+          <p class="redup">Klik <strong>Ubah</strong> untuk mengganti nama, urutan, atau lingkungan. Mengganti nama juga mengubah tampilan di data lama yang memakai pilihan ini. Moderator bisa <strong>menghapus</strong> pilihan yang belum pernah dipakai; yang sudah dipakai cukup dinonaktifkan agar data lama tetap utuh.</p>
         </template>
       </div>
     </div>
@@ -1140,6 +1148,11 @@ const Pengguna = {
     const buatGuru = () => jalan(() => api("/users/guru", { guru_id: f.guru_id, preset_id: f.presetGuru || null }), "Akun guru dibuat (masuk dengan Google).");
     const buatMod = () => jalan(() => api("/users/moderator", { nama: f.modNama, email: f.modEmail }), "Moderator ditambahkan (masuk dengan Google).");
     const ubah = (u, data) => jalan(() => api("/users/" + u.id, data), "Akun diperbarui.");
+    // akun dihapus permanen; riwayat yang dicatatnya tetap bernama "(akun dihapus)"
+    async function hapusAkun(x) {
+      f.galat = ""; f.ok = "";
+      try { if (await hapusData("users", x.id, "akun " + x.email, "Akses, sesi login, dan notifikasinya ikut terhapus. Data yang pernah dicatatnya tetap ada; di Riwayat Perubahan tampil sebagai \"" + x.nama + " (akun dihapus)\".")) { f.ok = "Akun dihapus."; f.sel = null; await muat(); } } catch (e) { f.galat = e.message; }
+    }
     const akses = (u, kode, beri) => jalan(() => api(`/users/${u.id}/akses`, { kode, beri }), beri ? "Akses diberikan." : "Akses dicabut.");
     const reset = (u) => confirm("Reset password " + u.email + "?") && jalan(() => api(`/users/${u.id}/reset-password`, {}),
       (r) => { f.sandi = [{ nama: u.nama, email: u.email, password: r.password_sementara }]; return "Password direset."; });
@@ -1177,7 +1190,7 @@ const Pengguna = {
     const dipakai = (p) => f.users.filter((u) => u.preset_id === p.id && u.status === "aktif").length;
 
     onMounted(async () => { await muatMaster(); try { await muat(); } catch (e) { f.galat = e.message; } });
-    return { tab, f, m, buatPengurus, buatGuru, buatMod, ubah, akses, reset, terapkan, jadikanMod, labelUser, kelasLabel, tampil, aksesUtama, aksesPilihan, namaAkses,
+    return { meId: negara.me.id, hapusAkun, tab, f, m, buatPengurus, buatGuru, buatMod, ubah, akses, reset, terapkan, jadikanMod, labelUser, kelasLabel, tampil, aksesUtama, aksesPilihan, namaAkses,
       ed, sunting, batal, simpanPreset, hapusPreset, dipakai, samaPreset, negara };
   },
   template: `<div><span class="jejak">Fungsi › Akses</span><h1>Pengguna & Manajemen Akses</h1></div>
@@ -1223,7 +1236,8 @@ const Pengguna = {
       <label class="isian" v-if="!f.sel.santri_id && f.sel.role !== 'moderator'">Lingkungan<select :value="f.sel.lingkungan" @change="ubah(f.sel, {lingkungan: $event.target.value})"><option>semua</option><option>putra</option><option>putri</option></select></label>
       <div class="baris"><button class="kedua" @click="ubah(f.sel, {status: f.sel.status==='aktif' ? 'nonaktif' : 'aktif'})">{{ f.sel.status==='aktif' ? 'Nonaktifkan' : 'Aktifkan' }}</button>
         <button v-if="f.sel.role !== 'moderator' && !f.sel.santri_id" class="kedua" @click="jadikanMod(f.sel, true)">Jadikan Moderator</button>
-        <button v-if="f.sel.punya_password || f.sel.santri_id" class="bahaya" @click="reset(f.sel)">Reset password</button></div>
+        <button v-if="f.sel.punya_password || f.sel.santri_id" class="bahaya" @click="reset(f.sel)">Reset password</button>
+        <button v-if="f.sel.id !== meId" class="bahaya" @click="hapusAkun(f.sel)">Hapus akun</button></div>
       <p v-if="f.sel.status === 'aktif'" class="redup" style="margin:0;font-size:12.5px">Menonaktifkan akun juga mencabut semua aksesnya.</p>
     </div>
   </div>

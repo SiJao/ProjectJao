@@ -805,5 +805,13 @@ export const MIGRATIONS = [
       `ALTER TABLE anggota_grup ADD COLUMN kelompok_id INTEGER REFERENCES kelompok_kegiatan(id)`,
       `CREATE INDEX IF NOT EXISTS anggota_grup_kelompok ON anggota_grup (kelompok_id) WHERE kelompok_id IS NOT NULL`
     ]
+  },
+  {
+    id: 9,
+    nama: "hapus-data",
+    sql: [
+      // Akun dihapus: jejaknya di riwayat tetap bernama ("Nama (akun dihapus)") walau user_id dikosongkan.
+      `ALTER TABLE riwayat_perubahan ADD COLUMN oleh_terhapus TEXT`
+    ]
   }
 ];

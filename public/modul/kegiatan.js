@@ -64,6 +64,11 @@
         if (await jalan(() => api("/kelompok", { grup_id: g.kelompok, nama: g.kelompokBaru }), "Kelompok ditambahkan.")) { g.kelompokBaru = ""; muatGrup(); }
       }
       const batalUbahKel = (k) => { delete g.ubahKel[k.id]; };
+      const moderator = me.role === "moderator";
+      async function hapusCabang(x, tabel = "grup_kegiatan") {
+        bersihPesan();
+        try { if (await hapusData(tabel, x.id, (tabel === "grup_kegiatan" ? "" : "kelompok ") + x.nama + (tabel === "grup_kegiatan" ? " (" + x.lingkungan + ")" : ""), tabel === "grup_kegiatan" ? "Kelompok di dalamnya ikut terhapus." : "")) { f.ok = "Terhapus."; if (tabel === "grup_kegiatan") g.kelompok = null; muatGrup(); } } catch (e) { f.galat = e.message; }
+      }
       async function ubahKelompok(k, data, pesan) {
         if (await jalan(() => api("/kelompok", { id: k.id, ...data }), pesan)) { delete g.ubahKel[k.id]; muatGrup(); }
       }
@@ -210,7 +215,7 @@
       watch(tab, bersihPesan);
 
       return { kini: hariIni(), me, daftarTab, tab, f, m, pilihan, lingSaya,
-        grup, g, grupTersaring, grupAktif, labelGrup, bukaGrup, simpanGrup, ekskulDari, punyaEkskul, grupKel, bukaKelompok, tambahKelompok, ubahKelompok, batalUbahKel,
+        grup, g, grupTersaring, grupAktif, labelGrup, bukaGrup, simpanGrup, ekskulDari, punyaEkskul, grupKel, bukaKelompok, tambahKelompok, ubahKelompok, batalUbahKel, moderator, hapusCabang,
         a, grupA, kelompokA, anggotaTersaring, kelasA, kamarA, calonTersaring, jumlahTerpilih, pilihSemua, bacaCsvNis, tambahCari, tambahBanyak, tambahCsv, keluarkan, pindahkan, gantiKelompok, ubahPeran, grupTujuan, namaKelas,
         ab, grupAb, sesiList, statusList, warna, semuaHadir, belumDiisi, simpanAbsensi,
         rk, kelompokRk, rekapTersaring, eksporRekap, pr, bukaPrestasi, simpanPrestasi, eksporPrestasi };
@@ -255,7 +260,7 @@
           <td>{{ k.jumlah }}</td>
           <td><button class="kecil" :class="k.aktif ? '' : 'kedua'" @click="ubahKelompok(k, {aktif: k.aktif ? 0 : 1}, k.aktif ? 'Kelompok dinonaktifkan.' : 'Kelompok diaktifkan.')">{{ k.aktif ? 'Aktif' : 'Nonaktif' }}</button></td>
           <td style="white-space:nowrap"><template v-if="g.ubahKel[k.id] !== undefined"><button class="kecil" @click="ubahKelompok(k, {nama: g.ubahKel[k.id]}, 'Nama kelompok diperbarui.')">Simpan</button> <button class="kedua kecil" @click="batalUbahKel(k)">Batal</button></template>
-            <button v-else class="kedua kecil" @click="g.ubahKel[k.id] = k.nama">Ubah nama</button></td>
+            <template v-else><button class="kedua kecil" @click="g.ubahKel[k.id] = k.nama">Ubah nama</button> <button v-if="moderator" class="bahaya kecil" @click="hapusCabang(k, 'kelompok_kegiatan')">Hapus</button></template></td>
         </tr></tbody></table>
         <p v-if="!grupKel.kelompok.length" class="redup" style="padding:14px">Belum ada kelompok. Anggota tetap bisa ditambahkan tanpa kelompok.</p></div>
       <div><button class="kedua" @click="g.kelompok = null">Tutup</button></div>
@@ -268,7 +273,7 @@
         <td><span v-if="x.kelompok.some(k => k.aktif)">{{ x.kelompok.filter(k => k.aktif).map(k => k.nama).join(', ') }}</span><span v-else class="redup">—</span></td>
         <td>{{ x.jumlah }}</td>
         <td><span class="lencana" :class="{hijau: x.aktif}">{{ x.aktif ? 'Aktif' : 'Nonaktif' }}</span></td>
-        <td style="white-space:nowrap"><button class="kedua kecil" @click="bukaGrup(x)">Ubah</button> <button class="kedua kecil" @click="bukaKelompok(x)">Kelompok</button> <button v-if="x.aktif" class="kecil" @click="a.grup_id = x.id; tab = 'anggota'">Anggota</button></td>
+        <td style="white-space:nowrap"><button class="kedua kecil" @click="bukaGrup(x)">Ubah</button> <button class="kedua kecil" @click="bukaKelompok(x)">Kelompok</button> <button v-if="x.aktif" class="kecil" @click="a.grup_id = x.id; tab = 'anggota'">Anggota</button> <button v-if="moderator" class="bahaya kecil" @click="hapusCabang(x)">Hapus</button></td>
       </tr></tbody></table>
       <p v-if="!grupTersaring.length" class="redup" style="padding:14px">{{ grup.length ? 'Tidak ada yang cocok.' : 'Belum ada kegiatan/ekskul. Klik Tambah kegiatan / ekskul.' }}</p></div>
   </template>

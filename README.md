@@ -390,7 +390,9 @@ flowchart LR
 | **Wali kelas** | Ditetapkan **per tahun ajaran** |
 | **Asrama & kamar** | Asrama (rayon, dengan jenis kelamin) → kamar. Wali asuh + asisten ditetapkan **per tahun ajaran** |
 | **Keluarga & kontak wali** | Nama ayah/ibu, no. HP. **No. HP wali hanya diubah Moderator** (no. HP adalah kunci penautan Portal Wali). Nomor WA ayah/ibu dari data 2026-2027 menjadi bahan pencocokan |
-| **Daftar pilihan** | Isi dropdown di modul lain disimpan sebagai data, bukan kode: jenis izin, status kehadiran, sesi absensi, jenis kunjungan, tindak lanjut, obat, diagnosa, kategori pelanggaran, tingkat vonis, kegiatan, ekstrakurikuler (ber-kategori kegiatan), tingkat & hasil lomba. Pilihan > 2 tampil sebagai dropdown, 2 pilihan sebagai tombol. Pilihan yang sudah dipakai **dinonaktifkan, tidak dihapus** |
+| **Daftar pilihan** | Isi dropdown di modul lain disimpan sebagai data, bukan kode: jenis izin, status kehadiran, sesi absensi, jenis kunjungan, tindak lanjut, obat, diagnosa, kategori pelanggaran, tingkat vonis, kegiatan, ekstrakurikuler (ber-kategori kegiatan), tingkat & hasil lomba. Pilihan > 2 tampil sebagai dropdown, 2 pilihan sebagai tombol. Pilihan yang sudah dipakai **dinonaktifkan**; yang belum pernah dipakai boleh **dihapus** Moderator |
+
+**Hapus data (K-114, hanya Moderator):** kelas, asrama, kamar, guru, daftar pilihan, status kehadiran, jenis izin, kegiatan/ekskul & kelompok, jabatan, dan barang bisa **dihapus permanen selama belum pernah dipakai**. Yang sudah dipakai ditolak dengan rinciannya (mis. *"sudah dipakai: 120 sesi absensi"*) dan cukup dinonaktifkan, sehingga riwayat & rapor tetap utuh. **Akun pengguna dan akun wali** selalu bisa dihapus (kecuali akun sendiri dan Moderator aktif terakhir): akses, sesi, notifikasi, dan tautan ikut terhapus; data yang pernah dicatatnya tetap ada, dan di Riwayat Perubahan pelakunya tampil sebagai *"Nama (akun dihapus)"*.
 
 **Riwayat yang tidak pernah ditimpa:**
 - **Riwayat kelas** — setiap masa tinggal di sebuah kelas, termasuk **pindah rombel** di tengah tahun (dicatat setiap kali + masuk Riwayat Perubahan).

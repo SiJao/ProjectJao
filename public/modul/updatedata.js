@@ -340,10 +340,11 @@
       }
       const tambahJabatan = () => coba(f, async () => { await api("/updatedata/jabatan", { nama: f.baru, lingkungan: f.ling }); f.baru = ""; await muat(); });
       const ubahJabatan = (j) => coba(f, async () => { await api("/updatedata/jabatan", { id: j.id, aktif: j.aktif ? 0 : 1 }); await muat(); });
+      const hapusJabatan = (j) => coba(f, async () => { if (await hapusData("jabatan", j.id, "jabatan " + j.nama)) await muat(); });
       const templat = () => unduhCsv("templat-pengurus.csv", [["NIS", "JABATAN"], ["990101", "Bagian Keamanan"]]);
       const lencanaAkun = (p) => p.user_status === "aktif" ? "hijau" : p.user_status === "tertahan" ? "kuning" : "merah";
       onMounted(async () => { await muatMaster(); await muat(); muatSantri(); });
-      return { f, moderator, kelas5, tampil, terpilih, jabatanAktif, pengurusTampil, dariPilihan, pilihFile, simpan, tambahJabatan, ubahJabatan, templat, lencanaAkun, namaKelas };
+      return { f, moderator, kelas5, tampil, terpilih, jabatanAktif, pengurusTampil, dariPilihan, pilihFile, simpan, tambahJabatan, ubahJabatan, hapusJabatan, templat, lencanaAkun, namaKelas };
     },
     template: `<div v-if="!info.masa_khidmat" class="pesan info">Belum ada masa khidmat aktif. Moderator membuatnya di tab Masa Khidmat & Serah Terima.</div>
     <div class="kartu" style="display:flex;flex-direction:column;gap:12px">
@@ -392,8 +393,8 @@
         <label class="isian">Lingkungan<select v-model="f.ling"><option>semua</option><option>putra</option><option>putri</option></select></label><button :disabled="!f.baru" @click="tambahJabatan">Tambah</button></div>
       <div class="tabel"><table><thead><tr><th>Jabatan</th><th>Lingkungan</th><th>Status</th></tr></thead>
         <tbody><tr v-for="j in f.jabatan" :key="j.id"><td><strong>{{ j.nama }}</strong></td><td>{{ j.lingkungan }}</td>
-          <td><button class="kecil" :class="j.aktif ? '' : 'kedua'" @click="ubahJabatan(j)">{{ j.aktif ? 'Aktif' : 'Nonaktif' }}</button></td></tr></tbody></table></div>
-      <p class="redup">Jabatan yang sudah dipakai tidak dihapus — cukup dinonaktifkan.</p>
+          <td style="white-space:nowrap"><button class="kecil" :class="j.aktif ? '' : 'kedua'" @click="ubahJabatan(j)">{{ j.aktif ? 'Aktif' : 'Nonaktif' }}</button> <button v-if="moderator" class="bahaya kecil" @click="hapusJabatan(j)">Hapus</button></td></tr></tbody></table></div>
+      <p class="redup">Moderator bisa menghapus jabatan yang belum pernah diisi; yang sudah dipakai cukup dinonaktifkan.</p>
     </div>`,
   };
 

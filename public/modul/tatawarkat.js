@@ -253,6 +253,9 @@ const TwInventaris = {
     const baru = () => { b.form = { id: null, kode: "", nama: "", aktif: true, lingkungan: pilihLing ? "" : negara.me.lingkungan }; };
     const ubah = (x) => { b.form = { id: x.id, kode: x.kode, nama: x.nama, aktif: !!x.aktif }; };
     async function simpan() { if (await jalan(() => api("/barang", b.form), "Barang tersimpan.")) { const id = b.form.id; b.form = null; await muat(); if (b.sel && b.sel.id === id) await buka(b.sel); } }
+    // barang tanpa unit bisa dihapus Moderator (K-114); yang sudah punya unit cukup dinonaktifkan
+    const moderator = negara.me.role === "moderator";
+    async function hapusBarang(x) { b.galat = ""; b.ok = ""; try { if (await hapusData("barang", x.id, "barang " + x.kode + " " + x.nama)) { b.ok = "Barang dihapus."; if (b.sel && b.sel.id === x.id) b.sel = null; await muat(); } } catch (e) { b.galat = e.message; } }
     async function tambahUnit() { if (await jalan(() => api(`/barang/${b.sel.id}/unit`, b.unit), "Unit ditambahkan.")) { await buka(b.sel); await muat(); } }
     async function ubahUnit(un, data) { if (await jalan(() => api(`/barang/${b.sel.id}/unit`, { ...un, ...data }), "Unit diperbarui.")) { await buka(b.sel); await muat(); } }
     async function ekspor() {
@@ -268,7 +271,7 @@ const TwInventaris = {
         ]);
       } catch (e) { b.galat = e.message; }
     }
-    return { b, pilihLing, saran, buka, baru, ubah, simpan, tambahUnit, ubahUnit, ekspor, TW_KONDISI };
+    return { b, pilihLing, saran, buka, baru, ubah, simpan, moderator, hapusBarang, tambahUnit, ubahUnit, ekspor, TW_KONDISI };
   },
   template: `<div class="kisi">
     <div class="kartu stat"><div class="redup">Total unit</div><div class="angka" v-hitung="b.data.ringkasan.total"></div></div>
@@ -298,7 +301,7 @@ const TwInventaris = {
         <td>{{ x.nama }}<span v-if="!x.aktif" class="lencana" style="margin-left:6px">nonaktif</span></td>
         <td>{{ x.jumlah }}</td>
         <td><template v-for="(v, kd) in TW_KONDISI" :key="kd"><span v-if="x[kd]" class="lencana" :class="v[1]" style="margin:1px">{{ v[0] }} {{ x[kd] }}</span></template></td>
-        <td style="white-space:nowrap"><button class="kedua kecil" @click="buka(x)">Unit</button> <button class="kedua kecil" @click="ubah(x)">Ubah</button></td>
+        <td style="white-space:nowrap"><button class="kedua kecil" @click="buka(x)">Unit</button> <button class="kedua kecil" @click="ubah(x)">Ubah</button> <button v-if="moderator" class="bahaya kecil" @click="hapusBarang(x)">Hapus</button></td>
       </tr></tbody></table>
       <p v-if="!b.data.barang.length" class="redup" style="padding:0 14px">Belum ada barang yang cocok.</p></div>
     <div v-if="b.sel" class="kartu" style="display:flex;flex-direction:column;gap:10px">

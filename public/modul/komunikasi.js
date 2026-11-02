@@ -61,6 +61,10 @@ const Komunikasi = {
       if (r.password_sementara) f.sandi = [{ nama: a.nama, email: a.email, password: r.password_sementara }];
       await muatAkun();
     });
+    // akun wali dihapus permanen: sesi, token, dan tautan ke anak ikut terhapus (K-114)
+    const hapusAkunWali = (a) => jalan(async () => {
+      if (await hapusData("akun_wali", a.id, "akun wali " + a.email, "Tautan ke anak, sesi login, dan token akun ini ikut terhapus. Wali bisa mendaftar ulang.")) { f.ok = "Akun wali dihapus."; await muatAkun(); await muatTautan(); }
+    });
     const cabut = (t) => jalan(async () => {
       if (!confirm(`Cabut tautan ${t.wali} ↔ ${t.santri}?`)) return;
       await api(`/komunikasi/tautan/${t.id}/cabut`, {}); f.ok = "Tautan dicabut."; await muatTautan(); await muatAkun();
@@ -86,7 +90,7 @@ const Komunikasi = {
     onMounted(() => muatMaster());
     const lencanaSt = (s) => ({ antre: "kuning", terkirim: "hijau", gagal: "merah", aktif: "hijau", belum_verifikasi: "kuning", nonaktif: "merah" }[s] || "");
     return { moderator, m, tab, tabTampil, f, pg, pratinjauPg, kirimPg, ew, kirimWali, an, ulang, ulangSemua, kirimSekarang,
-      pw, aksiAkun, cabut, tautkan, simpanHp, lencanaSt, namaKelas };
+      pw, aksiAkun, hapusAkunWali, cabut, tautkan, simpanHp, lencanaSt, namaKelas };
   },
   template: `<div><span class="jejak">Fungsi › Komunikasi</span><h1>Komunikasi</h1></div>
   <div class="tab"><button v-for="t in tabTampil" :key="t[0]" :class="{aktif: tab===t[0]}" @click="tab=t[0]; f.ok=''; f.galat=''">{{ t[1] }}<span v-if="t[0]==='antrean' && an.hitung.gagal" class="lencana merah" style="margin-left:6px">{{ an.hitung.gagal }}</span></button></div>
@@ -180,7 +184,8 @@ const Komunikasi = {
         <td style="white-space:nowrap"><button v-if="a.status==='belum_verifikasi'" class="kecil" @click="aksiAkun(a, 'verifikasi')">Verifikasi manual</button>
           <button v-if="a.status!=='nonaktif'" class="bahaya kecil" @click="aksiAkun(a, 'nonaktifkan')">Nonaktifkan</button>
           <button v-else class="kedua kecil" @click="aksiAkun(a, 'aktifkan')">Aktifkan</button>
-          <button v-if="a.terkunci_tautan_sampai" class="kedua kecil" @click="aksiAkun(a, 'buka_kunci')">Buka kunci</button></td></tr></tbody></table>
+          <button v-if="a.terkunci_tautan_sampai" class="kedua kecil" @click="aksiAkun(a, 'buka_kunci')">Buka kunci</button>
+          <button class="bahaya kecil" @click="hapusAkunWali(a)">Hapus</button></td></tr></tbody></table>
       <p v-if="!pw.akun.length" class="redup" style="padding:14px">Tidak ada akun wali.</p></div>
     <h2>Tautan aktif</h2>
     <div class="baris"><label class="isian" style="flex:1 1 240px">Cari santri / wali<input v-model="pw.tq" placeholder="Ketik untuk menyaring"></label>

@@ -752,6 +752,81 @@ on("POST", "/api/pilihan", async ({ db, u, body }) => {
   return json({ ok: true, id: r.meta.last_row_id });
 });
 
+// ---------------------------------------------------------------- hapus data (K-114)
+// Hanya Moderator. Item yang belum dipakai dihapus permanen; yang sudah dipakai ditolak dengan rincian pemakaiannya
+// (cukup dinonaktifkan). RUJUKAN = kolom foreign key ke tabel itu (dari skema) + rujukan tanpa FK (sesi absensi → kamar/cabang).
+// Anak yang hanya konfigurasi ikut terhapus (IKUT). Akun pengguna/wali selalu bisa dihapus: jejaknya dikosongkan atau dihapus.
+const RUJUKAN = {
+  pilihan: ["pilihan.induk_id", "absensi_sesi.sesi_pilihan_id", "pemeriksaan.tindak_lanjut_id", "pemeriksaan.diagnosa_id", "resep.obat_id", "pelanggaran.kategori_id",
+    "grup_kegiatan.ekstrakurikuler_id", "grup_kegiatan.kegiatan_id", "prestasi.hasil_lomba_id", "prestasi.tingkat_lomba_id"],
+  status_kehadiran: ["jenis_izin.status_kehadiran_id", "absensi.status_kehadiran_id", "jenis_kunjungan.status_kehadiran_id"],
+  jenis_izin: ["izin.jenis_izin_id", "libur_pondok.jenis_izin_id"],
+  kelas: ["wali_kelas.kelas_id", "santri.kelas_id", "riwayat_kelas.kelas_id"],
+  asrama: ["kamar.asrama_id"],
+  kamar: ["wali_asuh_kamar.kamar_id", "santri.kamar_id", "riwayat_kamar.kamar_id", "absensi_sesi.target_id:harian"],
+  guru: ["wali_kelas.guru_id", "wali_asuh_kamar.guru_id", "users.guru_id", "grup_kegiatan.pembimbing_guru_id"],
+  grup_kegiatan: ["anggota_grup.grup_id", "absensi_sesi.target_id:kegiatan"],
+  kelompok_kegiatan: ["anggota_grup.kelompok_id"],
+  jabatan: ["pengurus.jabatan_id"],
+  barang: ["barang_unit.barang_id"],
+};
+const IKUT = { grup_kegiatan: ["kelompok_kegiatan.grup_id"] };
+const LABEL_HAPUS = { pilihan: "pilihan", status_kehadiran: "status kehadiran", jenis_izin: "jenis izin", kelas: "kelas", asrama: "asrama", kamar: "kamar", guru: "guru",
+  grup_kegiatan: "kegiatan/ekskul", kelompok_kegiatan: "kelompok", jabatan: "jabatan", barang: "barang", users: "akun", akun_wali: "akun wali" };
+// Kolom users yang dicatat sebagai pelaku: dikosongkan saat akun dihapus. Baris milik akun (akses, sesi, notifikasi, token) ikut dihapus.
+const JEJAK_USER = ["user_akses.diberikan_oleh", "absensi_sesi.diisi_oleh", "izin.overdue_dikoreksi_oleh", "izin.dibatalkan_oleh", "izin.dikonfirmasi_oleh", "izin.diterbitkan_oleh",
+  "riwayat_status_santri.oleh", "masa_khidmat.ditutup_oleh", "masa_khidmat.dibuka_oleh", "pengurus.oleh", "pengurus.user_id", "libur_pondok.dibuat_oleh",
+  "kunjungan_kesehatan.dicatat_oleh", "kunjungan_kesehatan.dibatalkan_oleh", "pemeriksaan.dicatat_oleh", "profil_kesehatan.diubah_oleh", "pelanggaran.dibatalkan_oleh",
+  "pelanggaran.dicatat_oleh", "vonis.diputus_oleh", "skorsing.dibatalkan_oleh", "skorsing.oleh", "prestasi.dicatat_oleh", "agenda.dibuat_oleh", "surat.dicatat_oleh",
+  "tautan_wali.dicabut_oleh", "tautan_wali.oleh", "impor_batch.oleh", "impor_batch.dibatalkan_oleh", "backup_log.oleh"];
+const MILIK_USER = ["user_akses.user_id", "sesi_login.user_id", "notifikasi.user_id", "token_akun.user_id"];
+const NAMA_TABEL = { absensi_sesi: "sesi absensi", resep: "resep", riwayat_kelas: "riwayat kelas", riwayat_kamar: "riwayat kamar", wali_kelas: "penetapan wali kelas",
+  wali_asuh_kamar: "penetapan wali asuh", anggota_grup: "keanggotaan", grup_kegiatan: "kegiatan/ekskul", barang_unit: "unit barang", libur_pondok: "libur pondok",
+  jenis_kunjungan: "jenis kunjungan", jenis_izin: "jenis izin", users: "akun", pilihan: "ekskul" };
+
+async function pemakaian(db, tabel, id) {
+  const daftar = RUJUKAN[tabel] || [];
+  if (!daftar.length) return [];
+  const st = daftar.map((r) => {
+    const [tk, jenis] = r.split(":"), [t, k] = tk.split(".");
+    return db.prepare(`SELECT COUNT(*) n FROM ${t} WHERE ${k} = ?${jenis ? " AND jenis = ?" : ""}`).bind(...(jenis ? [id, jenis] : [id]));
+  });
+  const hasil = await db.batch(st);
+  return daftar.map((r, i) => ({ tabel: r.split(".")[0], n: hasil[i].results[0].n })).filter((x) => x.n);
+}
+
+on("POST", "/api/hapus", async ({ db, u, body }) => {
+  wajibModerator(u);
+  const tabel = String(body.tabel || ""), id = +body.id || 0;
+  if (!LABEL_HAPUS[tabel]) gagal(400, "Data ini tidak bisa dihapus.");
+  const x = await db.prepare(`SELECT * FROM ${tabel} WHERE id = ?`).bind(id).first();
+  if (!x) gagal(404, "Data tidak ditemukan.");
+  const nama = x.nama || x.kode || x.email || (x.tingkat ? `${x.tingkat} ${x.rombel}` : "#" + id);
+  const st = [];
+  if (tabel === "users") {
+    if (x.id === u.id) gagal(400, "Akun sendiri tidak bisa dihapus.");
+    if (x.role === "moderator" && (await db.prepare("SELECT COUNT(*) n FROM users WHERE role = 'moderator' AND status = 'aktif' AND id <> ?").bind(x.id).first()).n === 0)
+      gagal(400, "Harus tersisa minimal satu Moderator aktif.");
+    st.push(db.prepare("UPDATE riwayat_perubahan SET oleh_terhapus = ?, user_id = NULL WHERE user_id = ?").bind(x.nama, x.id));
+    for (const r of JEJAK_USER) { const [t, k] = r.split("."); st.push(db.prepare(`UPDATE ${t} SET ${k} = NULL WHERE ${k} = ?`).bind(x.id)); }
+    for (const r of MILIK_USER) { const [t, k] = r.split("."); st.push(db.prepare(`DELETE FROM ${t} WHERE ${k} = ?`).bind(x.id)); }
+  } else if (tabel === "akun_wali") {
+    st.push(db.prepare("UPDATE email_antrean SET akun_wali_id = NULL WHERE akun_wali_id = ?").bind(x.id));
+    for (const t of ["sesi_wali", "token_akun", "tautan_wali"]) st.push(db.prepare(`DELETE FROM ${t} WHERE akun_wali_id = ?`).bind(x.id));
+  } else {
+    const dipakai = await pemakaian(db, tabel, id);
+    if (dipakai.length) {
+      const rinci = dipakai.map((d) => `${d.n} ${NAMA_TABEL[d.tabel] || d.tabel.replace(/_/g, " ")}`).join(", ");
+      return json({ galat: `${LABEL_HAPUS[tabel][0].toUpperCase() + LABEL_HAPUS[tabel].slice(1)} "${nama}" sudah dipakai (${rinci}). Nonaktifkan saja agar riwayat tetap utuh.`, dipakai }, 409);
+    }
+    for (const r of IKUT[tabel] || []) { const [t, k] = r.split("."); st.push(db.prepare(`DELETE FROM ${t} WHERE ${k} = ?`).bind(id)); }
+  }
+  st.push(db.prepare(`DELETE FROM ${tabel} WHERE id = ?`).bind(id));
+  st.push(stmtCatat(db, u, "data", "hapus", tabel, id, `${LABEL_HAPUS[tabel]} "${nama}" dihapus permanen`, x.lingkungan || "semua"));
+  await db.batch(st);
+  return json({ ok: true });
+});
+
 // ---------------------------------------------------------------- santri
 on("GET", "/api/santri", async ({ db, u, url }) => {
   wajibAdaAkses(u);
@@ -1451,7 +1526,7 @@ on("GET", "/api/riwayat", async ({ db, u, url }) => {
   }
   if (url.searchParams.get("masa_khidmat_id")) { w.push("r.masa_khidmat_id = ?"); a.push(+url.searchParams.get("masa_khidmat_id")); }
   if (kat) { w.push("r.kategori = ?"); a.push(kat); }
-  const r = await db.prepare(`SELECT r.*, u.nama oleh FROM riwayat_perubahan r LEFT JOIN users u ON u.id = r.user_id ${w.length ? "WHERE " + w.join(" AND ") : ""} ORDER BY r.id DESC LIMIT 300`).bind(...a).all();
+  const r = await db.prepare(`SELECT r.*, COALESCE(u.nama, r.oleh_terhapus || ' (akun dihapus)') oleh FROM riwayat_perubahan r LEFT JOIN users u ON u.id = r.user_id ${w.length ? "WHERE " + w.join(" AND ") : ""} ORDER BY r.id DESC LIMIT 300`).bind(...a).all();
   return json(r.results);
 });
 
