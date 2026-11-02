@@ -302,7 +302,7 @@ flowchart TD
 | **Piket** | Absensi |
 | **Kesehatan** | Kesehatan (Pemeriksaan diberikan terpisah) |
 | **Kedisiplinan** | Input pelanggaran |
-| **Sekretaris** | Absensi, Kegiatan, Prestasi, Rapor, Tata Warkat, Pengumuman, Isi bagian pengurus, Riwayat |
+| **Sekretaris** | Absensi, Kegiatan, Prestasi, Rapor, Tata Warkat, Pengumuman, Isi bagian pengurus, Daftar jabatan, Riwayat |
 | **Asatidz** | Lihat absensi, perizinan, hasil vonis, prestasi, rapor |
 
 - Serah Terima memberi Sekretaris baru preset **Sekretaris** (bila preset itu ada); akun pengurus lain menunggu akses dari Moderator.
@@ -322,7 +322,7 @@ flowchart TD
 |---|---|
 | Absensi · Perizinan · Kesehatan · Pemeriksaan · Profil kesehatan | Fungsi harian |
 | Input pelanggaran · Putusan kedisiplinan | Kedisiplinan (pemutus = hakim) |
-| Kegiatan · Prestasi · Rapor · Tata Warkat · Pengumuman · Isi bagian pengurus · Riwayat | Administrasi |
+| Kegiatan · Prestasi · Rapor · Tata Warkat · Pengumuman · Isi bagian pengurus · Daftar jabatan · Riwayat | Administrasi |
 | Update Kamar · PAW | Proses data |
 | Lihat absensi / perizinan / hasil vonis / prestasi / rapor | Lihat saja |
 | Edit daftar pilihan tertentu (mis. obat, diagnosa) | Per daftar |
@@ -352,6 +352,7 @@ Keterangan: ✔ otomatis · ☑ jika diberi lewat Manajemen Akses · 👁 lihat 
 | Kegiatan & Ekstrakurikuler (kelola) | ✖ | ✖ | ✖ | ✔ | ✖ | ✔ |
 | Riwayat Perubahan | ✖ | ✖ | ✖ | ✔ (masa jabatannya) | ✖ | ✔ (semua) |
 | Isi bagian pengurus, pengumuman email | ✖ | ✖ | ✖ | ✔ | ✖ | ✔ |
+| Daftar jabatan (tambah, aktif/nonaktif; lingkungan sendiri — K-115) | ✖ | ✖ | ✖ | ✔ | ✖ | ✔ |
 | Data Master (termasuk no. HP wali) | ✖ | ✖ | ✖ | ✖ | ✖ | ✔ |
 | Edit daftar pilihan tertentu (mis. obat, diagnosa) | ☑ | ☑ | ☑ | ☑ | ☑ | ✔ |
 | Profil kesehatan | ✖ | ☑ | ✖ | ✖ | ✖ | ✔ |
@@ -656,7 +657,7 @@ flowchart TD
 1. **Moderator** menekan **Serah Terima Jabatan** dan menunjuk **1–2 Sekretaris baru**. Satu tombol untuk putra **dan** putri sekaligus, satu masa khidmat untuk kedua lingkungan (K-97).
 2. **Peringatan** selalu muncul (jumlah pengurus lama, waktu Serah Terima terakhir), lalu **password Moderator yang sedang login**.
 3. Dalam satu proses: masa khidmat lama & semua jabatan **diarsipkan** (bukan dihapus), akun pengurus lama **dinonaktifkan** (santrinya tetap aktif), masa khidmat baru dibuat, Sekretaris baru langsung aktif.
-4. **Sekretaris baru** mengisi bagian/jabatan pengurus lain — lewat **upload file** (NIS + jabatan) **atau pilih banyak sekaligus**. Hanya santri aktif Kelas 5; baris yang tidak valid **ditolak** dan proses tidak lanjut sampai diperbaiki.
+4. **Sekretaris baru** mengisi bagian/jabatan pengurus lain (dan boleh **menambah atau menonaktifkan jabatan** di lingkungannya; menghapus jabatan tetap Moderator) — lewat **upload file** (NIS + jabatan) **atau pilih banyak sekaligus**. Hanya santri aktif Kelas 5; baris yang tidak valid **ditolak** dan proses tidak lanjut sampai diperbaiki.
 5. Akun pengurus dibuat otomatis (`NIS@daarululuumlido.com`, password sementara acak yang ditampilkan sekali ke Sekretaris untuk diserahkan).
 6. **Moderator** menerapkan preset & Manajemen Akses tiap pengurus.
 

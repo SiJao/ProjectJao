@@ -813,5 +813,19 @@ export const MIGRATIONS = [
       // Akun dihapus: jejaknya di riwayat tetap bernama ("Nama (akun dihapus)") walau user_id dikosongkan.
       `ALTER TABLE riwayat_perubahan ADD COLUMN oleh_terhapus TEXT`
     ]
+  },
+  {
+    id: 10,
+    nama: "akses-jabatan",
+    sql: [
+      // Daftar jabatan (tambah, aktif/nonaktif) bisa diberikan ke selain Moderator; bawaan preset Sekretaris (K-115). Hapus tetap Moderator.
+      `INSERT OR IGNORE INTO akses (kode, nama, keterangan) VALUES ('jabatan','Daftar jabatan','Menambah dan menonaktifkan jabatan pengurus di lingkungan sendiri')`,
+      `INSERT OR IGNORE INTO preset_akses (preset_id, akses_kode) SELECT id, 'jabatan' FROM preset WHERE nama = 'Sekretaris'`,
+      `UPDATE preset SET keterangan = 'Absensi, kegiatan, prestasi, rapor, tata warkat, pengumuman, isi pengurus, daftar jabatan, riwayat'
+        WHERE nama = 'Sekretaris' AND keterangan = 'Absensi, kegiatan, prestasi, rapor, tata warkat, pengumuman, isi pengurus, riwayat'`,
+      // akun yang memakai preset Sekretaris langsung ikut mendapat akses ini
+      `INSERT OR IGNORE INTO user_akses (user_id, akses_kode) SELECT u.id, 'jabatan' FROM users u JOIN preset p ON p.id = u.preset_id
+        WHERE p.nama = 'Sekretaris' AND u.status = 'aktif'`
+    ]
   }
 ];

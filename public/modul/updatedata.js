@@ -313,6 +313,10 @@
     setup(props, { emit }) {
       const f = reactive({ cara: "pilih", pengurus: [], jabatan: [], santri: [], kelas_id: "", q: "", qp: "", centang: {}, jab: "", rows: [], p: null, baru: "", ling: "semua", galat: "", ok: "", sibuk: false, sandi: null });
       const moderator = computed(() => negara.me.role === "moderator");
+      // daftar jabatan: Moderator atau akses "jabatan" (bawaan Sekretaris, K-115) — selain Moderator hanya lingkungan sendiri
+      const bisaJabatan = computed(() => moderator.value || !!negara.me.bisa.jabatan);
+      const lingJabatan = computed(() => (moderator.value || negara.me.lingkungan === "semua" ? ["semua", "putra", "putri"] : [negara.me.lingkungan]));
+      if (!lingJabatan.value.includes(f.ling)) f.ling = lingJabatan.value[0];
       const kelas5 = computed(() => ((negara.master || {}).kelas || []).filter((k) => k.tingkat === 5));
       const muat = () => coba(f, async () => { const r = await api("/updatedata/pengurus"); f.pengurus = r.pengurus; f.jabatan = r.jabatan; });
       const muatSantri = () => coba(f, async () => {
@@ -344,7 +348,7 @@
       const templat = () => unduhCsv("templat-pengurus.csv", [["NIS", "JABATAN"], ["990101", "Bagian Keamanan"]]);
       const lencanaAkun = (p) => p.user_status === "aktif" ? "hijau" : p.user_status === "tertahan" ? "kuning" : "merah";
       onMounted(async () => { await muatMaster(); await muat(); muatSantri(); });
-      return { f, moderator, kelas5, tampil, terpilih, jabatanAktif, pengurusTampil, dariPilihan, pilihFile, simpan, tambahJabatan, ubahJabatan, hapusJabatan, templat, lencanaAkun, namaKelas };
+      return { f, moderator, bisaJabatan, lingJabatan, kelas5, tampil, terpilih, jabatanAktif, pengurusTampil, dariPilihan, pilihFile, simpan, tambahJabatan, ubahJabatan, hapusJabatan, templat, lencanaAkun, namaKelas };
     },
     template: `<div v-if="!info.masa_khidmat" class="pesan info">Belum ada masa khidmat aktif. Moderator membuatnya di tab Masa Khidmat & Serah Terima.</div>
     <div class="kartu" style="display:flex;flex-direction:column;gap:12px">
@@ -387,13 +391,13 @@
           <td><span class="lencana" :class="{kuning: !p.jumlah_akses}">{{ p.preset || (p.jumlah_akses ? 'Akses manual' : 'Belum ada akses') }}</span></td></tr></tbody></table>
         <p v-if="!pengurusTampil.length" class="redup" style="padding:14px">Belum ada pengurus.</p></div>
     </div>
-    <div v-if="moderator" class="kartu" style="display:flex;flex-direction:column;gap:10px">
+    <div v-if="bisaJabatan" class="kartu" style="display:flex;flex-direction:column;gap:10px">
       <h2>Daftar jabatan</h2>
       <div class="baris"><label class="isian" style="flex:2 1 200px">Jabatan baru<input v-model="f.baru" @keyup.enter="tambahJabatan"></label>
-        <label class="isian">Lingkungan<select v-model="f.ling"><option>semua</option><option>putra</option><option>putri</option></select></label><button :disabled="!f.baru" @click="tambahJabatan">Tambah</button></div>
+        <label class="isian">Lingkungan<select v-model="f.ling"><option v-for="l in lingJabatan" :key="l">{{ l }}</option></select></label><button :disabled="!f.baru" @click="tambahJabatan">Tambah</button></div>
       <div class="tabel"><table><thead><tr><th>Jabatan</th><th>Lingkungan</th><th>Status</th></tr></thead>
         <tbody><tr v-for="j in f.jabatan" :key="j.id"><td><strong>{{ j.nama }}</strong></td><td>{{ j.lingkungan }}</td>
-          <td style="white-space:nowrap"><button class="kecil" :class="j.aktif ? '' : 'kedua'" @click="ubahJabatan(j)">{{ j.aktif ? 'Aktif' : 'Nonaktif' }}</button> <button v-if="moderator" class="bahaya kecil" @click="hapusJabatan(j)">Hapus</button></td></tr></tbody></table></div>
+          <td style="white-space:nowrap"><button class="kecil" :class="j.aktif ? '' : 'kedua'" :disabled="!moderator && !lingJabatan.includes(j.lingkungan)" :title="!moderator && !lingJabatan.includes(j.lingkungan) ? 'Jabatan lingkungan lain — hanya Moderator' : ''" @click="ubahJabatan(j)">{{ j.aktif ? 'Aktif' : 'Nonaktif' }}</button> <button v-if="moderator" class="bahaya kecil" @click="hapusJabatan(j)">Hapus</button></td></tr></tbody></table></div>
       <p class="redup">Moderator bisa menghapus jabatan yang belum pernah diisi; yang sudah dipakai cukup dinonaktifkan.</p>
     </div>`,
   };

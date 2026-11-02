@@ -469,19 +469,24 @@ export default function (H) {
     return json({ ok: true, jumlah: p.siap.length, sandi });
   });
 
-  // Master jabatan (Moderator): tambah, nonaktifkan / aktifkan.
+  // Master jabatan (Moderator atau akses "jabatan", bawaan Sekretaris — K-115): tambah, nonaktifkan / aktifkan.
+  // Selain Moderator hanya lingkungan sendiri; jabatan 'semua' hanya bagi pemegang kedua lingkungan. Hapus tetap lewat /api/hapus (Moderator).
   on("POST", "/api/updatedata/jabatan", async ({ db, u, body }) => {
-    wajibModerator(u);
+    if (!boleh(u, "jabatan")) gagal(403, "Anda tidak punya akses mengedit daftar jabatan.");
+    const bolehLing = (l) => u.role === "moderator" || (l === "semua" ? u.ling.length === 2 : u.ling.includes(l));
     if (body.id) {
       const j = await db.prepare("SELECT * FROM jabatan WHERE id = ?").bind(+body.id).first();
       if (!j) gagal(404, "Jabatan tidak ditemukan.");
+      if (!bolehLing(j.lingkungan)) gagal(403, "Jabatan ini milik lingkungan lain.");
       const aktif = body.aktif ? 1 : 0;
       await db.prepare("UPDATE jabatan SET aktif = ? WHERE id = ?").bind(aktif, j.id).run();
       await H.catat(db, u, "jabatan", aktif ? "aktifkan_jabatan" : "nonaktifkan_jabatan", "jabatan", j.id, j.nama, j.lingkungan);
       return json({ ok: true });
     }
     const nama = bersih(body.nama, 80);
-    const ling = ["putra", "putri", "semua"].includes(body.lingkungan) ? body.lingkungan : "semua";
+    // bawaan: 'semua' bagi Moderator / pemegang dua lingkungan, selain itu lingkungan pengguna sendiri
+    const ling = ["putra", "putri", "semua"].includes(body.lingkungan) ? body.lingkungan : u.role === "moderator" || u.ling.length === 2 ? "semua" : u.ling[0];
+    if (!bolehLing(ling)) gagal(403, "Anda hanya bisa menambah jabatan untuk lingkungan Anda.");
     if (!nama) gagal(400, "Nama jabatan wajib diisi.");
     const urut = await db.prepare("SELECT COALESCE(MAX(urutan),0)+1 n FROM jabatan").first();
     const r = await db.prepare("INSERT INTO jabatan (nama, lingkungan, urutan) VALUES (?,?,?)").bind(nama, ling, urut.n).run();

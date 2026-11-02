@@ -156,7 +156,7 @@ async function penggunaDariSesi(db, req) {
 // Moderator adalah status khusus (users.role = 'moderator') = semua akses. "lihat_X" otomatis dimiliki siapa pun yang punya X.
 const KEMAMPUAN = ["absensi", "lihat_absensi", "perizinan", "lihat_perizinan", "kesehatan", "pemeriksaan", "profil_kesehatan",
   "input_pelanggaran", "putusan_kedisiplinan", "lihat_vonis", "kegiatan", "prestasi", "lihat_prestasi", "rapor", "lihat_rapor",
-  "tata_warkat", "pengumuman", "isi_pengurus", "update_kamar", "paw", "riwayat"];
+  "tata_warkat", "pengumuman", "isi_pengurus", "jabatan", "update_kamar", "paw", "riwayat"];
 // lihat_vonis tidak punya kode "vonis": pemegangnya adalah pemutus (hakim).
 const LIHAT_DARI = { lihat_vonis: "putusan_kedisiplinan" };
 const boleh = (u, kode) => u.role === "moderator" || u.akses.includes(kode)
